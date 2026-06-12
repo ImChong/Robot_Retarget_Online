@@ -21,9 +21,11 @@ export default defineConfig({
     chunkSizeWarningLimit: 12000,
     rollupOptions: {
       output: {
+        // NOTE: do not force mujoco-js into a manual chunk — it must stay a
+        // purely dynamic chunk so the 11 MB wasm bundle is not modulepreloaded
+        // on first paint.
         manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('mujoco-js')) return 'vendor-mujoco';
+          if (id.includes('node_modules') && !id.includes('mujoco-js')) {
             if (id.includes('three')) return 'vendor-three';
             if (id.includes('vuetify')) return 'vendor-vuetify';
             return 'vendor';

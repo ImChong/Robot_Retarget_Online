@@ -172,6 +172,7 @@ function buildMeshGeometry(model: MjModel, meshId: number): THREE.BufferGeometry
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(verts, 3));
   geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-  geometry.setIndex(new THREE.BufferAttribute(faces, 1));
+  // WebGL element indices must be unsigned; mesh_face comes as Int32Array.
+  geometry.setIndex(new THREE.BufferAttribute(Uint32Array.from(faces), 1));
   return geometry;
 }

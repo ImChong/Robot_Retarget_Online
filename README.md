@@ -35,6 +35,22 @@ No backend, no installation.
   `root_rot` (xyzw), `dof_pos`); `scripts/npz_to_pkl.py` converts to the exact
   GMR pickle format. CSV/JSON also available.
 
+## Validation · 数值验证
+
+The web engine is validated against the original Python GMR
+(`tests/parity.test.ts` + `scripts/gmr_reference.py`): on the bundled walk
+sample retargeted to Unitree G1, frame-0 preprocessed IK targets match GMR to
+~1e-9, and the full-motion output agrees within **0.019 rad DoF RMSE / 0.27 cm
+root RMSE** (differences stem from the damped Gauss–Newton step vs. mink's
+daqp QP). Throughput in-browser is ~700–800 frames/s vs ~34 frames/s for the
+Python pipeline on the same machine.
+
+```bash
+# regenerate the reference and run the parity test locally
+python3 scripts/gmr_reference.py public/sample_motions/walk.bvh unitree_g1 /tmp/gmr_ref_walk_g1.json
+npx vitest run tests/parity.test.ts
+```
+
 ## Develop
 
 ```bash

@@ -41,10 +41,11 @@ async function waitForServer(url, timeoutMs = 30000) {
 
 mkdirSync(OUT_DIR, { recursive: true });
 
-const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], {
-  stdio: 'pipe',
-});
-server.stderr.on('data', (d) => process.stderr.write(d));
+const server = spawn(
+  process.execPath,
+  ['node_modules/vite/bin/vite.js', 'preview', '--port', String(PORT), '--strictPort'],
+  { stdio: 'ignore', detached: true },
+);
 
 const errors = [];
 let browser;
@@ -61,6 +62,10 @@ try {
     if (msg.type() === 'error') errors.push(msg.text());
   });
   page.on('pageerror', (err) => errors.push(String(err)));
+  page.on('requestfailed', (req) => errors.push(`request failed: ${req.url()}`));
+  page.on('response', (res) => {
+    if (res.status() >= 400) errors.push(`HTTP ${res.status()}: ${res.url()}`);
+  });
 
   // ---- Page 1: BVH viewer + sample motion ----
   await page.goto(`http://localhost:${PORT}/#/bvh`);
@@ -98,7 +103,7 @@ try {
   console.log('stats:', stats.join(' | '));
 
   const fatal = errors.filter(
-    (e) => !e.includes('favicon') && !e.includes('WebGL') && !e.includes('GroupMarkerNotSet'),
+    (e) => !e.includes('favicon') && !e.includes('GroupMarkerNotSet'),
   );
   if (fatal.length) {
     console.log('console errors:');
@@ -121,5 +126,10 @@ try {
   process.exitCode = 1;
 } finally {
   await browser?.close();
-  server.kill();
+  try {
+    process.kill(-server.pid, 'SIGKILL'); // kill the whole preview process group
+  } catch {
+    server.kill('SIGKILL');
+  }
+  process.exit(process.exitCode ?? 0);
 }
