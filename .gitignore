@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+*.log
+.vite/
+coverage/
+probe*.mjs

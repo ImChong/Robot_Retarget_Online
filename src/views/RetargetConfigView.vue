@@ -1,0 +1,353 @@
+<script setup lang="ts">
+import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
+import * as THREE from 'three';
+import { mdiDownload, mdiUpload, mdiBackupRestore } from '@mdi/js';
+import { useI18n } from '@/i18n';
+import { useMotionStore } from '@/stores/motion';
+import { useRetargetStore } from '@/stores/retarget';
+import { getRobotManifest, loadRobot, type RobotManifestEntry, type RobotModel } from '@/lib/mujoco/runtime';
+import { buildRobotScene, type RobotSceneObject } from '@/lib/mujoco/threeScene';
+import { SceneManager } from '@/lib/viewport/SceneManager';
+import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
+import MappingTable from '@/components/MappingTable.vue';
+import { downloadBlob } from '@/lib/export/motion';
+
+const { t } = useI18n();
+const motion = useMotionStore();
+const store = useRetargetStore();
+
+const viewportEl = ref<HTMLElement | null>(null);
+const sceneManager = shallowRef<SceneManager | null>(null);
+const robotScene = shallowRef<RobotSceneObject | null>(null);
+const robotModel = shallowRef<RobotModel | null>(null);
+const skeleton = shallowRef<SkeletonView | null>(null);
+const lines = shallowRef<THREE.LineSegments | null>(null);
+const manifest = ref<RobotManifestEntry[]>([]);
+const loading = ref(false);
+const loadingText = ref('');
+const showLines = ref(true);
+const showHuman = ref(true);
+const highlightBody = ref<string | null>(null);
+const importInput = ref<HTMLInputElement | null>(null);
+const activeTab = ref('stage1');
+
+const ROBOT_X = 0.55;
+const HUMAN_X = -0.65;
+
+const robotItems = computed(() =>
+  manifest.value.map((m) => ({ title: m.label, value: m.id })),
+);
+
+async function ensureRobotScene() {
+  const sm = sceneManager.value;
+  if (!sm) return;
+  loading.value = true;
+  loadingText.value = t('loadingMujoco');
+  try {
+    const robot = await loadRobot(store.robotId, (done, total) => {
+      loadingText.value = `${t('loadingRobot')} ${done}/${total}`;
+    });
+    robotModel.value = robot;
+    robotScene.value?.dispose();
+    const scene = buildRobotScene(robot);
+    scene.root.position.x = ROBOT_X;
+    // default pose FK
+    (robot.data.qpos as Float64Array).set(robot.model.qpos0 as Float64Array);
+    robot.mujoco.mj_kinematics(robot.model, robot.data);
+    scene.update(robot.data);
+    sm.scene.add(scene.root);
+    robotScene.value = scene;
+    refreshLines();
+  } catch (err) {
+    loadingText.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    loading.value = false;
+  }
+}
+
+function rebuildSkeleton() {
+  const sm = sceneManager.value;
+  if (!sm) return;
+  skeleton.value?.dispose();
+  skeleton.value = null;
+  if (!motion.anim || !showHuman.value) {
+    refreshLines();
+    return;
+  }
+  const sk = buildSkeletonView(motion.anim, motion.unitScale);
+  sk.root.position.x = HUMAN_X;
+  sk.setFrame(0);
+  sm.scene.add(sk.root);
+  skeleton.value = sk;
+  refreshLines();
+}
+
+/** Correspondence lines between mapped robot bodies and human joints. */
+function refreshLines() {
+  const sm = sceneManager.value;
+  if (!sm) return;
+  if (lines.value) {
+    lines.value.geometry.dispose();
+    (lines.value.material as THREE.Material).dispose();
+    lines.value.removeFromParent();
+    lines.value = null;
+  }
+  if (!showLines.value || !robotScene.value || !skeleton.value || !robotModel.value || !motion.anim) return;
+
+  const robot = robotModel.value;
+  const jointIndex = new Map(motion.anim.joints.map((j, i) => [j.name, i]));
+  // virtual FootMod joints sit at the foot joints
+  if (jointIndex.has('LeftFoot')) jointIndex.set('LeftFootMod', jointIndex.get('LeftFoot')!);
+  if (jointIndex.has('RightFoot')) jointIndex.set('RightFootMod', jointIndex.get('RightFoot')!);
+
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const tmp = new THREE.Vector3();
+  const stageColor: Record<string, THREE.Color> = {
+    stage1: new THREE.Color(0x4fc3f7),
+    stage2: new THREE.Color(0xffb74d),
+  };
+  const tables: [Record<string, [string, number, number, number[], number[]]>, string][] = [
+    [store.config.ik_match_table1, 'stage1'],
+    [store.config.ik_match_table2, 'stage2'],
+  ];
+  const active = activeTab.value === 'stage2' ? 1 : 0;
+  const [table, stage] = tables[active];
+  const color = stageColor[stage];
+  const hl = highlightBody.value;
+  for (const [robotBody, entry] of Object.entries(table)) {
+    const humanJoint = entry[0];
+    const bodyId = robot.bodyIds.get(robotBody);
+    const jIdx = jointIndex.get(humanJoint);
+    if (bodyId === undefined || jIdx === undefined) continue;
+    const group = robotScene.value.bodyGroups.get(bodyId);
+    if (!group) continue;
+    group.getWorldPosition(tmp);
+    positions.push(tmp.x, tmp.y, tmp.z);
+    skeleton.value.getJointWorldPos(jIdx, tmp);
+    positions.push(tmp.x, tmp.y, tmp.z);
+    const c = robotBody === hl ? new THREE.Color(0xffffff) : color;
+    colors.push(c.r, c.g, c.b, c.r, c.g, c.b);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const mat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 });
+  const seg = new THREE.LineSegments(geo, mat);
+  seg.renderOrder = 10;
+  sm.scene.add(seg);
+  lines.value = seg;
+}
+
+function onExportConfig() {
+  const blob = new Blob([store.exportConfigJson()], { type: 'application/json' });
+  downloadBlob(blob, `ik_config_${store.robotId}.json`);
+}
+
+function onImportChosen(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  file.text().then((text) => {
+    try {
+      store.importConfigJson(text);
+    } catch (err) {
+      loadingText.value = err instanceof Error ? err.message : String(err);
+    }
+  });
+  (e.target as HTMLInputElement).value = '';
+}
+
+watch(() => store.robotId, ensureRobotScene);
+watch(() => motion.anim, rebuildSkeleton);
+watch([showLines, showHuman, activeTab, highlightBody], () => {
+  if (showHuman.value && !skeleton.value) rebuildSkeleton();
+  else if (!showHuman.value && skeleton.value) rebuildSkeleton();
+  else refreshLines();
+});
+watch(
+  () => store.config,
+  () => refreshLines(),
+  { deep: true },
+);
+
+onMounted(async () => {
+  manifest.value = await getRobotManifest().catch(() => []);
+  const sm = new SceneManager(viewportEl.value!, {
+    cameraPos: [0, -3.1, 1.7],
+    target: [0, 0, 0.85],
+  });
+  sm.start();
+  sceneManager.value = sm;
+  rebuildSkeleton();
+  await ensureRobotScene();
+});
+
+onActivated(() => sceneManager.value?.start());
+onDeactivated(() => sceneManager.value?.stop());
+onUnmounted(() => {
+  skeleton.value?.dispose();
+  robotScene.value?.dispose();
+  sceneManager.value?.dispose();
+});
+</script>
+
+<template>
+  <div class="page-root d-flex">
+    <input ref="importInput" type="file" accept=".json" class="d-none" @change="onImportChosen" />
+
+    <!-- Left panel -->
+    <div class="side-panel pa-3 d-flex flex-column ga-3">
+      <v-select
+        v-model="store.robotId"
+        :items="robotItems"
+        :label="t('robot')"
+        @update:model-value="(v: string) => store.setRobot(v)"
+      />
+
+      <v-card variant="tonal" density="compact">
+        <v-card-title class="text-subtitle-2">{{ t('globalParams') }}</v-card-title>
+        <v-card-text class="d-flex flex-column ga-2">
+          <v-text-field
+            v-model.number="store.solver.actualHumanHeight"
+            type="number"
+            step="0.01"
+            :label="t('actualHumanHeight')"
+          />
+          <v-text-field
+            :model-value="store.config.human_height_assumption"
+            type="number"
+            step="0.01"
+            :label="t('heightAssumption')"
+            @update:model-value="(v: string) => (store.config.human_height_assumption = parseFloat(v) || 1.8)"
+          />
+          <v-text-field
+            v-model.number="store.solver.groundOffset"
+            type="number"
+            step="0.01"
+            :label="t('groundHeight')"
+          />
+        </v-card-text>
+      </v-card>
+
+      <v-card variant="tonal" density="compact">
+        <v-card-title class="text-subtitle-2">{{ t('solverParams') }}</v-card-title>
+        <v-card-text class="d-flex flex-column ga-2">
+          <v-text-field v-model.number="store.solver.damping" type="number" step="0.1" :label="t('damping')" />
+          <v-text-field v-model.number="store.solver.maxIter" type="number" step="1" :label="t('maxIter')" />
+          <v-switch
+            v-model="store.solver.useVelocityLimit"
+            :label="t('velocityLimit')"
+            color="primary"
+            density="compact"
+            hide-details
+          />
+        </v-card-text>
+      </v-card>
+
+      <div class="d-flex flex-column ga-2">
+        <v-btn variant="tonal" :prepend-icon="mdiUpload" @click="importInput?.click()">
+          {{ t('importConfig') }}
+        </v-btn>
+        <v-btn variant="tonal" :prepend-icon="mdiDownload" @click="onExportConfig">
+          {{ t('exportConfig') }}
+        </v-btn>
+        <v-btn variant="text" color="warning" :prepend-icon="mdiBackupRestore" @click="store.resetConfig()">
+          {{ t('resetConfig') }}
+        </v-btn>
+      </div>
+
+      <div class="text-caption text-medium-emphasis">{{ t('configHint') }}</div>
+
+      <v-switch v-model="showHuman" :label="t('showHuman')" color="primary" density="compact" hide-details />
+      <v-switch v-model="showLines" :label="t('showLines')" color="primary" density="compact" hide-details />
+      <div v-if="!motion.hasMotion" class="text-caption text-warning">{{ t('noMotionHint') }}</div>
+    </div>
+
+    <!-- Right: viewport + tables -->
+    <div class="d-flex flex-column flex-grow-1" style="min-width: 0">
+      <div ref="viewportEl" class="viewport" />
+      <div v-if="loading || loadingText" class="loading-strip text-caption px-3 py-1">
+        <v-progress-circular v-if="loading" indeterminate size="12" width="2" class="mr-2" />
+        {{ loadingText }}
+      </div>
+
+      <div class="tables-panel">
+        <v-tabs v-model="activeTab" density="compact" color="primary">
+          <v-tab value="stage1">{{ t('stage1') }}</v-tab>
+          <v-tab value="stage2">{{ t('stage2') }}</v-tab>
+          <v-tab value="scale">{{ t('scaleTable') }}</v-tab>
+        </v-tabs>
+        <div class="table-scroll">
+          <MappingTable
+            v-if="activeTab === 'stage1'"
+            :table="store.config.ik_match_table1"
+            :human-joints="motion.jointNames"
+            @highlight="(b) => (highlightBody = b)"
+          />
+          <MappingTable
+            v-else-if="activeTab === 'stage2'"
+            :table="store.config.ik_match_table2"
+            :human-joints="motion.jointNames"
+            @highlight="(b) => (highlightBody = b)"
+          />
+          <v-table v-else density="compact">
+            <thead>
+              <tr>
+                <th>{{ t('humanJoint') }}</th>
+                <th style="width: 140px">Scale</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(value, key) in store.config.human_scale_table" :key="key">
+                <td class="mono">{{ key }}</td>
+                <td>
+                  <v-text-field
+                    :model-value="value"
+                    type="number"
+                    step="0.05"
+                    @update:model-value="(v: string) => (store.config.human_scale_table[key] = parseFloat(v) || 0)"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.page-root {
+  height: calc(100vh - 64px);
+}
+.side-panel {
+  width: 300px;
+  min-width: 300px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-y: auto;
+}
+.viewport {
+  flex: 1 1 55%;
+  min-height: 0;
+  position: relative;
+}
+.tables-panel {
+  flex: 1 1 45%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.table-scroll {
+  overflow-y: auto;
+  flex: 1;
+}
+.loading-strip {
+  background: rgba(79, 195, 247, 0.08);
+}
+.mono {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.82rem;
+}
+</style>
