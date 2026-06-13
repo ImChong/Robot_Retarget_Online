@@ -5,11 +5,35 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { THEME_CHANGE_EVENT, type AppTheme } from '@/composables/useAppTheme';
 
 export interface SceneManagerOptions {
   cameraPos?: [number, number, number];
   target?: [number, number, number];
   floor?: boolean;
+}
+
+const VIEWPORT_THEMES = {
+  dark: {
+    background: 0x16181d,
+    fogNear: 14,
+    fogFar: 34,
+    floor: ['#23262c', '#2b2f37'] as const,
+  },
+  light: {
+    background: 0xe8eaef,
+    fogNear: 18,
+    fogFar: 42,
+    floor: ['#d8dce3', '#c8cdd6'] as const,
+  },
+} as const;
+
+function readStoredTheme(): AppTheme {
+  try {
+    return localStorage.getItem('rro-theme') === 'light' ? 'light' : 'dark';
+  } catch {
+    return 'dark';
+  }
 }
 
 export class SceneManager {
@@ -23,13 +47,14 @@ export class SceneManager {
   private running = false;
   private clock = new THREE.Clock();
   private tickCallbacks = new Set<(dt: number) => void>();
+  private floorMesh: THREE.Mesh | null = null;
+  private themeListener: ((event: Event) => void) | null = null;
 
   constructor(container: HTMLElement, options: SceneManagerOptions = {}) {
     this.container = container;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x16181d);
-    this.scene.fog = new THREE.Fog(0x16181d, 14, 34);
+    this.applyTheme(readStoredTheme());
 
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.01, 120);
     this.camera.up.set(0, 0, 1); // Z-up
@@ -73,7 +98,16 @@ export class SceneManager {
     dir.shadow.bias = -0.0002;
     this.scene.add(dir);
 
-    if (options.floor !== false) this.scene.add(makeCheckerFloor());
+    if (options.floor !== false) {
+      this.floorMesh = makeCheckerFloor(readStoredTheme());
+      this.scene.add(this.floorMesh);
+    }
+
+    this.themeListener = (event: Event) => {
+      const theme = (event as CustomEvent<{ theme: AppTheme }>).detail.theme;
+      this.applyTheme(theme);
+    };
+    window.addEventListener(THEME_CHANGE_EVENT, this.themeListener);
 
     this.resizeObserver = new ResizeObserver(() => this.onResize());
     this.resizeObserver.observe(container);
@@ -120,6 +154,10 @@ export class SceneManager {
 
   dispose() {
     this.stop();
+    if (this.themeListener) {
+      window.removeEventListener(THEME_CHANGE_EVENT, this.themeListener);
+      this.themeListener = null;
+    }
     this.resizeObserver.disconnect();
     this.controls.dispose();
     this.renderer.dispose();
@@ -132,16 +170,28 @@ export class SceneManager {
       else mat?.dispose();
     });
   }
+
+  applyTheme(theme: AppTheme) {
+    const palette = VIEWPORT_THEMES[theme];
+    this.scene.background = new THREE.Color(palette.background);
+    this.scene.fog = new THREE.Fog(palette.background, palette.fogNear, palette.fogFar);
+
+    if (!this.floorMesh) return;
+    const floorMat = this.floorMesh.material as THREE.MeshStandardMaterial;
+    const oldMap = floorMat.map;
+    floorMat.map = makeCheckerTexture(theme);
+    floorMat.needsUpdate = true;
+    oldMap?.dispose();
+  }
 }
 
-function makeCheckerFloor(): THREE.Mesh {
+function makeCheckerTexture(theme: AppTheme): THREE.CanvasTexture {
   const size = 256;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d')!;
-  const c0 = '#23262c';
-  const c1 = '#2b2f37';
+  const [c0, c1] = VIEWPORT_THEMES[theme].floor;
   const n = 8;
   const cell = size / n;
   for (let i = 0; i < n; i++) {
@@ -157,6 +207,12 @@ function makeCheckerFloor(): THREE.Mesh {
   texture.repeat.set(repeats, repeats);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
+  return texture;
+}
+
+function makeCheckerFloor(theme: AppTheme): THREE.Mesh {
+  const texture = makeCheckerTexture(theme);
+  const repeats = 14;
 
   const geo = new THREE.PlaneGeometry(repeats * 2, repeats * 2);
   const mat = new THREE.MeshStandardMaterial({

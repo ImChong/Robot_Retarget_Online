@@ -4,6 +4,13 @@ import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg';
 
+const THEME_STORAGE_KEY = 'rro-theme';
+const stored =
+  typeof localStorage !== 'undefined'
+    ? (localStorage.getItem(THEME_STORAGE_KEY) as 'dark' | 'light' | null)
+    : null;
+const initialTheme = stored === 'light' ? 'light' : 'dark';
+
 export default createVuetify({
   components,
   directives,
@@ -13,7 +20,7 @@ export default createVuetify({
     sets: { mdi },
   },
   theme: {
-    defaultTheme: 'dark',
+    defaultTheme: initialTheme,
     themes: {
       dark: {
         dark: true,
@@ -27,6 +34,20 @@ export default createVuetify({
           warning: '#ffa726',
           error: '#ef5350',
           info: '#29b6f6',
+        },
+      },
+      light: {
+        dark: false,
+        colors: {
+          background: '#f5f6f8',
+          surface: '#ffffff',
+          'surface-light': '#eef0f3',
+          primary: '#0288d1',
+          secondary: '#7e57c2',
+          success: '#43a047',
+          warning: '#fb8c00',
+          error: '#e53935',
+          info: '#039be5',
         },
       },
     },

@@ -83,6 +83,8 @@ const messages: Record<string, { zh: string; en: string }> = {
   sourceMotion: { zh: '源动作', en: 'Source motion' },
   followCamera: { zh: '跟随相机', en: 'Follow camera' },
   openPanel: { zh: '打开控制面板', en: 'Open control panel' },
+  themeDark: { zh: '切换到白天模式', en: 'Switch to light mode' },
+  themeLight: { zh: '切换到黑夜模式', en: 'Switch to dark mode' },
 };
 
 const stored =
