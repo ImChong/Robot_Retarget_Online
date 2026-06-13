@@ -31,7 +31,7 @@ void locale.value;
 
 <template>
   <v-app>
-    <v-app-bar density="comfortable" flat border>
+    <v-app-bar density="comfortable" flat border class="app-bar">
       <v-app-bar-title class="app-title">
         <v-icon :icon="mdiRobotExcited" color="primary" class="mr-2" />
         <span class="font-weight-bold d-none d-sm-inline">{{ t('appTitle') }}</span>
@@ -40,29 +40,31 @@ void locale.value;
         </span>
       </v-app-bar-title>
 
-      <v-tabs v-if="mdAndUp" v-model="currentTab" color="primary">
+      <v-tabs v-if="mdAndUp" v-model="currentTab" color="primary" class="app-bar-tabs">
         <v-tab v-for="tab in tabs" :key="tab.value" :value="tab.value">{{ tab.label }}</v-tab>
       </v-tabs>
 
-      <v-spacer />
+      <v-spacer v-if="!mdAndUp" />
 
-      <v-btn
-        :icon="isDark ? mdiWeatherSunny : mdiWeatherNight"
-        variant="text"
-        :aria-label="isDark ? t('themeDark') : t('themeLight')"
-        :title="isDark ? t('themeDark') : t('themeLight')"
-        @click="toggleAppTheme"
-      />
-      <v-btn variant="text" :prepend-icon="mdiTranslate" class="locale-btn" @click="toggleLocale">
-        {{ localeLabel }}
-      </v-btn>
-      <v-btn
-        :icon="mdiGithub"
-        variant="text"
-        href="https://github.com/ImChong/Robot_Retarget_Online"
-        target="_blank"
-        rel="noopener"
-      />
+      <div class="app-bar-actions">
+        <v-btn
+          :icon="isDark ? mdiWeatherSunny : mdiWeatherNight"
+          variant="text"
+          :aria-label="isDark ? t('themeDark') : t('themeLight')"
+          :title="isDark ? t('themeDark') : t('themeLight')"
+          @click="toggleAppTheme"
+        />
+        <v-btn variant="text" :prepend-icon="mdiTranslate" class="locale-btn" @click="toggleLocale">
+          {{ localeLabel }}
+        </v-btn>
+        <v-btn
+          :icon="mdiGithub"
+          variant="text"
+          href="https://github.com/ImChong/Robot_Retarget_Online"
+          target="_blank"
+          rel="noopener"
+        />
+      </div>
     </v-app-bar>
 
     <v-bottom-navigation v-if="!mdAndUp" v-model="currentTab" grow color="primary" class="bottom-nav">
@@ -109,6 +111,26 @@ void locale.value;
 .app-title {
   flex: 0 0 auto;
   min-width: 0;
+}
+
+@media (min-width: 960px) {
+  .app-bar :deep(.v-toolbar__content) {
+    position: relative;
+  }
+
+  .app-bar-tabs {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+  }
+
+  .app-bar-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+  }
 }
 
 .bottom-nav {
