@@ -12,18 +12,49 @@ export type MjModel = any;
 export type MjData = any;
 
 let mujocoPromise: Promise<MujocoModule> | null = null;
+let mujocoInstance: MujocoModule | null = null;
+let activeRobotKey: string | null = null;
 
 export function getMujoco(): Promise<MujocoModule> {
   if (!mujocoPromise) {
     mujocoPromise = (async () => {
       const mod = await import('mujoco-js');
       const mujoco = await mod.default();
+      mujocoInstance = mujoco;
       mujoco.FS.mkdir('/working');
       mujoco.FS.mount(mujoco.MEMFS, { root: '.' }, '/working');
       return mujoco;
     })();
   }
   return mujocoPromise;
+}
+
+/**
+ * Tear down the singleton MuJoCo WASM module so the next load gets a fresh heap.
+ * MuJoCo mesh compilation can temporarily need multiple GB; `model.delete()` alone
+ * does not shrink the Emscripten heap enough to load another full humanoid.
+ */
+export async function resetMujocoModule() {
+  for (const [id, robot] of [...loadedRobots.entries()]) {
+    disposeRobotModel(robot);
+    loadedRobots.delete(id);
+    if (mujocoInstance) removeVfsTree(mujocoInstance, robotVfsDir(id));
+  }
+
+  const { clearCustomRobotCache } = await import('./customRobot');
+  clearCustomRobotCache();
+
+  if (mujocoInstance) {
+    try {
+      mujocoInstance.FS.unmount('/working');
+    } catch {
+      // ignore
+    }
+  }
+
+  mujocoInstance = null;
+  mujocoPromise = null;
+  activeRobotKey = null;
 }
 
 export interface RobotManifestEntry {
@@ -54,6 +85,62 @@ export interface RobotModel {
 const loadedRobots = new Map<string, RobotModel>();
 let manifestCache: RobotManifestEntry[] | null = null;
 
+/** Release MuJoCo WASM allocations held by a loaded robot. */
+export function disposeRobotModel(robot: RobotModel) {
+  robot.data?.delete?.();
+  robot.model?.delete?.();
+}
+
+function robotVfsDir(robotId: string): string {
+  return `/working/robots/${robotId}`;
+}
+
+/** Remove a path from the MuJoCo MEMFS tree (files or directories). */
+export function removeVfsTree(mujoco: MujocoModule, path: string) {
+  try {
+    if (!mujoco.FS.analyzePath(path).exists) return;
+    const stat = mujoco.FS.stat(path);
+    if (mujoco.FS.isDir(stat.mode)) {
+      for (const entry of mujoco.FS.readdir(path) as string[]) {
+        if (entry === '.' || entry === '..') continue;
+        removeVfsTree(mujoco, `${path}/${entry}`);
+      }
+      mujoco.FS.rmdir(path);
+    } else {
+      mujoco.FS.unlink(path);
+    }
+  } catch {
+    // Best-effort cleanup; missing paths are fine.
+  }
+}
+
+/** Drop a built-in robot from the in-memory cache and free its WASM assets. */
+export function unloadRobot(robotId: string) {
+  const cached = loadedRobots.get(robotId);
+  if (!cached) return;
+  disposeRobotModel(cached);
+  loadedRobots.delete(robotId);
+  removeVfsTree(cached.mujoco, robotVfsDir(robotId));
+}
+
+/** Keep only `keepId` in the built-in robot cache (frees all others). */
+export function unloadOtherRobots(keepId?: string) {
+  for (const id of [...loadedRobots.keys()]) {
+    if (id !== keepId) unloadRobot(id);
+  }
+}
+
+let robotLoadChain: Promise<unknown> = Promise.resolve();
+
+function serializeRobotLoad<T>(fn: () => Promise<T>): Promise<T> {
+  const run = robotLoadChain.then(fn, fn);
+  robotLoadChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 export async function getRobotManifest(): Promise<RobotManifestEntry[]> {
   if (manifestCache) return manifestCache;
   const url = `${import.meta.env.BASE_URL}robots/manifest.json`;
@@ -63,11 +150,32 @@ export async function getRobotManifest(): Promise<RobotManifestEntry[]> {
   return manifestCache;
 }
 
+export async function prepareRobotSlot(
+  robotKey: string,
+  cached: RobotModel | null = null,
+): Promise<RobotModel | null> {
+  if (activeRobotKey === robotKey) {
+    if (cached) return cached;
+    const builtIn = loadedRobots.get(robotKey);
+    if (builtIn) return builtIn;
+  }
+  await resetMujocoModule();
+  activeRobotKey = robotKey;
+  return null;
+}
+
 export async function loadRobot(
   robotId: string,
   onProgress?: (loaded: number, total: number, file: string) => void,
 ): Promise<RobotModel> {
-  const cached = loadedRobots.get(robotId);
+  return serializeRobotLoad(() => loadRobotImpl(robotId, onProgress));
+}
+
+async function loadRobotImpl(
+  robotId: string,
+  onProgress?: (loaded: number, total: number, file: string) => void,
+): Promise<RobotModel> {
+  const cached = await prepareRobotSlot(robotId, loadedRobots.get(robotId) ?? null);
   if (cached) return cached;
 
   const [mujoco, manifest] = await Promise.all([getMujoco(), getRobotManifest()]);
