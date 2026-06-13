@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
+import * as THREE from 'three';
 import { mdiFolderOpen, mdiRun, mdiTune } from '@mdi/js';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
@@ -7,6 +8,7 @@ import { useMotionStore } from '@/stores/motion';
 import { usePlayback } from '@/composables/usePlayback';
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
+import { followOrbitCamera, jointIndexByName } from '@/lib/viewport/sceneAlignment';
 import FileDropZone from '@/components/FileDropZone.vue';
 import PlaybackBar from '@/components/PlaybackBar.vue';
 import JointTreePanel from '@/components/JointTreePanel.vue';
@@ -21,6 +23,7 @@ const viewportEl = ref<HTMLElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const sceneManager = shallowRef<SceneManager | null>(null);
 const skeleton = shallowRef<SkeletonView | null>(null);
+const hipsIndex = ref(-1);
 const selectedJoint = ref<number | null>(null);
 const loadErrorSnack = ref(false);
 const panelOpen = ref(false);
@@ -88,8 +91,26 @@ function rebuildSkeleton() {
   const sk = buildSkeletonView(motion.anim, motion.unitScale);
   sm.scene.add(sk.root);
   skeleton.value = sk;
+  try {
+    hipsIndex.value = jointIndexByName(motion.anim, 'Hips');
+  } catch {
+    hipsIndex.value = 0;
+  }
   playback.setMotion(motion.frameCount, motion.fps);
   playback.state.playing = true;
+  applyFrame(0);
+}
+
+const hipPos = new THREE.Vector3();
+
+function applyFrame(frame: number) {
+  const sk = skeleton.value;
+  const sm = sceneManager.value;
+  if (!sk || hipsIndex.value < 0) return;
+  sk.setFrame(frame);
+  if (!sm) return;
+  sk.getJointWorldPos(hipsIndex.value, hipPos);
+  followOrbitCamera(sm, hipPos);
 }
 
 watch(() => motion.anim, rebuildSkeleton);
@@ -102,7 +123,7 @@ onMounted(() => {
   const sm = new SceneManager(el, { cameraPos: [2.4, -2.6, 1.6], target: [0, 0, 0.9] });
   sm.onTick((dt) => {
     playback.tick(dt);
-    skeleton.value?.setFrame(playback.frameIndex.value);
+    applyFrame(playback.frameIndex.value);
   });
   sm.start();
   sceneManager.value = sm;
