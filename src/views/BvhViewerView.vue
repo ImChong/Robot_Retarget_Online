@@ -147,13 +147,17 @@ onUnmounted(() => {
         {{ t('openBvh') }}
       </v-btn>
 
-      <v-menu>
+      <v-menu
+        :location="mdAndUp ? 'end top' : 'bottom start'"
+        :offset="mdAndUp ? 8 : 0"
+        content-class="sample-menu-panel"
+      >
         <template #activator="{ props: mProps }">
           <v-btn v-bind="mProps" variant="tonal" :prepend-icon="mdiRun" block :loading="sampleLoading">
             {{ t('loadSample') }}
           </v-btn>
         </template>
-        <v-list density="compact">
+        <v-list density="compact" class="sample-menu-list">
           <v-list-item v-for="s in samples" :key="s.file" :title="s.title" @click="loadSample(s.file)" />
         </v-list>
       </v-menu>
@@ -275,5 +279,15 @@ onUnmounted(() => {
   top: 12px;
   left: 12px;
   z-index: 4;
+}
+</style>
+
+<style>
+.sample-menu-panel {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.sample-menu-list {
+  min-width: 260px;
 }
 </style>
