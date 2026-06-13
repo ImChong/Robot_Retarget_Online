@@ -251,6 +251,8 @@ onUnmounted(() => {
     <input ref="importInput" type="file" accept=".json" class="d-none" @change="onImportChosen" />
 
     <MobileSidePanel v-model="panelOpen">
+      <div v-if="!motion.hasMotion" class="text-caption text-warning text-center">{{ t('noMotionHint') }}</div>
+
       <v-select
         :model-value="store.robotId"
         :items="robotItems"
@@ -316,7 +318,6 @@ onUnmounted(() => {
 
       <v-switch v-model="showHuman" :label="t('showHuman')" color="primary" density="compact" hide-details />
       <v-switch v-model="showLines" :label="t('showLines')" color="primary" density="compact" hide-details />
-      <div v-if="!motion.hasMotion" class="text-caption text-warning">{{ t('noMotionHint') }}</div>
     </MobileSidePanel>
 
     <div class="main-col d-flex flex-column flex-grow-1">

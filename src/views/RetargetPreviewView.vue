@@ -140,6 +140,8 @@ onUnmounted(() => {
 <template>
   <div class="page-root d-flex">
     <MobileSidePanel v-model="panelOpen">
+      <div v-if="!motion.hasMotion" class="text-caption text-warning text-center">{{ t('noMotionHint') }}</div>
+
       <v-btn
         v-if="!store.isBusy"
         color="primary"
@@ -154,8 +156,6 @@ onUnmounted(() => {
       <v-btn v-else color="error" variant="tonal" :prepend-icon="mdiStopCircle" block @click="store.cancel()">
         {{ t('cancel') }}
       </v-btn>
-
-      <div v-if="!motion.hasMotion" class="text-caption text-warning">{{ t('noMotionHint') }}</div>
 
       <div v-if="store.status === 'loading-robot'" class="text-caption">
         {{ t('loadingRobot') }} {{ store.robotLoadProgress.done }}/{{ store.robotLoadProgress.total }}
