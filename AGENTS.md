@@ -17,3 +17,14 @@ Non-obvious caveats:
 - `scripts/e2e_smoke.mjs` is an optional headless smoke test that needs Chromium and a prior `npm run build`; it is not part of `npm test`.
 - `mujoco-js` ships an ~11 MB WASM bundle (excluded from Vite dep optimization). The build prints a `Module "module" has been externalized for browser compatibility` warning from `mujoco_wasm.js` and a large-chunk note — both are expected, not errors.
 - To exercise the app end-to-end without uploading files: BVH Viewer → "Loading example actions" → "Walk (sample)", then Retarget Preview → "Start redirection". Bundled samples live in `public/sample_motions/`.
+
+## UI change verification (required)
+
+Any change that affects layout, styling, or visible UI behavior **must** be verified in the browser with a **screenshot** before the task is considered done.
+
+1. Start the app (`npm run dev`) and open http://localhost:3000.
+2. Navigate to the affected view(s) and exercise the changed control(s).
+3. Capture at least one screenshot showing the result (use the `computerUse` subagent or `RecordScreen` when appropriate).
+4. Include the screenshot in the PR walkthrough or final summary so reviewers can see the before/after or fixed state.
+
+Do not rely on code review or unit tests alone for UI fixes — visual confirmation is mandatory.
