@@ -7,7 +7,7 @@
  */
 
 import * as THREE from 'three';
-import type { BvhAnim } from '../bvh/parse';
+import { estimateSkeletonSize, type BvhAnim } from '../bvh/parse';
 
 const BONE_COLOR = 0x8d99ae;
 const BONE_EMISSIVE = 0x10151c;
@@ -36,8 +36,9 @@ export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonVie
   const geometries: THREE.BufferGeometry[] = [];
   const jointSpheres: THREE.Mesh[] = [];
 
-  // Bone thickness relative to skeleton size (file units).
-  const skeletonSize = estimateSize(anim);
+  // Bone thickness relative to standing height (file units); use FK extent so
+  // LAFAN1 root world offsets do not inflate capsule/sphere size.
+  const skeletonSize = estimateSkeletonSize(anim);
   const boneRadius = Math.max(skeletonSize * 0.022, 1e-6);
 
   const boneMat = new THREE.MeshStandardMaterial({
@@ -137,20 +138,6 @@ export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonVie
 
   setFrame(0);
   return { root, setFrame, setSelected, getJointWorldPos, dispose };
-}
-
-function estimateSize(anim: BvhAnim): number {
-  // Sum of |offset| along the longest chain is overkill; use max joint offset reach.
-  let maxReach = 0;
-  const reach: number[] = [];
-  for (let j = 0; j < anim.joints.length; j++) {
-    const off = anim.joints[j].offset;
-    const parent = anim.joints[j].parent;
-    const r = (parent >= 0 ? reach[parent] : 0) + Math.hypot(off[0], off[1], off[2]);
-    reach.push(r);
-    if (r > maxReach) maxReach = r;
-  }
-  return maxReach || 1;
 }
 
 /** Simple keypoint cloud + topology lines for the scaled human overlay. */
