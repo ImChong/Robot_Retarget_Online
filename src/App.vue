@@ -50,8 +50,6 @@ void locale.value;
         <v-tab v-for="tab in tabs" :key="tab.value" :value="tab.value">{{ tab.label }}</v-tab>
       </v-tabs>
 
-      <v-spacer v-if="!mdAndUp" />
-
       <div class="app-bar-actions">
         <v-btn
           :icon="isDark ? mdiWeatherSunny : mdiWeatherNight"
@@ -60,8 +58,16 @@ void locale.value;
           :title="isDark ? t('themeDark') : t('themeLight')"
           @click="toggleAppTheme"
         />
-        <v-btn variant="text" :prepend-icon="mdiTranslate" class="locale-btn" @click="toggleLocale">
-          {{ localeLabel }}
+        <v-btn
+          variant="text"
+          :icon="!mdAndUp ? mdiTranslate : undefined"
+          :prepend-icon="mdAndUp ? mdiTranslate : undefined"
+          class="locale-btn"
+          :aria-label="localeLabel"
+          :title="localeLabel"
+          @click="toggleLocale"
+        >
+          <span v-if="mdAndUp">{{ localeLabel }}</span>
         </v-btn>
         <v-btn
           :icon="mdiHeart"
@@ -146,12 +152,17 @@ void locale.value;
   overflow: hidden;
 }
 
-.app-title-inner {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.app-bar :deep(.v-toolbar-title) {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
+}
+
+.app-title-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .app-title-text {
@@ -164,27 +175,43 @@ void locale.value;
 .app-logo {
   flex: 0 0 auto;
   font-size: 1.35rem;
-  line-height: 1;
+  line-height: 1.2;
 }
 
 .app-title-badge {
   flex: 0 0 auto;
 }
 
+.app-bar-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-right: var(--app-bar-edge-inset);
+}
+
 @media (max-width: 768px) {
+  .app-title-inner {
+    align-items: center;
+  }
+
   .app-title-text {
     font-size: 0.94rem;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
   .app-logo {
     font-size: 1.15rem;
   }
-}
 
-.app-bar-actions {
-  display: flex;
-  align-items: center;
-  padding-right: var(--app-bar-edge-inset);
+  .app-bar-actions {
+    gap: 0;
+    padding-right: 4px;
+  }
 }
 
 @media (min-width: 960px) {
@@ -198,10 +225,6 @@ void locale.value;
     top: 50%;
     transform: translate(-50%, -50%);
     z-index: 1;
-  }
-
-  .app-bar-actions {
-    margin-left: auto;
   }
 }
 
