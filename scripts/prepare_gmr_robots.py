@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Sync GMR robot MJCF assets + ik_configs into this repo.
 
+All robots under public/robots/<id>/ are kept (MJCF + meshes). Only robots with
+a bundled bvh_lafan1 ik_config appear in manifest.json (UI dropdown).
+
 Usage:
   python3 scripts/prepare_gmr_robots.py [--gmr /path/to/GMR]
 """
@@ -19,6 +22,14 @@ ROOT = Path(__file__).resolve().parents[1]
 ROBOTS_DIR = ROOT / "public" / "robots"
 CONFIGS_DIR = ROOT / "src" / "lib" / "retarget" / "configs"
 DEFAULTS_TS = ROOT / "src" / "lib" / "retarget" / "defaults.ts"
+TESTS_ROBOTS = ROOT / "tests" / "robots"
+TESTS_PARITY = TESTS_ROBOTS / "parity"
+FIXTURES_PARITY = ROOT / "tests" / "fixtures" / "gmr_parity"
+
+CONFIG_RENAME = {
+    "bvh_lafan1_to_g1.json": "bvh_lafan1_to_unitree_g1.json",
+    "bvh_lafan1_to_t1_29dof.json": "bvh_lafan1_to_booster_t1_29dof.json",
+}
 
 ROBOTS: dict[str, dict] = {
     "unitree_g1": {
@@ -243,31 +254,28 @@ def sync_robot(gmr: Path, robot_id: str, meta: dict) -> tuple[dict, str | None]:
         shutil.copy2(src, dst)
         rel_files.append(rel)
 
+    bvh = "bvh_config" in meta
     entry = {
         "id": robot_id,
         "label": meta["label"],
         "xml": src_xml.relative_to(asset_root).as_posix(),
         "baseBody": meta["baseBody"],
         "camDistance": meta["camDistance"],
-        "configKey": "bvh_lafan1" if "bvh_config" in meta else "smplx",
+        "configKey": "bvh_lafan1" if bvh else "smplx",
         "files": sorted(set(rel_files)),
     }
     config_name = meta.get("bvh_config") or meta.get("smplx_config")
     return entry, config_name
 
 
-def sync_configs(gmr: Path, config_names: set[str]) -> None:
+def sync_bvh_configs(gmr: Path, config_names: set[str]) -> None:
     src_root = gmr / "general_motion_retargeting" / "ik_configs"
     CONFIGS_DIR.mkdir(parents=True, exist_ok=True)
-    rename = {
-        "bvh_lafan1_to_g1.json": "bvh_lafan1_to_unitree_g1.json",
-        "bvh_lafan1_to_t1_29dof.json": "bvh_lafan1_to_booster_t1_29dof.json",
-    }
     for name in sorted(config_names):
         src = src_root / name
         if not src.exists():
             raise FileNotFoundError(f"Missing ik_config: {src}")
-        shutil.copy2(src, CONFIGS_DIR / rename.get(name, name))
+        shutil.copy2(src, CONFIGS_DIR / CONFIG_RENAME.get(name, name))
 
 
 def write_defaults(robot_config_map: dict[str, str]) -> None:
@@ -285,6 +293,7 @@ def write_defaults(robot_config_map: dict[str, str]) -> None:
  * Built-in robots and their default GMR ik_configs (copied verbatim from the
  * GMR repository, MIT License — https://github.com/YanjieZe/GMR).
  *
+ * Only robots with bundled bvh_lafan1 configs (UI dropdown entries).
  * Regenerate via: python3 scripts/prepare_gmr_robots.py
  */
 
@@ -326,6 +335,71 @@ export function validateConfig(raw: unknown): GmrIkConfig {{
     DEFAULTS_TS.write_text(content)
 
 
+def write_robot_tests(bvh_ids: list[str]) -> None:
+    TESTS_ROBOTS.mkdir(parents=True, exist_ok=True)
+    for old in TESTS_ROBOTS.glob("*.test.ts"):
+        old.unlink()
+    for robot_id in bvh_ids:
+        (TESTS_ROBOTS / f"{robot_id}.test.ts").write_text(
+            f"""import {{ describe, it }} from 'vitest';
+import {{ entryById, smokeLoad }} from './_utils';
+
+describe('{robot_id}', () => {{
+  it('loads and ik_config matches model', async () => {{
+    await smokeLoad(entryById('{robot_id}'));
+  }});
+}});
+"""
+        )
+
+
+def write_parity_tests(bvh_ids: list[str]) -> None:
+    TESTS_PARITY.mkdir(parents=True, exist_ok=True)
+    for old in TESTS_PARITY.glob("*.test.ts"):
+        if old.name != "_utils.ts":
+            old.unlink()
+    for robot_id in bvh_ids:
+        (TESTS_PARITY / f"{robot_id}.test.ts").write_text(
+            f"""import {{ describe, it }} from 'vitest';
+import {{ parityRefPath, runParitySuite, refAvailable }} from './_utils';
+
+describe.skipIf(!refAvailable('{robot_id}'))('parity {robot_id}', () => {{
+  it('matches Python GMR on walk.bvh', async () => {{
+    await runParitySuite('{robot_id}', parityRefPath('{robot_id}'));
+  }});
+}});
+"""
+        )
+
+
+def write_assets_only_test(asset_only: list[dict]) -> None:
+    ids = json.dumps([a["id"] for a in asset_only], indent=2)
+    xmls = json.dumps({a["id"]: a["xml"] for a in asset_only}, indent=2)
+    (TESTS_ROBOTS / "assets_only.test.ts").write_text(
+        f"""import {{ existsSync, readFileSync }} from 'node:fs';
+import {{ join }} from 'node:path';
+import {{ describe, expect, it }} from 'vitest';
+import {{ ROOT }} from './_utils';
+
+/** Robots kept on disk for reference but not in the UI dropdown (no BVH ik_config). */
+const ASSET_ONLY_IDS = {ids} as const;
+const XML_BY_ID: Record<string, string> = {xmls};
+
+describe('asset-only robots (not in dropdown)', () => {{
+  for (const id of ASSET_ONLY_IDS) {{
+    it(`${{id}}: MJCF and meshes present`, () => {{
+      const dir = join(ROOT, 'public', 'robots', id);
+      expect(existsSync(dir)).toBe(true);
+      const xml = join(dir, XML_BY_ID[id]);
+      expect(existsSync(xml)).toBe(true);
+      expect(readFileSync(xml, 'utf-8').length).toBeGreaterThan(100);
+    }});
+  }}
+}});
+"""
+    )
+
+
 def ensure_gmr(path: Path) -> Path:
     if path.exists():
         return path
@@ -345,46 +419,47 @@ def main() -> None:
     gmr = ensure_gmr(args.gmr)
 
     manifest: list[dict] = []
+    assets_index: list[dict] = []
     config_names: set[str] = set()
     robot_config_map: dict[str, str] = {}
-    rename = {
-        "bvh_lafan1_to_g1.json": "bvh_lafan1_to_unitree_g1.json",
-        "bvh_lafan1_to_t1_29dof.json": "bvh_lafan1_to_booster_t1_29dof.json",
-    }
+    bvh_ids: list[str] = []
+    asset_only: list[dict] = []
 
     for robot_id, meta in ROBOTS.items():
         print(f"sync {robot_id} …", file=sys.stderr)
         entry, cfg_name = sync_robot(gmr, robot_id, meta)
-        manifest.append(entry)
-        if cfg_name:
-            config_names.add(cfg_name)
-            robot_config_map[robot_id] = rename.get(cfg_name, cfg_name)
-
-    sync_configs(gmr, config_names)
-    (ROBOTS_DIR / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    write_defaults(robot_config_map)
-    write_robot_tests(list(ROBOTS.keys()))
-    print(f"Synced {len(manifest)} robots.", file=sys.stderr)
-
-
-def write_robot_tests(robot_ids: list[str]) -> None:
-    tests_dir = ROOT / "tests" / "robots"
-    tests_dir.mkdir(parents=True, exist_ok=True)
-    for old in tests_dir.glob("*.test.ts"):
-        if old.name != "_utils.ts":
-            old.unlink()
-    for robot_id in robot_ids:
-        (tests_dir / f"{robot_id}.test.ts").write_text(
-            f"""import {{ describe, it }} from 'vitest';
-import {{ entryById, smokeLoad }} from './_utils';
-
-describe('{robot_id}', () => {{
-  it('loads and ik_config matches model', async () => {{
-    await smokeLoad(entryById('{robot_id}'));
-  }});
-}});
-"""
+        selectable = "bvh_config" in meta
+        assets_index.append(
+            {
+                "id": robot_id,
+                "label": meta["label"],
+                "xml": entry["xml"],
+                "selectable": selectable,
+                "fileCount": len(entry["files"]),
+            }
         )
+        if selectable:
+            manifest.append(entry)
+            bvh_ids.append(robot_id)
+            if cfg_name:
+                config_names.add(cfg_name)
+                robot_config_map[robot_id] = CONFIG_RENAME.get(cfg_name, cfg_name)
+        else:
+            asset_only.append({"id": robot_id, "xml": entry["xml"]})
+
+    sync_bvh_configs(gmr, config_names)
+    (ROBOTS_DIR / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (ROBOTS_DIR / "assets_index.json").write_text(json.dumps(assets_index, indent=2) + "\n")
+    write_defaults(robot_config_map)
+    write_robot_tests(bvh_ids)
+    write_parity_tests(bvh_ids)
+    write_assets_only_test(asset_only)
+    FIXTURES_PARITY.mkdir(parents=True, exist_ok=True)
+    print(
+        f"Synced {len(assets_index)} robots ({len(manifest)} selectable, "
+        f"{len(asset_only)} asset-only).",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":
