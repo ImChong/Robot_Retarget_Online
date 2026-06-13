@@ -84,6 +84,9 @@ void locale.value;
 <style>
 :root {
   --app-bar-height: 64px;
+  --app-bar-outer-height: calc(56px + 2px); /* comfortable toolbar + top/bottom border */
+  --app-bar-icon-size: 36px;
+  --app-bar-edge-inset: calc((var(--app-bar-outer-height) - var(--app-bar-icon-size)) / 2);
   --app-bottom-nav-height: 0px;
 }
 
@@ -113,6 +116,12 @@ void locale.value;
   min-width: 0;
 }
 
+.app-bar-actions {
+  display: flex;
+  align-items: center;
+  padding-right: var(--app-bar-edge-inset);
+}
+
 @media (min-width: 960px) {
   .app-bar :deep(.v-toolbar__content) {
     position: relative;
@@ -128,8 +137,6 @@ void locale.value;
 
   .app-bar-actions {
     margin-left: auto;
-    display: flex;
-    align-items: center;
   }
 }
 
