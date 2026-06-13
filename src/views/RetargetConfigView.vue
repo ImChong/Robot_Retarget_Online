@@ -248,7 +248,7 @@ onUnmounted(() => {
     <input ref="importInput" type="file" accept=".json" class="d-none" @change="onImportChosen" />
 
     <MobileSidePanel v-model="panelOpen">
-      <div v-if="!motion.hasMotion" class="text-caption text-warning">{{ t('noMotionHint') }}</div>
+      <div v-if="!motion.hasMotion" class="text-caption text-warning text-center">{{ t('noMotionHint') }}</div>
 
       <v-select
         v-model="store.robotId"

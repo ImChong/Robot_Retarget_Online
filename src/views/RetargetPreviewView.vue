@@ -140,7 +140,7 @@ onUnmounted(() => {
 <template>
   <div class="page-root d-flex">
     <MobileSidePanel v-model="panelOpen">
-      <div v-if="!motion.hasMotion" class="text-caption text-warning">{{ t('noMotionHint') }}</div>
+      <div v-if="!motion.hasMotion" class="text-caption text-warning text-center">{{ t('noMotionHint') }}</div>
 
       <v-btn
         v-if="!store.isBusy"
