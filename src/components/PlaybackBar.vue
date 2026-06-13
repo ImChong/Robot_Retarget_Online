@@ -3,10 +3,12 @@ import { computed } from 'vue';
 import { mdiPlay, mdiPause, mdiSkipPrevious, mdiSkipNext, mdiRestart } from '@mdi/js';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
+import { useAppTheme } from '@/composables/useAppTheme';
 import type { PlaybackController } from '@/composables/usePlayback';
 
 const props = defineProps<{ controller: PlaybackController }>();
 const { t } = useI18n();
+const { isDark } = useAppTheme();
 const { smAndDown } = useDisplay();
 
 const state = props.controller.state;
@@ -36,7 +38,10 @@ function step(delta: number) {
 </script>
 
 <template>
-  <div class="playback-bar" :class="{ 'playback-bar--compact': smAndDown }">
+  <div
+    class="playback-bar"
+    :class="{ 'playback-bar--compact': smAndDown, 'playback-bar--light': !isDark }"
+  >
     <div class="playback-row playback-row--transport d-flex align-center ga-1">
       <v-btn :icon="mdiSkipPrevious" size="small" variant="text" @click="step(-1)" />
       <v-btn
@@ -101,6 +106,10 @@ function step(delta: number) {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding: 4px 8px 6px;
   flex-shrink: 0;
+}
+.playback-bar--light {
+  background: rgba(255, 255, 255, 0.94);
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 .playback-row--transport {
   min-width: 0;

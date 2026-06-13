@@ -49,7 +49,7 @@
     "id": "booster_t1_29dof",
     "label": "Booster T1 (29 DoF)",
     "xml": "t1_mocap.xml",
-    "baseBody": "Waist",
+    "baseBody": "pelvis",
     "camDistance": 2.0,
     "configKey": "bvh_lafan1",
     "files": [
