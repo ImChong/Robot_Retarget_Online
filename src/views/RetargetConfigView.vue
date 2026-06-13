@@ -10,6 +10,12 @@ import { getRobotManifest, loadRobot, type RobotManifestEntry, type RobotModel }
 import { buildRobotScene, type RobotSceneObject } from '@/lib/mujoco/threeScene';
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
+import {
+  alignRobotRoot,
+  alignSkeletonToRobot,
+  jointIndexByName,
+  VIEWPORT_ANCHOR,
+} from '@/lib/viewport/sceneAlignment';
 import MappingTable from '@/components/MappingTable.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import { downloadBlob } from '@/lib/export/motion';
@@ -35,9 +41,6 @@ const importInput = ref<HTMLInputElement | null>(null);
 const activeTab = ref('stage1');
 const panelOpen = ref(false);
 
-const ROBOT_X = 0.55;
-const HUMAN_X = -0.65;
-
 const robotItems = computed(() =>
   manifest.value.map((m) => ({ title: m.label, value: m.id })),
 );
@@ -54,12 +57,24 @@ async function ensureRobotScene() {
     robotModel.value = robot;
     robotScene.value?.dispose();
     const scene = buildRobotScene(robot);
-    scene.root.position.x = ROBOT_X;
     (robot.data.qpos as Float64Array).set(robot.model.qpos0 as Float64Array);
     robot.mujoco.mj_kinematics(robot.model, robot.data);
     scene.update(robot.data);
+    alignRobotRoot(scene, robot, store.config.robot_root_name, VIEWPORT_ANCHOR);
+    scene.root.renderOrder = 1;
     sm.scene.add(scene.root);
     robotScene.value = scene;
+    if (skeleton.value && motion.anim) {
+      alignSkeletonToRobot(
+        skeleton.value,
+        motion.anim,
+        store.config.human_root_name,
+        scene,
+        robot,
+        store.config.robot_root_name,
+        VIEWPORT_ANCHOR,
+      );
+    }
     refreshLines();
   } catch (err) {
     loadingText.value = err instanceof Error ? err.message : String(err);
@@ -78,10 +93,22 @@ function rebuildSkeleton() {
     return;
   }
   const sk = buildSkeletonView(motion.anim, motion.unitScale);
-  sk.root.position.x = HUMAN_X;
   sk.setFrame(0);
   sm.scene.add(sk.root);
   skeleton.value = sk;
+  if (robotScene.value && robotModel.value) {
+    alignSkeletonToRobot(
+      sk,
+      motion.anim,
+      store.config.human_root_name,
+      robotScene.value,
+      robotModel.value,
+      store.config.robot_root_name,
+      VIEWPORT_ANCHOR,
+    );
+  } else {
+    sk.lockJointToWorld(jointIndexByName(motion.anim, store.config.human_root_name), VIEWPORT_ANCHOR);
+  }
   refreshLines();
 }
 
@@ -170,6 +197,28 @@ watch(
   () => refreshLines(),
   { deep: true },
 );
+watch(
+  () => [store.config.robot_root_name, store.config.human_root_name] as const,
+  () => {
+    if (!robotScene.value || !robotModel.value || !skeleton.value || !motion.anim) return;
+    alignRobotRoot(
+      robotScene.value,
+      robotModel.value,
+      store.config.robot_root_name,
+      VIEWPORT_ANCHOR,
+    );
+    alignSkeletonToRobot(
+      skeleton.value,
+      motion.anim,
+      store.config.human_root_name,
+      robotScene.value,
+      robotModel.value,
+      store.config.robot_root_name,
+      VIEWPORT_ANCHOR,
+    );
+    refreshLines();
+  },
+);
 watch(mdAndUp, () => sceneManager.value?.resize());
 watch(panelOpen, () => nextTick(() => sceneManager.value?.resize()));
 
@@ -177,7 +226,7 @@ onMounted(async () => {
   manifest.value = await getRobotManifest().catch(() => []);
   const sm = new SceneManager(viewportEl.value!, {
     cameraPos: [0, -3.1, 1.7],
-    target: [0, 0, 0.85],
+    target: [VIEWPORT_ANCHOR.x, VIEWPORT_ANCHOR.y, VIEWPORT_ANCHOR.z],
   });
   sm.start();
   sceneManager.value = sm;

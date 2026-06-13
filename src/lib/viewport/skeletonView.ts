@@ -18,23 +18,32 @@ export interface SkeletonView {
   root: THREE.Group;
   setFrame(frame: number): void;
   setSelected(jointIndex: number | null): void;
+  /** Extra yaw (radians) about world Z applied after the Y-up→Z-up rotation. */
+  setYaw(radians: number): void;
+  /** Keep a joint at a fixed world position (call after setFrame). */
+  lockJointToWorld(jointIndex: number, anchor: THREE.Vector3): void;
   /** world position of a joint (after wrapper transform) */
   getJointWorldPos(jointIndex: number, out: THREE.Vector3): THREE.Vector3;
+  getJointWorldQuat(jointIndex: number, out: THREE.Quaternion): THREE.Quaternion;
   dispose(): void;
 }
 
 export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonView {
   const root = new THREE.Group();
   root.name = 'bvh-skeleton';
+  const coord = new THREE.Group();
+  coord.name = 'bvh-coord';
   // Y-up (BVH) -> Z-up (world): rotate +90° about X, then scale units -> meters.
-  root.rotation.x = Math.PI / 2;
-  root.scale.setScalar(unitScale);
+  coord.rotation.x = Math.PI / 2;
+  coord.scale.setScalar(unitScale);
+  root.add(coord);
 
   const J = anim.joints.length;
   const jointGroups: THREE.Group[] = [];
   const materials: THREE.Material[] = [];
   const geometries: THREE.BufferGeometry[] = [];
   const jointSpheres: THREE.Mesh[] = [];
+  const lockTmp = new THREE.Vector3();
 
   // Bone thickness relative to standing height (file units); use FK extent so
   // LAFAN1 root world offsets do not inflate capsule/sphere size.
@@ -67,7 +76,7 @@ export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonVie
     group.name = anim.joints[j].name;
     jointGroups.push(group);
     const parent = anim.joints[j].parent;
-    if (parent < 0) root.add(group);
+    if (parent < 0) coord.add(group);
     else jointGroups[parent].add(group);
 
     const sphere = new THREE.Mesh(sphereGeo, jointMat);
@@ -130,6 +139,21 @@ export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonVie
     return jointGroups[jointIndex].getWorldPosition(out);
   }
 
+  function getJointWorldQuat(jointIndex: number, out: THREE.Quaternion): THREE.Quaternion {
+    return jointGroups[jointIndex].getWorldQuaternion(out);
+  }
+
+  function setYaw(radians: number) {
+    root.rotation.z = radians;
+  }
+
+  function lockJointToWorld(jointIndex: number, anchor: THREE.Vector3) {
+    root.position.set(0, 0, 0);
+    root.updateMatrixWorld(true);
+    getJointWorldPos(jointIndex, lockTmp);
+    root.position.set(anchor.x - lockTmp.x, anchor.y - lockTmp.y, anchor.z - lockTmp.z);
+  }
+
   function dispose() {
     for (const g of geometries) g.dispose();
     for (const m of materials) m.dispose();
@@ -137,7 +161,16 @@ export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonVie
   }
 
   setFrame(0);
-  return { root, setFrame, setSelected, getJointWorldPos, dispose };
+  return {
+    root,
+    setFrame,
+    setSelected,
+    setYaw,
+    lockJointToWorld,
+    getJointWorldPos,
+    getJointWorldQuat,
+    dispose,
+  };
 }
 
 /** Simple keypoint cloud + topology lines for the scaled human overlay. */
