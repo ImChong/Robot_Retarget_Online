@@ -6,6 +6,8 @@ const STORAGE_KEY = 'rro-locale';
 
 const messages: Record<string, { zh: string; en: string }> = {
   appTitle: { zh: '在线动作重定向', en: 'Robot Retarget Online' },
+  /** Bilingual site header — always English | 中文 regardless of locale */
+  appTitleBilingual: { zh: 'Robot Retarget Online | 在线动作重定向', en: 'Robot Retarget Online | 在线动作重定向' },
   navBvh: { zh: 'BVH 预览', en: 'BVH Viewer' },
   navConfig: { zh: '重定向设置', en: 'Retarget Config' },
   navPreview: { zh: '重定向预览', en: 'Retarget Preview' },
