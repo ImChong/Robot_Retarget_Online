@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
-import { mdiFolderOpen, mdiRun } from '@mdi/js';
+import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
+import { mdiFolderOpen, mdiRun, mdiTune } from '@mdi/js';
+import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
 import { usePlayback } from '@/composables/usePlayback';
@@ -9,8 +10,10 @@ import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonVie
 import FileDropZone from '@/components/FileDropZone.vue';
 import PlaybackBar from '@/components/PlaybackBar.vue';
 import JointTreePanel from '@/components/JointTreePanel.vue';
+import MobileSidePanel from '@/components/MobileSidePanel.vue';
 
 const { t } = useI18n();
+const { mdAndUp } = useDisplay();
 const motion = useMotionStore();
 const playback = usePlayback();
 
@@ -20,6 +23,7 @@ const sceneManager = shallowRef<SceneManager | null>(null);
 const skeleton = shallowRef<SkeletonView | null>(null);
 const selectedJoint = ref<number | null>(null);
 const loadErrorSnack = ref(false);
+const panelOpen = ref(false);
 
 const samples = [
   { title: 'Walk (sample)', file: 'walk.bvh' },
@@ -87,6 +91,8 @@ function rebuildSkeleton() {
 
 watch(() => motion.anim, rebuildSkeleton);
 watch(selectedJoint, (j) => skeleton.value?.setSelected(j));
+watch(mdAndUp, () => sceneManager.value?.resize());
+watch(panelOpen, () => nextTick(() => sceneManager.value?.resize()));
 
 onMounted(() => {
   const el = viewportEl.value!;
@@ -112,8 +118,7 @@ onUnmounted(() => {
   <div class="page-root d-flex">
     <input ref="fileInput" type="file" accept=".bvh" class="d-none" @change="onFileChosen" />
 
-    <!-- Left panel -->
-    <div class="side-panel pa-3 d-flex flex-column ga-3">
+    <MobileSidePanel v-model="panelOpen">
       <v-btn color="primary" :prepend-icon="mdiFolderOpen" block @click="openFilePicker">
         {{ t('openBvh') }}
       </v-btn>
@@ -144,7 +149,7 @@ onUnmounted(() => {
       <template v-if="motion.anim">
         <div class="text-subtitle-2 mt-1">{{ t('jointTree') }}</div>
         <JointTreePanel
-          class="flex-grow-1"
+          class="joint-tree-grow"
           :anim="motion.anim"
           :selected="selectedJoint"
           @select="(j) => (selectedJoint = j)"
@@ -158,19 +163,32 @@ onUnmounted(() => {
           </v-card-text>
         </v-card>
       </template>
-    </div>
+    </MobileSidePanel>
 
-    <!-- Viewport -->
-    <FileDropZone class="flex-grow-1" @load="loadText">
+    <FileDropZone class="main-col flex-grow-1" @load="loadText">
       <div class="viewport-col d-flex flex-column">
         <div ref="viewportEl" class="viewport flex-grow-1" />
         <div v-if="!motion.hasMotion" class="empty-hint d-flex flex-column align-center justify-center">
           <div class="text-h6 text-medium-emphasis mb-1">{{ t('noMotion') }}</div>
-          <div class="text-body-2 text-disabled">{{ t('dropHint') }}</div>
+          <div class="text-body-2 text-disabled px-4 text-center">{{ t('dropHint') }}</div>
+          <v-btn class="mt-4 mobile-open-btn" color="primary" variant="tonal" :prepend-icon="mdiFolderOpen" @click="openFilePicker">
+            {{ t('openBvh') }}
+          </v-btn>
         </div>
         <PlaybackBar v-if="motion.hasMotion" :controller="playback" />
       </div>
     </FileDropZone>
+
+    <v-btn
+      v-if="!mdAndUp"
+      class="panel-fab"
+      color="primary"
+      :icon="mdiTune"
+      size="small"
+      elevation="4"
+      :title="t('openPanel')"
+      @click="panelOpen = true"
+    />
 
     <v-snackbar v-model="loadErrorSnack" color="error" timeout="5000">
       {{ motion.loadError ?? 'Failed to load BVH' }}
@@ -180,13 +198,13 @@ onUnmounted(() => {
 
 <style scoped>
 .page-root {
-  height: calc(100vh - 64px);
+  height: 100%;
+  min-height: 0;
+  position: relative;
 }
-.side-panel {
-  width: 300px;
-  min-width: 300px;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  overflow-y: auto;
+.main-col {
+  min-width: 0;
+  min-height: 0;
 }
 .viewport-col {
   height: 100%;
@@ -201,6 +219,24 @@ onUnmounted(() => {
   inset: 0;
   pointer-events: none;
 }
+.empty-hint .mobile-open-btn {
+  pointer-events: auto;
+}
+@media (min-width: 960px) {
+  .mobile-open-btn {
+    display: none;
+  }
+}
+.joint-tree-grow {
+  flex: 1 1 auto;
+  min-height: 120px;
+  max-height: 40vh;
+}
+@media (min-width: 960px) {
+  .joint-tree-grow {
+    max-height: none;
+  }
+}
 .info-line {
   display: flex;
   justify-content: space-between;
@@ -208,5 +244,12 @@ onUnmounted(() => {
 }
 .info-line b {
   max-width: 60%;
+  text-align: right;
+}
+.panel-fab {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 4;
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
-import { mdiPlayCircle, mdiStopCircle, mdiDownload } from '@mdi/js';
+import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
+import { mdiPlayCircle, mdiStopCircle, mdiDownload, mdiTune } from '@mdi/js';
+import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore } from '@/stores/retarget';
@@ -10,10 +11,12 @@ import { SceneManager } from '@/lib/viewport/SceneManager';
 import { buildKeypointCloud, type KeypointCloud } from '@/lib/viewport/skeletonView';
 import { usePlayback } from '@/composables/usePlayback';
 import PlaybackBar from '@/components/PlaybackBar.vue';
+import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import ErrorChart from '@/components/ErrorChart.vue';
 import { exportCsv, exportJson, exportNpz, downloadBlob } from '@/lib/export/motion';
 
 const { t } = useI18n();
+const { mdAndUp } = useDisplay();
 const motion = useMotionStore();
 const store = useRetargetStore();
 const playback = usePlayback();
@@ -25,6 +28,7 @@ const robotModel = shallowRef<RobotModel | null>(null);
 const ghost = shallowRef<KeypointCloud | null>(null);
 const showGhost = ref(true);
 const followCamera = ref(true);
+const panelOpen = ref(false);
 
 const progressPct = computed(() =>
   store.runProgress.total > 0 ? (100 * store.runProgress.done) / store.runProgress.total : 0,
@@ -103,6 +107,8 @@ function onExport(kind: 'npz' | 'csv' | 'json') {
 watch(showGhost, (v) => {
   if (ghost.value) ghost.value.root.visible = v;
 });
+watch(mdAndUp, () => sceneManager.value?.resize());
+watch(panelOpen, () => nextTick(() => sceneManager.value?.resize()));
 
 onMounted(() => {
   const sm = new SceneManager(viewportEl.value!, {
@@ -120,7 +126,6 @@ onMounted(() => {
 
 onActivated(() => {
   sceneManager.value?.start();
-  // result may have been produced while this page was not mounted yet
   if (store.result && !robotScene.value) setupResultScene();
 });
 onDeactivated(() => sceneManager.value?.stop());
@@ -133,8 +138,7 @@ onUnmounted(() => {
 
 <template>
   <div class="page-root d-flex">
-    <!-- Left panel -->
-    <div class="side-panel pa-3 d-flex flex-column ga-3">
+    <MobileSidePanel v-model="panelOpen">
       <v-btn
         v-if="!store.isBusy"
         color="primary"
@@ -196,10 +200,9 @@ onUnmounted(() => {
       <div v-else-if="store.status !== 'running'" class="text-caption text-disabled mt-2">
         {{ t('notRun') }}
       </div>
-    </div>
+    </MobileSidePanel>
 
-    <!-- Viewport -->
-    <div class="viewport-col d-flex flex-column flex-grow-1" style="min-width: 0">
+    <div class="main-col d-flex flex-column flex-grow-1">
       <div ref="viewportEl" class="viewport flex-grow-1" />
       <div v-if="store.result" class="chart-wrap px-3 py-2">
         <div class="text-caption text-medium-emphasis mb-1">{{ t('errorChart') }}</div>
@@ -207,18 +210,29 @@ onUnmounted(() => {
       </div>
       <PlaybackBar v-if="store.result" :controller="playback" />
     </div>
+
+    <v-btn
+      v-if="!mdAndUp"
+      class="panel-fab"
+      color="primary"
+      :icon="mdiTune"
+      size="small"
+      elevation="4"
+      :title="t('openPanel')"
+      @click="panelOpen = true"
+    />
   </div>
 </template>
 
 <style scoped>
 .page-root {
-  height: calc(100vh - 64px);
+  height: 100%;
+  min-height: 0;
+  position: relative;
 }
-.side-panel {
-  width: 300px;
-  min-width: 300px;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  overflow-y: auto;
+.main-col {
+  min-width: 0;
+  min-height: 0;
 }
 .viewport {
   min-height: 0;
@@ -226,9 +240,17 @@ onUnmounted(() => {
 }
 .chart-wrap {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
 }
 .info-line {
   display: flex;
   justify-content: space-between;
+  gap: 8px;
+}
+.panel-fab {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 4;
 }
 </style>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
+import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
 import * as THREE from 'three';
-import { mdiDownload, mdiUpload, mdiBackupRestore } from '@mdi/js';
+import { mdiDownload, mdiUpload, mdiBackupRestore, mdiTune } from '@mdi/js';
+import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore } from '@/stores/retarget';
@@ -10,9 +11,11 @@ import { buildRobotScene, type RobotSceneObject } from '@/lib/mujoco/threeScene'
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
 import MappingTable from '@/components/MappingTable.vue';
+import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import { downloadBlob } from '@/lib/export/motion';
 
 const { t } = useI18n();
+const { mdAndUp } = useDisplay();
 const motion = useMotionStore();
 const store = useRetargetStore();
 
@@ -30,6 +33,7 @@ const showHuman = ref(true);
 const highlightBody = ref<string | null>(null);
 const importInput = ref<HTMLInputElement | null>(null);
 const activeTab = ref('stage1');
+const panelOpen = ref(false);
 
 const ROBOT_X = 0.55;
 const HUMAN_X = -0.65;
@@ -51,7 +55,6 @@ async function ensureRobotScene() {
     robotScene.value?.dispose();
     const scene = buildRobotScene(robot);
     scene.root.position.x = ROBOT_X;
-    // default pose FK
     (robot.data.qpos as Float64Array).set(robot.model.qpos0 as Float64Array);
     robot.mujoco.mj_kinematics(robot.model, robot.data);
     scene.update(robot.data);
@@ -82,7 +85,6 @@ function rebuildSkeleton() {
   refreshLines();
 }
 
-/** Correspondence lines between mapped robot bodies and human joints. */
 function refreshLines() {
   const sm = sceneManager.value;
   if (!sm) return;
@@ -96,7 +98,6 @@ function refreshLines() {
 
   const robot = robotModel.value;
   const jointIndex = new Map(motion.anim.joints.map((j, i) => [j.name, i]));
-  // virtual FootMod joints sit at the foot joints
   if (jointIndex.has('LeftFoot')) jointIndex.set('LeftFootMod', jointIndex.get('LeftFoot')!);
   if (jointIndex.has('RightFoot')) jointIndex.set('RightFootMod', jointIndex.get('RightFoot')!);
 
@@ -169,6 +170,8 @@ watch(
   () => refreshLines(),
   { deep: true },
 );
+watch(mdAndUp, () => sceneManager.value?.resize());
+watch(panelOpen, () => nextTick(() => sceneManager.value?.resize()));
 
 onMounted(async () => {
   manifest.value = await getRobotManifest().catch(() => []);
@@ -195,8 +198,7 @@ onUnmounted(() => {
   <div class="page-root d-flex">
     <input ref="importInput" type="file" accept=".json" class="d-none" @change="onImportChosen" />
 
-    <!-- Left panel -->
-    <div class="side-panel pa-3 d-flex flex-column ga-3">
+    <MobileSidePanel v-model="panelOpen">
       <v-select
         v-model="store.robotId"
         :items="robotItems"
@@ -261,10 +263,9 @@ onUnmounted(() => {
       <v-switch v-model="showHuman" :label="t('showHuman')" color="primary" density="compact" hide-details />
       <v-switch v-model="showLines" :label="t('showLines')" color="primary" density="compact" hide-details />
       <div v-if="!motion.hasMotion" class="text-caption text-warning">{{ t('noMotionHint') }}</div>
-    </div>
+    </MobileSidePanel>
 
-    <!-- Right: viewport + tables -->
-    <div class="d-flex flex-column flex-grow-1" style="min-width: 0">
+    <div class="main-col d-flex flex-column flex-grow-1">
       <div ref="viewportEl" class="viewport" />
       <div v-if="loading || loadingText" class="loading-strip text-caption px-3 py-1">
         <v-progress-circular v-if="loading" indeterminate size="12" width="2" class="mr-2" />
@@ -272,7 +273,7 @@ onUnmounted(() => {
       </div>
 
       <div class="tables-panel">
-        <v-tabs v-model="activeTab" density="compact" color="primary">
+        <v-tabs v-model="activeTab" density="compact" color="primary" show-arrows>
           <v-tab value="stage1">{{ t('stage1') }}</v-tab>
           <v-tab value="stage2">{{ t('stage2') }}</v-tab>
           <v-tab value="scale">{{ t('scaleTable') }}</v-tab>
@@ -290,47 +291,66 @@ onUnmounted(() => {
             :human-joints="motion.jointNames"
             @highlight="(b) => (highlightBody = b)"
           />
-          <v-table v-else density="compact">
-            <thead>
-              <tr>
-                <th>{{ t('humanJoint') }}</th>
-                <th style="width: 140px">Scale</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(value, key) in store.config.human_scale_table" :key="key">
-                <td class="mono">{{ key }}</td>
-                <td>
-                  <v-text-field
-                    :model-value="value"
-                    type="number"
-                    step="0.05"
-                    @update:model-value="(v: string) => (store.config.human_scale_table[key] = parseFloat(v) || 0)"
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </v-table>
+          <div v-else class="table-x-scroll">
+            <v-table density="compact">
+              <thead>
+                <tr>
+                  <th>{{ t('humanJoint') }}</th>
+                  <th style="width: 140px">Scale</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(value, key) in store.config.human_scale_table" :key="key">
+                  <td class="mono">{{ key }}</td>
+                  <td>
+                    <v-text-field
+                      :model-value="value"
+                      type="number"
+                      step="0.05"
+                      @update:model-value="(v: string) => (store.config.human_scale_table[key] = parseFloat(v) || 0)"
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </div>
         </div>
       </div>
     </div>
+
+    <v-btn
+      v-if="!mdAndUp"
+      class="panel-fab"
+      color="primary"
+      :icon="mdiTune"
+      size="small"
+      elevation="4"
+      :title="t('openPanel')"
+      @click="panelOpen = true"
+    />
   </div>
 </template>
 
 <style scoped>
 .page-root {
-  height: calc(100vh - 64px);
+  height: 100%;
+  min-height: 0;
+  position: relative;
 }
-.side-panel {
-  width: 300px;
-  min-width: 300px;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  overflow-y: auto;
+.main-col {
+  min-width: 0;
+  min-height: 0;
 }
 .viewport {
   flex: 1 1 55%;
   min-height: 0;
   position: relative;
+}
+@media (max-width: 959.98px) {
+  .viewport {
+    flex: 0 0 38vh;
+    min-height: 220px;
+  }
 }
 .tables-panel {
   flex: 1 1 45%;
@@ -340,8 +360,13 @@ onUnmounted(() => {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 .table-scroll {
-  overflow-y: auto;
+  overflow: auto;
   flex: 1;
+  -webkit-overflow-scrolling: touch;
+}
+.table-x-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .loading-strip {
   background: rgba(79, 195, 247, 0.08);
@@ -349,5 +374,11 @@ onUnmounted(() => {
 .mono {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-size: 0.82rem;
+}
+.panel-fab {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 4;
 }
 </style>

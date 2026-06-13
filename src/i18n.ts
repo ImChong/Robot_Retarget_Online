@@ -82,6 +82,7 @@ const messages: Record<string, { zh: string; en: string }> = {
   robotMotion: { zh: '机器人动作', en: 'Robot motion' },
   sourceMotion: { zh: '源动作', en: 'Source motion' },
   followCamera: { zh: '跟随相机', en: 'Follow camera' },
+  openPanel: { zh: '打开控制面板', en: 'Open control panel' },
 };
 
 const stored =
