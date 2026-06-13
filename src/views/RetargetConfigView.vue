@@ -32,8 +32,36 @@ const robotModel = shallowRef<RobotModel | null>(null);
 const skeleton = shallowRef<SkeletonView | null>(null);
 const lines = shallowRef<THREE.LineSegments | null>(null);
 const manifest = ref<RobotManifestEntry[]>([]);
-const loading = ref(false);
+const LOADING_STRIP_HIDE_MS = 2500;
+
+type LoadingStripState = 'loading' | 'success' | 'error';
+const stripVisible = ref(false);
+const stripState = ref<LoadingStripState>('loading');
 const loadingText = ref('');
+let hideStripTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearHideStripTimer() {
+  if (hideStripTimer !== null) {
+    clearTimeout(hideStripTimer);
+    hideStripTimer = null;
+  }
+}
+
+function showLoadingStrip(state: LoadingStripState, text: string) {
+  clearHideStripTimer();
+  stripVisible.value = true;
+  stripState.value = state;
+  loadingText.value = text;
+}
+
+function scheduleHideStrip() {
+  clearHideStripTimer();
+  hideStripTimer = setTimeout(() => {
+    stripVisible.value = false;
+    loadingText.value = '';
+    hideStripTimer = null;
+  }, LOADING_STRIP_HIDE_MS);
+}
 const showLines = ref(true);
 const showHuman = ref(true);
 const highlightBody = ref<string | null>(null);
@@ -51,10 +79,11 @@ async function ensureRobotScene() {
   const sm = sceneManager.value;
   if (!sm) return;
   robotModel.value = null;
-  loading.value = true;
-  loadingText.value = t('loadingMujoco');
+  showLoadingStrip('loading', t('loadingMujoco'));
+  let loadTotal = 0;
   try {
     const robot = await loadRobot(store.robotId, (done, total) => {
+      loadTotal = total;
       loadingText.value = `${t('loadingRobot')} ${done}/${total}`;
     });
     robotModel.value = robot;
@@ -79,10 +108,12 @@ async function ensureRobotScene() {
       );
     }
     refreshLines();
+    stripState.value = 'success';
+    loadingText.value =
+      loadTotal > 0 ? `${t('robotLoadComplete')} (${loadTotal}/${loadTotal})` : t('robotLoadComplete');
+    scheduleHideStrip();
   } catch (err) {
-    loadingText.value = err instanceof Error ? err.message : String(err);
-  } finally {
-    loading.value = false;
+    showLoadingStrip('error', err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -182,7 +213,7 @@ function onImportChosen(e: Event) {
     try {
       store.importConfigJson(text);
     } catch (err) {
-      loadingText.value = err instanceof Error ? err.message : String(err);
+      showLoadingStrip('error', err instanceof Error ? err.message : String(err));
     }
   });
   (e.target as HTMLInputElement).value = '';
@@ -240,6 +271,7 @@ onMounted(async () => {
 onActivated(() => sceneManager.value?.start());
 onDeactivated(() => sceneManager.value?.stop());
 onUnmounted(() => {
+  clearHideStripTimer();
   skeleton.value?.dispose();
   robotScene.value?.dispose();
   sceneManager.value?.dispose();
@@ -322,8 +354,15 @@ onUnmounted(() => {
 
     <div class="main-col d-flex flex-column flex-grow-1">
       <div ref="viewportEl" class="viewport" />
-      <div v-if="loading || loadingText" class="loading-strip text-caption px-3 py-1">
-        <v-progress-circular v-if="loading" indeterminate size="12" width="2" class="mr-2" />
+      <div
+        v-if="stripVisible && loadingText"
+        class="loading-strip text-caption px-3 py-1"
+        :class="{
+          'loading-strip--success': stripState === 'success',
+          'loading-strip--error': stripState === 'error',
+        }"
+      >
+        <v-progress-circular v-if="stripState === 'loading'" indeterminate size="12" width="2" class="mr-2" />
         {{ loadingText }}
       </div>
 
@@ -427,6 +466,16 @@ onUnmounted(() => {
 }
 .loading-strip {
   background: rgba(79, 195, 247, 0.08);
+  color: rgba(255, 255, 255, 0.87);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+.loading-strip--success {
+  background: rgba(76, 175, 80, 0.22);
+  color: rgb(129, 199, 132);
+}
+.loading-strip--error {
+  background: rgba(244, 67, 54, 0.12);
+  color: rgb(239, 154, 154);
 }
 .mono {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
