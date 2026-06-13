@@ -1,5 +1,13 @@
 # AGENTS.md
 
+## Project roadmap · 项目规划
+
+**Read [`ROADMAP.md`](ROADMAP.md) before planning new work** — it is the plan of
+record (Phase 1 = GMR online, done; Phase 2 = holosoma as a second pluggable
+engine; SMPL-X/AMASS input as a deferred parallel track) and lists the cheap
+near-term extensions (more GMR robots, a `RetargetEngine` interface). Keep it in
+sync when milestones land.
+
 ## Cursor Cloud specific instructions
 
 This is a 100% browser-based, backend-free app (Vite + Vue 3 + TypeScript). There is **no server, database, or external service** — all computation (MuJoCo physics/IK via WASM) runs client-side. The only "service" is the Vite dev/preview server.
