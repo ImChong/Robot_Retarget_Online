@@ -35,6 +35,9 @@ void locale.value;
       <v-app-bar-title class="app-title">
         <v-icon :icon="mdiRobotExcited" color="primary" class="mr-2" />
         <span class="font-weight-bold d-none d-sm-inline">{{ t('appTitle') }}</span>
+        <span class="text-medium-emphasis ml-2 d-none d-lg-inline" style="font-size: 0.8em">
+          GMR
+        </span>
       </v-app-bar-title>
 
       <v-tabs v-if="mdAndUp" v-model="currentTab" color="primary" class="app-bar-tabs">
