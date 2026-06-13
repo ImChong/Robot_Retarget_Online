@@ -87,6 +87,11 @@ const robotItems = computed((): RobotSelectItem[] => {
 
 const robotBodies = computed(() => robotModel.value?.bodyNames ?? []);
 
+function alignBodyName(robotRootName = store.config.robot_root_name): string {
+  const entry = manifest.value.find((m) => m.id === store.robotId);
+  return entry?.alignBody ?? robotRootName;
+}
+
 async function ensureRobotScene() {
   const sm = sceneManager.value;
   if (!sm) return;
@@ -103,7 +108,7 @@ async function ensureRobotScene() {
     (robot.data.qpos as Float64Array).set(robot.model.qpos0 as Float64Array);
     robot.mujoco.mj_kinematics(robot.model, robot.data);
     scene.update(robot.data);
-    alignRobotRoot(scene, robot, store.config.robot_root_name, VIEWPORT_ANCHOR);
+    alignRobotRoot(scene, robot, alignBodyName(), VIEWPORT_ANCHOR);
     scene.root.renderOrder = 1;
     sm.scene.add(scene.root);
     robotScene.value = scene;
@@ -114,7 +119,7 @@ async function ensureRobotScene() {
         store.config.human_root_name,
         scene,
         robot,
-        store.config.robot_root_name,
+        alignBodyName(),
         VIEWPORT_ANCHOR,
       );
     }
@@ -148,7 +153,7 @@ function rebuildSkeleton() {
       store.config.human_root_name,
       robotScene.value,
       robotModel.value,
-      store.config.robot_root_name,
+      alignBodyName(),
       VIEWPORT_ANCHOR,
     );
   } else {
@@ -277,7 +282,7 @@ watch(
     alignRobotRoot(
       robotScene.value,
       robotModel.value,
-      store.config.robot_root_name,
+      alignBodyName(),
       VIEWPORT_ANCHOR,
     );
     alignSkeletonToRobot(
@@ -286,7 +291,7 @@ watch(
       store.config.human_root_name,
       robotScene.value,
       robotModel.value,
-      store.config.robot_root_name,
+      alignBodyName(),
       VIEWPORT_ANCHOR,
     );
     refreshLines();

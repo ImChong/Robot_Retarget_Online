@@ -24,19 +24,43 @@ import {
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
-async function loadG1(): Promise<RobotModel> {
+async function loadRobotForAlign(id: string, xml: string, extraDirs: string[] = []): Promise<RobotModel> {
   const mujoco = await getMujoco();
-  const id = 'unitree_g1';
-  const xml = 'g1_mocap_29dof.xml';
   const dir = join(ROOT, 'public', 'robots', id);
   const vdir = `/working/align_${id}`;
   if (!mujoco.FS.analyzePath(vdir).exists) {
     mujoco.FS.mkdir(vdir);
-    mujoco.FS.mkdir(`${vdir}/meshes`);
-    for (const f of readdirSync(join(dir, 'meshes'))) {
-      mujoco.FS.writeFile(`${vdir}/meshes/${f}`, readFileSync(join(dir, 'meshes', f)));
+    for (const sub of extraDirs) {
+      mujoco.FS.mkdir(`${vdir}/${sub}`);
+      for (const f of readdirSync(join(dir, sub), { recursive: true })) {
+        if (typeof f === 'string' && !f.endsWith('/')) {
+          const rel = f;
+          const src = join(dir, rel);
+          if (readFileSync(src, { flag: 'r' }).byteLength >= 0) {
+            const parts = rel.split('/');
+            let cur = vdir;
+            for (const p of parts.slice(0, -1)) {
+              cur = `${cur}/${p}`;
+              if (!mujoco.FS.analyzePath(cur).exists) mujoco.FS.mkdir(cur);
+            }
+            mujoco.FS.writeFile(`${vdir}/${rel}`, readFileSync(src));
+          }
+        }
+      }
     }
-    mujoco.FS.writeFile(`${vdir}/${xml}`, readFileSync(join(dir, xml)));
+    function copyTree(src: string, dst: string) {
+      for (const ent of readdirSync(src, { withFileTypes: true })) {
+        const s = join(src, ent.name);
+        const d = `${dst}/${ent.name}`;
+        if (ent.isDirectory()) {
+          if (!mujoco.FS.analyzePath(d).exists) mujoco.FS.mkdir(d);
+          copyTree(s, d);
+        } else {
+          mujoco.FS.writeFile(d, readFileSync(s));
+        }
+      }
+    }
+    copyTree(dir, vdir);
   }
   const model = mujoco.MjModel.loadFromXML(`${vdir}/${xml}`);
   const data = new mujoco.MjData(model);
@@ -61,10 +85,47 @@ async function loadG1(): Promise<RobotModel> {
   };
 }
 
-/** Yaw of a body whose local +X points forward. */
+async function loadG1(): Promise<RobotModel> {
+  return loadRobotForAlign('unitree_g1', 'g1_mocap_29dof.xml');
+}
+
+async function loadToddy(): Promise<RobotModel> {
+  return loadRobotForAlign('stanford_toddy', 'toddy_mocap.xml');
+}
+
+/** Yaw of a body's local +X axis in the horizontal plane. */
 function forwardYaw(q: THREE.Quaternion): number {
   const f = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
   return Math.atan2(f.y, f.x);
+}
+
+function assertAlignedPair(
+  robot: RobotModel,
+  scene: ReturnType<typeof buildRobotScene>,
+  sk: ReturnType<typeof buildSkeletonView>,
+  anim: ReturnType<typeof parseBvh>,
+  alignBody: string,
+) {
+  const bodyId = robot.bodyIds.get(alignBody)!;
+  const rPos = new THREE.Vector3();
+  const rQuat = new THREE.Quaternion();
+  scene.bodyGroups.get(bodyId)!.getWorldPosition(rPos);
+  scene.bodyGroups.get(bodyId)!.getWorldQuaternion(rQuat);
+  expect(forwardYaw(rQuat)).toBeCloseTo(FACING_YAW, 3);
+  expect(rPos.x).toBeCloseTo(VIEWPORT_ANCHOR.x, 3);
+  expect(rPos.y).toBeCloseTo(VIEWPORT_ANCHOR.y + ROBOT_DEPTH_Y, 3);
+  expect(rPos.z).toBeCloseTo(VIEWPORT_ANCHOR.z, 3);
+
+  const hipsIdx = anim.joints.findIndex((j) => j.name === 'Hips');
+  const hPos = new THREE.Vector3();
+  sk.getJointWorldPos(hipsIdx, hPos);
+  expect(hPos.x).toBeCloseTo(VIEWPORT_ANCHOR.x, 3);
+  expect(hPos.y).toBeCloseTo(VIEWPORT_ANCHOR.y + HUMAN_DEPTH_Y, 3);
+  expect(hPos.z).toBeCloseTo(VIEWPORT_ANCHOR.z, 3);
+  expect(hipFacingYaw(sk, anim)).toBeCloseTo(FACING_YAW, 2);
+
+  expect(rPos.y).toBeLessThan(hPos.y);
+  expect(hPos.y - rPos.y).toBeCloseTo(HUMAN_DEPTH_Y - ROBOT_DEPTH_Y, 3);
 }
 
 /** Yaw of the skeleton's facing, from its left→right hip vector. */
@@ -91,29 +152,27 @@ describe('robot + BVH config alignment', () => {
     alignSkeletonToRobot(sk, anim, 'Hips', scene, robot, 'pelvis', VIEWPORT_ANCHOR);
     sk.root.updateMatrixWorld(true);
 
-    // Robot pelvis: faces the canonical axis, anchored in front of the BVH (-Y).
-    const pelvisId = robot.bodyIds.get('pelvis')!;
-    const rPos = new THREE.Vector3();
-    const rQuat = new THREE.Quaternion();
-    scene.bodyGroups.get(pelvisId)!.getWorldPosition(rPos);
-    scene.bodyGroups.get(pelvisId)!.getWorldQuaternion(rQuat);
-    expect(forwardYaw(rQuat)).toBeCloseTo(FACING_YAW, 3);
-    expect(rPos.x).toBeCloseTo(VIEWPORT_ANCHOR.x, 3);
-    expect(rPos.y).toBeCloseTo(VIEWPORT_ANCHOR.y + ROBOT_DEPTH_Y, 3);
-    expect(rPos.z).toBeCloseTo(VIEWPORT_ANCHOR.z, 3);
+    assertAlignedPair(robot, scene, sk, anim, 'pelvis');
 
-    // BVH Hips: anchored behind the robot (+Y), facing the same axis as the robot.
-    const hipsIdx = anim.joints.findIndex((j) => j.name === 'Hips');
-    const hPos = new THREE.Vector3();
-    sk.getJointWorldPos(hipsIdx, hPos);
-    expect(hPos.x).toBeCloseTo(VIEWPORT_ANCHOR.x, 3);
-    expect(hPos.y).toBeCloseTo(VIEWPORT_ANCHOR.y + HUMAN_DEPTH_Y, 3);
-    expect(hPos.z).toBeCloseTo(VIEWPORT_ANCHOR.z, 3);
-    expect(hipFacingYaw(sk, anim)).toBeCloseTo(FACING_YAW, 2);
+    sk.dispose();
+    scene.dispose();
+  });
 
-    // Robot sits in front of the BVH (closer to the -Y camera) by the configured gap.
-    expect(rPos.y).toBeLessThan(hPos.y);
-    expect(hPos.y - rPos.y).toBeCloseTo(HUMAN_DEPTH_Y - ROBOT_DEPTH_Y, 3);
+  it('aligns Stanford ToddlerBot when using torso for viewport facing', async () => {
+    const robot = await loadToddy();
+    (robot.data.qpos as Float64Array).set(robot.model.qpos0 as Float64Array);
+    robot.mujoco.mj_kinematics(robot.model, robot.data);
+
+    const scene = buildRobotScene(robot);
+    alignRobotRoot(scene, robot, 'torso', VIEWPORT_ANCHOR);
+    scene.root.updateMatrixWorld(true);
+
+    const anim = parseBvh(readFileSync(join(ROOT, 'public', 'sample_motions', 'walk.bvh'), 'utf-8'));
+    const sk = buildSkeletonView(anim, 0.01);
+    alignSkeletonToRobot(sk, anim, 'Hips', scene, robot, 'torso', VIEWPORT_ANCHOR);
+    sk.root.updateMatrixWorld(true);
+
+    assertAlignedPair(robot, scene, sk, anim, 'torso');
 
     sk.dispose();
     scene.dispose();

@@ -33,6 +33,8 @@ export interface RobotManifestEntry {
   /** files relative to robots/<id>/ */
   files: string[];
   baseBody: string;
+  /** Body whose local +X defines viewport facing; defaults to baseBody when omitted. */
+  alignBody?: string;
   camDistance: number;
   configKey: string;
 }
