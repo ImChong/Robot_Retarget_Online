@@ -36,10 +36,12 @@ void locale.value;
 <template>
   <v-app>
     <v-app-bar density="comfortable" flat border class="app-bar">
-      <v-app-bar-title class="app-title">
-        <span class="app-logo mr-2" aria-hidden="true">🔄</span>
-        <span class="font-weight-bold d-none d-sm-inline">{{ t('appTitleBilingual') }}</span>
-        <span class="text-medium-emphasis ml-2 d-none d-lg-inline" style="font-size: 0.8em">
+      <v-app-bar-title class="app-title" :aria-label="t('appTitleBilingual')">
+        <span class="app-title-inner">
+          <span class="app-logo" aria-hidden="true">🔄</span>
+          <span class="app-title-text font-weight-bold">{{ t('appTitleBilingual') }}</span>
+        </span>
+        <span class="text-medium-emphasis ml-2 d-none d-lg-inline app-title-badge" style="font-size: 0.8em">
           GMR
         </span>
       </v-app-bar-title>
@@ -139,14 +141,44 @@ void locale.value;
 }
 
 .app-title {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
+}
+
+.app-title-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.app-title-text {
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-logo {
+  flex: 0 0 auto;
   font-size: 1.35rem;
   line-height: 1;
-  vertical-align: middle;
+}
+
+.app-title-badge {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 768px) {
+  .app-title-text {
+    font-size: 0.94rem;
+  }
+
+  .app-logo {
+    font-size: 1.15rem;
+  }
 }
 
 .app-bar-actions {
