@@ -37,7 +37,9 @@ export class SceneManager {
     this.camera.position.set(cp[0], cp[1], cp[2]);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const isMobile = window.matchMedia('(max-width: 959.98px)').matches;
+    const dprCap = isMobile ? 1.5 : 2;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -61,7 +63,7 @@ export class SceneManager {
     const dir = new THREE.DirectionalLight(0xffffff, 2.2);
     dir.position.set(3, -2.5, 5);
     dir.castShadow = true;
-    dir.shadow.mapSize.set(2048, 2048);
+    dir.shadow.mapSize.set(isMobile ? 1024 : 2048, isMobile ? 1024 : 2048);
     dir.shadow.camera.left = -5;
     dir.shadow.camera.right = 5;
     dir.shadow.camera.top = 5;
@@ -101,6 +103,11 @@ export class SceneManager {
   stop() {
     this.running = false;
     cancelAnimationFrame(this.rafId);
+  }
+
+  /** Re-run layout after container size changes (e.g. drawer open/close). */
+  resize() {
+    this.onResize();
   }
 
   private onResize() {

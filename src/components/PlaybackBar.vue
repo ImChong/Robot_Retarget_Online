@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { mdiPlay, mdiPause, mdiSkipPrevious, mdiSkipNext, mdiRestart } from '@mdi/js';
+import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import type { PlaybackController } from '@/composables/usePlayback';
 
 const props = defineProps<{ controller: PlaybackController }>();
 const { t } = useI18n();
+const { smAndDown } = useDisplay();
 
 const state = props.controller.state;
 
@@ -20,6 +22,10 @@ const timeLabel = computed(() => {
   return `${cur.toFixed(2)}s / ${total.toFixed(2)}s`;
 });
 
+const frameShort = computed(
+  () => `${Math.floor(state.frame)} / ${Math.max(state.frameCount - 1, 0)}`,
+);
+
 const speeds = [0.25, 0.5, 1, 1.5, 2];
 
 function step(delta: number) {
@@ -30,52 +36,62 @@ function step(delta: number) {
 </script>
 
 <template>
-  <div class="playback-bar d-flex align-center px-3 py-1 ga-2">
-    <v-btn :icon="mdiSkipPrevious" size="small" variant="text" @click="step(-1)" />
-    <v-btn
-      :icon="state.playing ? mdiPause : mdiPlay"
-      color="primary"
-      size="small"
-      variant="tonal"
-      @click="controller.toggle()"
-    />
-    <v-btn :icon="mdiSkipNext" size="small" variant="text" @click="step(1)" />
+  <div class="playback-bar" :class="{ 'playback-bar--compact': smAndDown }">
+    <div class="playback-row playback-row--transport d-flex align-center ga-1">
+      <v-btn :icon="mdiSkipPrevious" size="small" variant="text" @click="step(-1)" />
+      <v-btn
+        :icon="state.playing ? mdiPause : mdiPlay"
+        color="primary"
+        size="small"
+        variant="tonal"
+        @click="controller.toggle()"
+      />
+      <v-btn :icon="mdiSkipNext" size="small" variant="text" @click="step(1)" />
 
-    <v-slider
-      v-model="sliderValue"
-      class="flex-grow-1 mx-2"
-      :min="0"
-      :max="Math.max(state.frameCount - 1, 0)"
-      :step="1"
-      color="primary"
-      track-size="3"
-      thumb-size="12"
-    />
+      <v-slider
+        v-model="sliderValue"
+        class="flex-grow-1 mx-1"
+        :min="0"
+        :max="Math.max(state.frameCount - 1, 0)"
+        :step="1"
+        color="primary"
+        track-size="3"
+        thumb-size="12"
+        hide-details
+      />
 
-    <span class="text-caption text-medium-emphasis frame-label">
-      {{ t('frame') }} {{ Math.floor(state.frame) }} / {{ Math.max(state.frameCount - 1, 0) }}
-      · {{ timeLabel }}
-    </span>
+      <v-btn
+        :icon="mdiRestart"
+        size="small"
+        variant="text"
+        :color="state.loop ? 'primary' : undefined"
+        :title="t('loop')"
+        @click="state.loop = !state.loop"
+      />
+    </div>
 
-    <v-select
-      v-model="state.speed"
-      :items="speeds"
-      style="max-width: 92px"
-      density="compact"
-      variant="outlined"
-      hide-details
-    >
-      <template #selection="{ item }">{{ item.value }}×</template>
-    </v-select>
+    <div class="playback-row playback-row--meta d-flex align-center ga-2 px-1">
+      <span class="text-caption text-medium-emphasis frame-label">
+        <template v-if="smAndDown">{{ frameShort }} · {{ timeLabel }}</template>
+        <template v-else>
+          {{ t('frame') }} {{ Math.floor(state.frame) }} / {{ Math.max(state.frameCount - 1, 0) }}
+          · {{ timeLabel }}
+        </template>
+      </span>
 
-    <v-btn
-      :icon="mdiRestart"
-      size="small"
-      variant="text"
-      :color="state.loop ? 'primary' : undefined"
-      :title="t('loop')"
-      @click="state.loop = !state.loop"
-    />
+      <v-spacer v-if="smAndDown" />
+
+      <v-select
+        v-model="state.speed"
+        :items="speeds"
+        class="speed-select"
+        density="compact"
+        variant="outlined"
+        hide-details
+      >
+        <template #selection="{ item }">{{ item.value }}×</template>
+      </v-select>
+    </div>
   </div>
 </template>
 
@@ -83,9 +99,27 @@ function step(delta: number) {
 .playback-bar {
   background: rgba(29, 32, 38, 0.92);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 4px 8px 6px;
+  flex-shrink: 0;
+}
+.playback-row--transport {
+  min-width: 0;
+}
+.playback-row--meta {
+  margin-top: 2px;
 }
 .frame-label {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.speed-select {
+  flex: 0 0 auto;
+  max-width: 92px;
+}
+.playback-bar--compact .speed-select {
+  max-width: 76px;
 }
 </style>

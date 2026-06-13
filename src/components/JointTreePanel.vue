@@ -55,8 +55,10 @@ function toggle(index: number) {
 }
 .joint-row {
   cursor: pointer;
-  padding: 1px 8px;
+  padding: 2px 8px;
   border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .joint-row:hover {

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { mdiTranslate, mdiGithub, mdiRobotExcited } from '@mdi/js';
 
 const { t, toggleLocale, localeLabel, locale } = useI18n();
+const { mdAndUp } = useDisplay();
 const route = useRoute();
 const router = useRouter();
 
@@ -30,19 +32,19 @@ void locale.value;
     <v-app-bar density="comfortable" flat border>
       <v-app-bar-title class="app-title">
         <v-icon :icon="mdiRobotExcited" color="primary" class="mr-2" />
-        <span class="font-weight-bold">{{ t('appTitle') }}</span>
-        <span class="text-medium-emphasis ml-2 d-none d-md-inline" style="font-size: 0.8em">
+        <span class="font-weight-bold d-none d-sm-inline">{{ t('appTitle') }}</span>
+        <span class="text-medium-emphasis ml-2 d-none d-lg-inline" style="font-size: 0.8em">
           GMR · Unitree G1 / Booster T1
         </span>
       </v-app-bar-title>
 
-      <v-tabs v-model="currentTab" color="primary" class="d-none d-sm-flex">
+      <v-tabs v-if="mdAndUp" v-model="currentTab" color="primary">
         <v-tab v-for="tab in tabs" :key="tab.value" :value="tab.value">{{ tab.label }}</v-tab>
       </v-tabs>
 
       <v-spacer />
 
-      <v-btn variant="text" :prepend-icon="mdiTranslate" @click="toggleLocale">
+      <v-btn variant="text" :prepend-icon="mdiTranslate" class="locale-btn" @click="toggleLocale">
         {{ localeLabel }}
       </v-btn>
       <v-btn
@@ -54,8 +56,7 @@ void locale.value;
       />
     </v-app-bar>
 
-    <!-- Mobile nav -->
-    <v-bottom-navigation v-if="$vuetify.display.xs" v-model="currentTab" grow color="primary">
+    <v-bottom-navigation v-if="!mdAndUp" v-model="currentTab" grow color="primary" class="bottom-nav">
       <v-btn v-for="tab in tabs" :key="tab.value" :value="tab.value">{{ tab.label }}</v-btn>
     </v-bottom-navigation>
 
@@ -70,14 +71,42 @@ void locale.value;
 </template>
 
 <style>
-html {
-  overflow-y: hidden !important;
+:root {
+  --app-bar-height: 64px;
+  --app-bottom-nav-height: 0px;
 }
+
+@media (max-width: 959.98px) {
+  :root {
+    --app-bottom-nav-height: 56px;
+  }
+
+  html {
+    overflow-y: auto !important;
+  }
+}
+
+@media (min-width: 960px) {
+  html {
+    overflow-y: hidden !important;
+  }
+}
+
 .app-main {
-  height: 100vh;
+  height: calc(100dvh - var(--app-bar-height) - var(--app-bottom-nav-height));
+  overflow: hidden;
 }
+
 .app-title {
   flex: 0 0 auto;
   min-width: 0;
+}
+
+.bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.locale-btn {
+  min-width: 0 !important;
 }
 </style>
