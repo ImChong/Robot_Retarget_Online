@@ -10,6 +10,7 @@ import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonVie
 import FileDropZone from '@/components/FileDropZone.vue';
 import PlaybackBar from '@/components/PlaybackBar.vue';
 import JointTreePanel from '@/components/JointTreePanel.vue';
+import MobileSidePanel from '@/components/MobileSidePanel.vue';
 
 const { t } = useI18n();
 const { mdAndUp } = useDisplay();
@@ -117,62 +118,52 @@ onUnmounted(() => {
   <div class="page-root d-flex">
     <input ref="fileInput" type="file" accept=".bvh" class="d-none" @change="onFileChosen" />
 
-    <v-navigation-drawer
-      :model-value="mdAndUp || panelOpen"
-      :permanent="mdAndUp"
-      :temporary="!mdAndUp"
-      location="start"
-      :width="mdAndUp ? 300 : 'min(320px, 100vw)'"
-      class="side-drawer"
-      @update:model-value="(v: boolean) => { if (!mdAndUp) panelOpen = v; }"
-    >
-      <div class="side-panel pa-3 d-flex flex-column ga-3">
-        <v-btn color="primary" :prepend-icon="mdiFolderOpen" block @click="openFilePicker">
-          {{ t('openBvh') }}
-        </v-btn>
+    <MobileSidePanel v-model="panelOpen">
+      <v-btn color="primary" :prepend-icon="mdiFolderOpen" block @click="openFilePicker">
+        {{ t('openBvh') }}
+      </v-btn>
 
-        <v-menu>
-          <template #activator="{ props: mProps }">
-            <v-btn v-bind="mProps" variant="tonal" :prepend-icon="mdiRun" block :loading="sampleLoading">
-              {{ t('loadSample') }}
-            </v-btn>
-          </template>
-          <v-list density="compact">
-            <v-list-item v-for="s in samples" :key="s.file" :title="s.title" @click="loadSample(s.file)" />
-          </v-list>
-        </v-menu>
+      <v-menu>
+        <template #activator="{ props: mProps }">
+          <v-btn v-bind="mProps" variant="tonal" :prepend-icon="mdiRun" block :loading="sampleLoading">
+            {{ t('loadSample') }}
+          </v-btn>
+        </template>
+        <v-list density="compact">
+          <v-list-item v-for="s in samples" :key="s.file" :title="s.title" @click="loadSample(s.file)" />
+        </v-list>
+      </v-menu>
 
-        <v-card v-if="motion.hasMotion" variant="tonal" density="compact">
-          <v-card-title class="text-subtitle-2">{{ t('motionInfo') }}</v-card-title>
-          <v-card-text class="text-body-2">
-            <div class="info-line"><span>{{ t('fileName') }}</span><b class="text-truncate">{{ motion.fileName }}</b></div>
-            <div class="info-line"><span>{{ t('frames') }}</span><b>{{ motion.frameCount }} @ {{ motion.fps.toFixed(0) }} fps</b></div>
-            <div class="info-line"><span>{{ t('duration') }}</span><b>{{ motion.duration.toFixed(2) }} s</b></div>
-            <div class="info-line"><span>{{ t('joints') }}</span><b>{{ motion.jointNames.length }}</b></div>
-            <div class="info-line"><span>{{ t('estHeight') }}</span><b>{{ motion.estHeightMeters.toFixed(2) }} m</b></div>
-            <div class="info-line"><span>{{ t('units') }}</span><b>{{ motion.unitScale === 0.01 ? 'cm' : 'm' }}</b></div>
+      <v-card v-if="motion.hasMotion" variant="tonal" density="compact">
+        <v-card-title class="text-subtitle-2">{{ t('motionInfo') }}</v-card-title>
+        <v-card-text class="text-body-2">
+          <div class="info-line"><span>{{ t('fileName') }}</span><b class="text-truncate">{{ motion.fileName }}</b></div>
+          <div class="info-line"><span>{{ t('frames') }}</span><b>{{ motion.frameCount }} @ {{ motion.fps.toFixed(0) }} fps</b></div>
+          <div class="info-line"><span>{{ t('duration') }}</span><b>{{ motion.duration.toFixed(2) }} s</b></div>
+          <div class="info-line"><span>{{ t('joints') }}</span><b>{{ motion.jointNames.length }}</b></div>
+          <div class="info-line"><span>{{ t('estHeight') }}</span><b>{{ motion.estHeightMeters.toFixed(2) }} m</b></div>
+          <div class="info-line"><span>{{ t('units') }}</span><b>{{ motion.unitScale === 0.01 ? 'cm' : 'm' }}</b></div>
+        </v-card-text>
+      </v-card>
+
+      <template v-if="motion.anim">
+        <div class="text-subtitle-2 mt-1">{{ t('jointTree') }}</div>
+        <JointTreePanel
+          class="joint-tree-grow"
+          :anim="motion.anim"
+          :selected="selectedJoint"
+          @select="(j) => (selectedJoint = j)"
+        />
+        <v-card v-if="selectedInfo" variant="outlined" density="compact">
+          <v-card-text class="text-caption">
+            <div class="info-line"><span>Joint</span><b>{{ selectedInfo.name }}</b></div>
+            <div class="info-line"><span>Parent</span><b>{{ selectedInfo.parent }}</b></div>
+            <div class="info-line"><span>Offset</span><b>{{ selectedInfo.offset }}</b></div>
+            <div class="info-line"><span>Channels</span><b class="text-truncate">{{ selectedInfo.channels }}</b></div>
           </v-card-text>
         </v-card>
-
-        <template v-if="motion.anim">
-          <div class="text-subtitle-2 mt-1">{{ t('jointTree') }}</div>
-          <JointTreePanel
-            class="joint-tree-grow"
-            :anim="motion.anim"
-            :selected="selectedJoint"
-            @select="(j) => (selectedJoint = j)"
-          />
-          <v-card v-if="selectedInfo" variant="outlined" density="compact">
-            <v-card-text class="text-caption">
-              <div class="info-line"><span>Joint</span><b>{{ selectedInfo.name }}</b></div>
-              <div class="info-line"><span>Parent</span><b>{{ selectedInfo.parent }}</b></div>
-              <div class="info-line"><span>Offset</span><b>{{ selectedInfo.offset }}</b></div>
-              <div class="info-line"><span>Channels</span><b class="text-truncate">{{ selectedInfo.channels }}</b></div>
-            </v-card-text>
-          </v-card>
-        </template>
-      </div>
-    </v-navigation-drawer>
+      </template>
+    </MobileSidePanel>
 
     <FileDropZone class="main-col flex-grow-1" @load="loadText">
       <div class="viewport-col d-flex flex-column">
@@ -210,9 +201,6 @@ onUnmounted(() => {
   height: 100%;
   min-height: 0;
   position: relative;
-}
-.side-drawer :deep(.v-navigation-drawer__content) {
-  overflow-y: auto;
 }
 .main-col {
   min-width: 0;

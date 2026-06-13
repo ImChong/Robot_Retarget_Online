@@ -11,6 +11,7 @@ import { buildRobotScene, type RobotSceneObject } from '@/lib/mujoco/threeScene'
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
 import MappingTable from '@/components/MappingTable.vue';
+import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import { downloadBlob } from '@/lib/export/motion';
 
 const { t } = useI18n();
@@ -197,82 +198,72 @@ onUnmounted(() => {
   <div class="page-root d-flex">
     <input ref="importInput" type="file" accept=".json" class="d-none" @change="onImportChosen" />
 
-    <v-navigation-drawer
-      :model-value="mdAndUp || panelOpen"
-      :permanent="mdAndUp"
-      :temporary="!mdAndUp"
-      location="start"
-      :width="mdAndUp ? 300 : 'min(320px, 100vw)'"
-      class="side-drawer"
-      @update:model-value="(v: boolean) => { if (!mdAndUp) panelOpen = v; }"
-    >
-      <div class="side-panel pa-3 d-flex flex-column ga-3">
-        <v-select
-          v-model="store.robotId"
-          :items="robotItems"
-          :label="t('robot')"
-          @update:model-value="(v: string) => store.setRobot(v)"
-        />
+    <MobileSidePanel v-model="panelOpen">
+      <v-select
+        v-model="store.robotId"
+        :items="robotItems"
+        :label="t('robot')"
+        @update:model-value="(v: string) => store.setRobot(v)"
+      />
 
-        <v-card variant="tonal" density="compact">
-          <v-card-title class="text-subtitle-2">{{ t('globalParams') }}</v-card-title>
-          <v-card-text class="d-flex flex-column ga-2">
-            <v-text-field
-              v-model.number="store.solver.actualHumanHeight"
-              type="number"
-              step="0.01"
-              :label="t('actualHumanHeight')"
-            />
-            <v-text-field
-              :model-value="store.config.human_height_assumption"
-              type="number"
-              step="0.01"
-              :label="t('heightAssumption')"
-              @update:model-value="(v: string) => (store.config.human_height_assumption = parseFloat(v) || 1.8)"
-            />
-            <v-text-field
-              v-model.number="store.solver.groundOffset"
-              type="number"
-              step="0.01"
-              :label="t('groundHeight')"
-            />
-          </v-card-text>
-        </v-card>
+      <v-card variant="tonal" density="compact">
+        <v-card-title class="text-subtitle-2">{{ t('globalParams') }}</v-card-title>
+        <v-card-text class="d-flex flex-column ga-2">
+          <v-text-field
+            v-model.number="store.solver.actualHumanHeight"
+            type="number"
+            step="0.01"
+            :label="t('actualHumanHeight')"
+          />
+          <v-text-field
+            :model-value="store.config.human_height_assumption"
+            type="number"
+            step="0.01"
+            :label="t('heightAssumption')"
+            @update:model-value="(v: string) => (store.config.human_height_assumption = parseFloat(v) || 1.8)"
+          />
+          <v-text-field
+            v-model.number="store.solver.groundOffset"
+            type="number"
+            step="0.01"
+            :label="t('groundHeight')"
+          />
+        </v-card-text>
+      </v-card>
 
-        <v-card variant="tonal" density="compact">
-          <v-card-title class="text-subtitle-2">{{ t('solverParams') }}</v-card-title>
-          <v-card-text class="d-flex flex-column ga-2">
-            <v-text-field v-model.number="store.solver.damping" type="number" step="0.1" :label="t('damping')" />
-            <v-text-field v-model.number="store.solver.maxIter" type="number" step="1" :label="t('maxIter')" />
-            <v-switch
-              v-model="store.solver.useVelocityLimit"
-              :label="t('velocityLimit')"
-              color="primary"
-              density="compact"
-              hide-details
-            />
-          </v-card-text>
-        </v-card>
+      <v-card variant="tonal" density="compact">
+        <v-card-title class="text-subtitle-2">{{ t('solverParams') }}</v-card-title>
+        <v-card-text class="d-flex flex-column ga-2">
+          <v-text-field v-model.number="store.solver.damping" type="number" step="0.1" :label="t('damping')" />
+          <v-text-field v-model.number="store.solver.maxIter" type="number" step="1" :label="t('maxIter')" />
+          <v-switch
+            v-model="store.solver.useVelocityLimit"
+            :label="t('velocityLimit')"
+            color="primary"
+            density="compact"
+            hide-details
+          />
+        </v-card-text>
+      </v-card>
 
-        <div class="d-flex flex-column ga-2">
-          <v-btn variant="tonal" :prepend-icon="mdiUpload" @click="importInput?.click()">
-            {{ t('importConfig') }}
-          </v-btn>
-          <v-btn variant="tonal" :prepend-icon="mdiDownload" @click="onExportConfig">
-            {{ t('exportConfig') }}
-          </v-btn>
-          <v-btn variant="text" color="warning" :prepend-icon="mdiBackupRestore" @click="store.resetConfig()">
-            {{ t('resetConfig') }}
-          </v-btn>
-        </div>
-
-        <div class="text-caption text-medium-emphasis">{{ t('configHint') }}</div>
-
-        <v-switch v-model="showHuman" :label="t('showHuman')" color="primary" density="compact" hide-details />
-        <v-switch v-model="showLines" :label="t('showLines')" color="primary" density="compact" hide-details />
-        <div v-if="!motion.hasMotion" class="text-caption text-warning">{{ t('noMotionHint') }}</div>
+      <div class="d-flex flex-column ga-2">
+        <v-btn variant="tonal" :prepend-icon="mdiUpload" @click="importInput?.click()">
+          {{ t('importConfig') }}
+        </v-btn>
+        <v-btn variant="tonal" :prepend-icon="mdiDownload" @click="onExportConfig">
+          {{ t('exportConfig') }}
+        </v-btn>
+        <v-btn variant="text" color="warning" :prepend-icon="mdiBackupRestore" @click="store.resetConfig()">
+          {{ t('resetConfig') }}
+        </v-btn>
       </div>
-    </v-navigation-drawer>
+
+      <div class="text-caption text-medium-emphasis">{{ t('configHint') }}</div>
+
+      <v-switch v-model="showHuman" :label="t('showHuman')" color="primary" density="compact" hide-details />
+      <v-switch v-model="showLines" :label="t('showLines')" color="primary" density="compact" hide-details />
+      <div v-if="!motion.hasMotion" class="text-caption text-warning">{{ t('noMotionHint') }}</div>
+    </MobileSidePanel>
 
     <div class="main-col d-flex flex-column flex-grow-1">
       <div ref="viewportEl" class="viewport" />
@@ -345,9 +336,6 @@ onUnmounted(() => {
   height: 100%;
   min-height: 0;
   position: relative;
-}
-.side-drawer :deep(.v-navigation-drawer__content) {
-  overflow-y: auto;
 }
 .main-col {
   min-width: 0;

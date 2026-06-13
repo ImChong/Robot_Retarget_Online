@@ -11,6 +11,7 @@ import { SceneManager } from '@/lib/viewport/SceneManager';
 import { buildKeypointCloud, type KeypointCloud } from '@/lib/viewport/skeletonView';
 import { usePlayback } from '@/composables/usePlayback';
 import PlaybackBar from '@/components/PlaybackBar.vue';
+import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import ErrorChart from '@/components/ErrorChart.vue';
 import { exportCsv, exportJson, exportNpz, downloadBlob } from '@/lib/export/motion';
 
@@ -137,79 +138,69 @@ onUnmounted(() => {
 
 <template>
   <div class="page-root d-flex">
-    <v-navigation-drawer
-      :model-value="mdAndUp || panelOpen"
-      :permanent="mdAndUp"
-      :temporary="!mdAndUp"
-      location="start"
-      :width="mdAndUp ? 300 : 'min(320px, 100vw)'"
-      class="side-drawer"
-      @update:model-value="(v: boolean) => { if (!mdAndUp) panelOpen = v; }"
-    >
-      <div class="side-panel pa-3 d-flex flex-column ga-3">
-        <v-btn
-          v-if="!store.isBusy"
-          color="primary"
-          size="large"
-          :prepend-icon="mdiPlayCircle"
-          :disabled="!motion.hasMotion"
-          block
-          @click="run"
-        >
-          {{ t('runRetarget') }}
-        </v-btn>
-        <v-btn v-else color="error" variant="tonal" :prepend-icon="mdiStopCircle" block @click="store.cancel()">
-          {{ t('cancel') }}
-        </v-btn>
+    <MobileSidePanel v-model="panelOpen">
+      <v-btn
+        v-if="!store.isBusy"
+        color="primary"
+        size="large"
+        :prepend-icon="mdiPlayCircle"
+        :disabled="!motion.hasMotion"
+        block
+        @click="run"
+      >
+        {{ t('runRetarget') }}
+      </v-btn>
+      <v-btn v-else color="error" variant="tonal" :prepend-icon="mdiStopCircle" block @click="store.cancel()">
+        {{ t('cancel') }}
+      </v-btn>
 
-        <div v-if="!motion.hasMotion" class="text-caption text-warning">{{ t('noMotionHint') }}</div>
+      <div v-if="!motion.hasMotion" class="text-caption text-warning">{{ t('noMotionHint') }}</div>
 
-        <div v-if="store.status === 'loading-robot'" class="text-caption">
-          {{ t('loadingRobot') }} {{ store.robotLoadProgress.done }}/{{ store.robotLoadProgress.total }}
-        </div>
-
-        <template v-if="store.status === 'running'">
-          <v-progress-linear :model-value="progressPct" color="primary" height="18" rounded>
-            <span class="text-caption">
-              {{ t('retargeting') }} {{ store.runProgress.done }}/{{ store.runProgress.total }}
-            </span>
-          </v-progress-linear>
-        </template>
-
-        <v-alert v-if="store.status === 'error'" type="error" density="compact" variant="tonal">
-          {{ store.errorMessage }}
-        </v-alert>
-
-        <v-card v-if="stats" variant="tonal" density="compact">
-          <v-card-title class="text-subtitle-2">{{ t('statsTitle') }}</v-card-title>
-          <v-card-text class="text-body-2">
-            <div class="info-line"><span>{{ t('robot') }}</span><b>{{ store.result?.robotId }}</b></div>
-            <div class="info-line"><span>{{ t('frames') }}</span><b>{{ stats.frames }}</b></div>
-            <div class="info-line"><span>{{ t('solveTime') }}</span><b>{{ stats.time }}</b></div>
-            <div class="info-line"><span>{{ t('procSpeed') }}</span><b>{{ stats.speed }}</b></div>
-          </v-card-text>
-        </v-card>
-
-        <template v-if="store.result">
-          <v-switch v-model="showGhost" :label="t('showGhost')" color="primary" density="compact" hide-details />
-          <v-switch v-model="followCamera" :label="t('followCamera')" color="primary" density="compact" hide-details />
-
-          <div class="text-subtitle-2 mt-2">{{ t('export') }}</div>
-          <v-btn variant="tonal" :prepend-icon="mdiDownload" block @click="onExport('npz')">
-            {{ t('exportNpz') }}
-          </v-btn>
-          <v-btn variant="tonal" :prepend-icon="mdiDownload" block @click="onExport('csv')">
-            {{ t('exportCsv') }}
-          </v-btn>
-          <v-btn variant="tonal" :prepend-icon="mdiDownload" block @click="onExport('json')">
-            {{ t('exportJson') }}
-          </v-btn>
-        </template>
-        <div v-else-if="store.status !== 'running'" class="text-caption text-disabled mt-2">
-          {{ t('notRun') }}
-        </div>
+      <div v-if="store.status === 'loading-robot'" class="text-caption">
+        {{ t('loadingRobot') }} {{ store.robotLoadProgress.done }}/{{ store.robotLoadProgress.total }}
       </div>
-    </v-navigation-drawer>
+
+      <template v-if="store.status === 'running'">
+        <v-progress-linear :model-value="progressPct" color="primary" height="18" rounded>
+          <span class="text-caption">
+            {{ t('retargeting') }} {{ store.runProgress.done }}/{{ store.runProgress.total }}
+          </span>
+        </v-progress-linear>
+      </template>
+
+      <v-alert v-if="store.status === 'error'" type="error" density="compact" variant="tonal">
+        {{ store.errorMessage }}
+      </v-alert>
+
+      <v-card v-if="stats" variant="tonal" density="compact">
+        <v-card-title class="text-subtitle-2">{{ t('statsTitle') }}</v-card-title>
+        <v-card-text class="text-body-2">
+          <div class="info-line"><span>{{ t('robot') }}</span><b>{{ store.result?.robotId }}</b></div>
+          <div class="info-line"><span>{{ t('frames') }}</span><b>{{ stats.frames }}</b></div>
+          <div class="info-line"><span>{{ t('solveTime') }}</span><b>{{ stats.time }}</b></div>
+          <div class="info-line"><span>{{ t('procSpeed') }}</span><b>{{ stats.speed }}</b></div>
+        </v-card-text>
+      </v-card>
+
+      <template v-if="store.result">
+        <v-switch v-model="showGhost" :label="t('showGhost')" color="primary" density="compact" hide-details />
+        <v-switch v-model="followCamera" :label="t('followCamera')" color="primary" density="compact" hide-details />
+
+        <div class="text-subtitle-2 mt-2">{{ t('export') }}</div>
+        <v-btn variant="tonal" :prepend-icon="mdiDownload" block @click="onExport('npz')">
+          {{ t('exportNpz') }}
+        </v-btn>
+        <v-btn variant="tonal" :prepend-icon="mdiDownload" block @click="onExport('csv')">
+          {{ t('exportCsv') }}
+        </v-btn>
+        <v-btn variant="tonal" :prepend-icon="mdiDownload" block @click="onExport('json')">
+          {{ t('exportJson') }}
+        </v-btn>
+      </template>
+      <div v-else-if="store.status !== 'running'" class="text-caption text-disabled mt-2">
+        {{ t('notRun') }}
+      </div>
+    </MobileSidePanel>
 
     <div class="main-col d-flex flex-column flex-grow-1">
       <div ref="viewportEl" class="viewport flex-grow-1" />
@@ -238,9 +229,6 @@ onUnmounted(() => {
   height: 100%;
   min-height: 0;
   position: relative;
-}
-.side-drawer :deep(.v-navigation-drawer__content) {
-  overflow-y: auto;
 }
 .main-col {
   min-width: 0;
