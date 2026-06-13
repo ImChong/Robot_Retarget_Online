@@ -5,7 +5,7 @@ import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore } from '@/stores/retarget';
-import { loadRobot, type RobotModel } from '@/lib/mujoco/runtime';
+import type { RobotModel } from '@/lib/mujoco/runtime';
 import { buildRobotScene, type RobotSceneObject } from '@/lib/mujoco/threeScene';
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { buildKeypointCloud, type KeypointCloud } from '@/lib/viewport/skeletonView';
@@ -55,7 +55,7 @@ async function setupResultScene() {
   const result = store.result;
   if (!sm || !result) return;
 
-  const robot = await loadRobot(result.robotId);
+  const robot = await store.ensureRobot();
   robotModel.value = robot;
 
   robotScene.value?.dispose();

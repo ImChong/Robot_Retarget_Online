@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
 import * as THREE from 'three';
-import { mdiDownload, mdiUpload, mdiBackupRestore, mdiTune } from '@mdi/js';
+import { mdiDownload, mdiUpload, mdiBackupRestore, mdiTune, mdiRobotOutline } from '@mdi/js';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
-import { useRetargetStore } from '@/stores/retarget';
-import { getRobotManifest, loadRobot, type RobotManifestEntry, type RobotModel } from '@/lib/mujoco/runtime';
+import { useRetargetStore, CUSTOM_ROBOT_ID } from '@/stores/retarget';
+import { getRobotManifest, type RobotManifestEntry, type RobotModel } from '@/lib/mujoco/runtime';
 import { buildRobotScene, type RobotSceneObject } from '@/lib/mujoco/threeScene';
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
@@ -66,12 +66,18 @@ const showLines = ref(true);
 const showHuman = ref(true);
 const highlightBody = ref<string | null>(null);
 const importInput = ref<HTMLInputElement | null>(null);
+const urdfInput = ref<HTMLInputElement | null>(null);
+const urdfSpecOpen = ref<string | undefined>(undefined);
 const activeTab = ref('stage1');
 const panelOpen = ref(false);
 
-const robotItems = computed(() =>
-  manifest.value.map((m) => ({ title: m.label, value: m.id })),
-);
+const robotItems = computed(() => {
+  const items = manifest.value.map((m) => ({ title: m.label, value: m.id }));
+  if (store.customRobot) {
+    items.unshift({ title: `${store.customRobot.label} (${t('customRobot')})`, value: CUSTOM_ROBOT_ID });
+  }
+  return items;
+});
 
 const robotBodies = computed(() => robotModel.value?.bodyNames ?? []);
 
@@ -82,10 +88,9 @@ async function ensureRobotScene() {
   showLoadingStrip('loading', t('loadingMujoco'));
   let loadTotal = 0;
   try {
-    const robot = await loadRobot(store.robotId, (done, total) => {
-      loadTotal = total;
-      loadingText.value = `${t('loadingRobot')} ${done}/${total}`;
-    });
+    store.robotLoadProgress = { done: 0, total: 1 };
+    const robot = await store.ensureRobot();
+    loadTotal = store.robotLoadProgress.total;
     robotModel.value = robot;
     robotScene.value?.dispose();
     const scene = buildRobotScene(robot);
@@ -219,7 +224,31 @@ function onImportChosen(e: Event) {
   (e.target as HTMLInputElement).value = '';
 }
 
+async function onUrdfChosen(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  (e.target as HTMLInputElement).value = '';
+  showLoadingStrip('loading', t('loadingRobot'));
+  try {
+    await store.importCustomRobot(file);
+    await ensureRobotScene();
+    showLoadingStrip('success', t('urdfImportSuccess'));
+    scheduleHideStrip();
+  } catch (err) {
+    showLoadingStrip('error', err instanceof Error ? err.message : String(err));
+  }
+}
+
 watch(() => store.robotId, ensureRobotScene);
+watch(
+  () => store.robotLoadProgress,
+  ({ done, total }) => {
+    if (stripState.value === 'loading' && total > 0) {
+      loadingText.value = `${t('loadingRobot')} ${done}/${total}`;
+    }
+  },
+  { deep: true },
+);
 watch(() => motion.anim, rebuildSkeleton);
 watch([showLines, showHuman, activeTab, highlightBody], () => {
   if (showHuman.value && !skeleton.value) rebuildSkeleton();
@@ -281,6 +310,7 @@ onUnmounted(() => {
 <template>
   <div class="page-root d-flex">
     <input ref="importInput" type="file" accept=".json" class="d-none" @change="onImportChosen" />
+    <input ref="urdfInput" type="file" accept=".urdf,.xml,.zip,.URDF,.XML,.ZIP" class="d-none" @change="onUrdfChosen" />
 
     <MobileSidePanel v-model="panelOpen">
       <div v-if="!motion.hasMotion" class="text-caption text-warning text-center">{{ t('noMotionHint') }}</div>
@@ -293,6 +323,29 @@ onUnmounted(() => {
         hide-details
         @update:model-value="(v: string) => store.setRobot(v)"
       />
+
+      <v-btn variant="tonal" color="secondary" :prepend-icon="mdiRobotOutline" @click="urdfInput?.click()">
+        {{ t('importUrdf') }}
+      </v-btn>
+
+      <v-expansion-panels v-model="urdfSpecOpen" variant="accordion" density="compact">
+        <v-expansion-panel value="spec" :title="t('urdfSpecTitle')">
+          <v-expansion-panel-text>
+            <ul class="spec-list text-caption text-medium-emphasis">
+              <li>{{ t('urdfSpecFormats') }}</li>
+              <li>{{ t('urdfSpecZip') }}</li>
+              <li>{{ t('urdfSpecUrdf') }}</li>
+              <li><code class="spec-code">{{ t('urdfSpecCompilerSnippet') }}</code></li>
+              <li>{{ t('urdfSpecMeshes') }}</li>
+              <li>{{ t('urdfSpecFloating') }}</li>
+              <li>{{ t('urdfSpecLimits') }}</li>
+            </ul>
+            <div v-if="store.customRobot" class="text-caption mt-2">
+              {{ t('baseBody') }}: <span class="mono">{{ store.customRobot.baseBody }}</span>
+            </div>
+          </v-expansion-panel-text>
+        </v-expansion-panel>
+      </v-expansion-panels>
 
       <v-card variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('globalParams') }}</v-card-title>
@@ -486,5 +539,22 @@ onUnmounted(() => {
   top: 12px;
   left: 12px;
   z-index: 4;
+}
+.spec-list {
+  padding-left: 1.1rem;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.spec-code {
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
 }
 </style>
