@@ -78,6 +78,7 @@ ROBOTS: dict[str, dict] = {
         "label": "Stanford ToddlerBot",
         "xml": "assets/stanford_toddy/toddy_mocap.xml",
         "baseBody": "waist_link",
+        "alignBody": "torso",
         "camDistance": 1.0,
         "bvh_config": "bvh_lafan1_to_toddy.json",
     },
@@ -264,6 +265,8 @@ def sync_robot(gmr: Path, robot_id: str, meta: dict) -> tuple[dict, str | None]:
         "configKey": "bvh_lafan1" if bvh else "smplx",
         "files": sorted(set(rel_files)),
     }
+    if "alignBody" in meta:
+        entry["alignBody"] = meta["alignBody"]
     config_name = meta.get("bvh_config") or meta.get("smplx_config")
     return entry, config_name
 

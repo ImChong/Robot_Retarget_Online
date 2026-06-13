@@ -151,6 +151,7 @@
     "label": "Stanford ToddlerBot",
     "xml": "toddy_mocap.xml",
     "baseBody": "waist_link",
+    "alignBody": "torso",
     "camDistance": 1.0,
     "configKey": "bvh_lafan1",
     "files": [
