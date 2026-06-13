@@ -62,15 +62,13 @@ void locale.value;
           {{ localeLabel }}
         </v-btn>
         <v-btn
+          :icon="mdiHeart"
           variant="text"
           class="sponsor-btn"
-          :prepend-icon="mdiHeart"
           :aria-label="t('sponsorTitle')"
           :title="t('sponsorTitle')"
           @click="sponsorOpen = true"
-        >
-          <span class="d-none d-sm-inline">{{ t('sponsor') }}</span>
-        </v-btn>
+        />
         <v-btn
           :icon="mdiGithub"
           variant="text"
@@ -187,7 +185,6 @@ void locale.value;
   min-width: 0 !important;
 }
 
-/* Tint just the heart so the sponsor action stands out without recoloring the label. */
 .sponsor-btn :deep(.v-icon) {
   color: #e2566a;
 }

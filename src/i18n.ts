@@ -95,7 +95,6 @@ const messages: Record<string, { zh: string; en: string }> = {
   themeDark: { zh: '切换到白天模式', en: 'Switch to light mode' },
   themeLight: { zh: '切换到黑夜模式', en: 'Switch to dark mode' },
 
-  sponsor: { zh: '赞助', en: 'Sponsor' },
   sponsorTitle: { zh: '赞助我', en: 'Support me' },
   sponsorHint: { zh: '微信扫一扫，赞助支持作者 ❤', en: 'Scan with WeChat to support the author ❤' },
   sponsorImgAlt: { zh: '微信收款码', en: 'WeChat payment QR code' },
