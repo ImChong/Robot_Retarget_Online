@@ -13,6 +13,10 @@ interface RetargetState {
   robotId: string;
   config: GmrIkConfig;
   solver: SolverOptions;
+  /** Per-robot saved IK config so switching robots does not discard user edits. */
+  configByRobot: Record<string, GmrIkConfig>;
+  /** Per-robot saved solver options. */
+  solverByRobot: Record<string, SolverOptions>;
   status: RetargetStatus;
   robotLoadProgress: { done: number; total: number };
   runProgress: { done: number; total: number };
@@ -21,11 +25,27 @@ interface RetargetState {
   abortController: AbortController | null;
 }
 
+/** Keep user-tuned global fields; load robot-specific IK tables from defaults. */
+export function mergeConfigForRobot(current: GmrIkConfig, robotId: string): GmrIkConfig {
+  const defaults = getDefaultConfig(robotId);
+  return {
+    ...defaults,
+    human_root_name: current.human_root_name,
+    human_height_assumption: current.human_height_assumption,
+    ground_height: current.ground_height,
+    human_scale_table: { ...current.human_scale_table },
+    use_ik_match_table1: current.use_ik_match_table1,
+    use_ik_match_table2: current.use_ik_match_table2,
+  };
+}
+
 export const useRetargetStore = defineStore('retarget', {
   state: (): RetargetState => ({
     robotId: 'unitree_g1',
     config: getDefaultConfig('unitree_g1'),
     solver: { ...DEFAULT_SOLVER_OPTIONS },
+    configByRobot: {},
+    solverByRobot: {},
     status: 'idle',
     robotLoadProgress: { done: 0, total: 1 },
     runProgress: { done: 0, total: 1 },
@@ -37,19 +57,35 @@ export const useRetargetStore = defineStore('retarget', {
     isBusy: (s) => s.status === 'loading-robot' || s.status === 'running',
   },
   actions: {
+    persistCurrentRobotSettings() {
+      const id = this.robotId;
+      this.configByRobot[id] = structuredClone(toRaw(this.config)) as GmrIkConfig;
+      this.solverByRobot[id] = { ...toRaw(this.solver) };
+    },
     setRobot(robotId: string) {
       if (robotId === this.robotId) return;
+      const previousConfig = structuredClone(toRaw(this.config)) as GmrIkConfig;
+      const previousSolver = { ...toRaw(this.solver) };
+      this.persistCurrentRobotSettings();
+
       this.robotId = robotId;
-      this.config = getDefaultConfig(robotId);
+      const cachedConfig = this.configByRobot[robotId];
+      const cachedSolver = this.solverByRobot[robotId];
+      this.config = cachedConfig
+        ? structuredClone(toRaw(cachedConfig))
+        : mergeConfigForRobot(previousConfig, robotId);
+      this.solver = cachedSolver ? { ...toRaw(cachedSolver) } : previousSolver;
       this.result = null;
       this.status = 'idle';
       this.errorMessage = null;
     },
     resetConfig() {
       this.config = getDefaultConfig(this.robotId);
+      this.persistCurrentRobotSettings();
     },
     importConfigJson(text: string) {
       this.config = validateConfig(JSON.parse(text));
+      this.persistCurrentRobotSettings();
     },
     exportConfigJson(): string {
       return JSON.stringify(toRaw(this.config), null, 4);
