@@ -1,5 +1,11 @@
 # Robot Retarget Online · 在线人形机器人动作重定向
 
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live-brightgreen?logo=github)](https://imchong.github.io/Robot_Retarget_Online/)
+[![Deploy to GitHub Pages](https://github.com/ImChong/Robot_Retarget_Online/actions/workflows/deploy.yml/badge.svg)](https://github.com/ImChong/Robot_Retarget_Online/actions/workflows/deploy.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+在线地址：<https://imchong.github.io/Robot_Retarget_Online/>
+
 Browser-based humanoid motion retargeting — a pure-frontend port of
 [GMR (General Motion Retargeting)](https://github.com/YanjieZe/GMR) that runs
 entirely in your browser via the official
