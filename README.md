@@ -88,10 +88,12 @@ Pages → Source: GitHub Actions**.
 
 ## Roadmap
 
-- [x] Phase 1 — GMR online (BVH/LAFAN1 → Unitree G1, Booster T1)
+Full plan of record in **[`ROADMAP.md`](ROADMAP.md)**. Headlines:
+
+- [x] Phase 1 — GMR online (BVH/LAFAN1 → Unitree G1, Booster T1), parity-validated
 - [ ] More GMR robots (assets are drop-in: `public/robots/` + manifest entry)
-- [ ] SMPL-X / AMASS input (user-supplied body model)
-- [ ] Phase 2 — [holosoma](https://github.com/amazon-far/holosoma) retargeting engine
+- [ ] Phase 2 — [holosoma](https://github.com/amazon-far/holosoma) as a second pluggable engine
+- [ ] SMPL-X / AMASS input (user-supplied body model; deferred for licensing)
 
 ## Credits & licenses
 
