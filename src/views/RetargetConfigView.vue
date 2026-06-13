@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
 import * as THREE from 'three';
-import { mdiDownload, mdiUpload, mdiBackupRestore, mdiTune } from '@mdi/js';
+import { mdiDownload, mdiUpload, mdiBackupRestore, mdiTune, mdiRobotOutline, mdiDelete } from '@mdi/js';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
-import { useRetargetStore } from '@/stores/retarget';
-import { getRobotManifest, loadRobot, type RobotManifestEntry, type RobotModel } from '@/lib/mujoco/runtime';
+import { useRetargetStore, CUSTOM_ROBOT_ID } from '@/stores/retarget';
+import { getRobotManifest, type RobotManifestEntry, type RobotModel } from '@/lib/mujoco/runtime';
 import { buildRobotScene, type RobotSceneObject } from '@/lib/mujoco/threeScene';
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
@@ -18,6 +18,7 @@ import {
 } from '@/lib/viewport/sceneAlignment';
 import MappingTable from '@/components/MappingTable.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
+import CustomUrdfImportDialog from '@/components/CustomUrdfImportDialog.vue';
 import { downloadBlob } from '@/lib/export/motion';
 
 const { t } = useI18n();
@@ -66,12 +67,23 @@ const showLines = ref(true);
 const showHuman = ref(true);
 const highlightBody = ref<string | null>(null);
 const importInput = ref<HTMLInputElement | null>(null);
+const urdfDialogOpen = ref(false);
 const activeTab = ref('stage1');
 const panelOpen = ref(false);
 
-const robotItems = computed(() =>
-  manifest.value.map((m) => ({ title: m.label, value: m.id })),
-);
+type RobotSelectItem = { title: string; value: string; isCustom?: boolean };
+
+const robotItems = computed((): RobotSelectItem[] => {
+  const items: RobotSelectItem[] = manifest.value.map((m) => ({ title: m.label, value: m.id }));
+  if (store.customRobot) {
+    items.unshift({
+      title: `${store.customRobot.label} (${t('customRobot')})`,
+      value: CUSTOM_ROBOT_ID,
+      isCustom: true,
+    });
+  }
+  return items;
+});
 
 const robotBodies = computed(() => robotModel.value?.bodyNames ?? []);
 
@@ -82,10 +94,9 @@ async function ensureRobotScene() {
   showLoadingStrip('loading', t('loadingMujoco'));
   let loadTotal = 0;
   try {
-    const robot = await loadRobot(store.robotId, (done, total) => {
-      loadTotal = total;
-      loadingText.value = `${t('loadingRobot')} ${done}/${total}`;
-    });
+    store.robotLoadProgress = { done: 0, total: 1 };
+    const robot = await store.ensureRobot();
+    loadTotal = store.robotLoadProgress.total;
     robotModel.value = robot;
     robotScene.value?.dispose();
     const scene = buildRobotScene(robot);
@@ -219,7 +230,35 @@ function onImportChosen(e: Event) {
   (e.target as HTMLInputElement).value = '';
 }
 
+async function onCustomUrdfImported() {
+  showLoadingStrip('loading', t('loadingRobot'));
+  try {
+    await ensureRobotScene();
+    showLoadingStrip('success', t('urdfImportSuccess'));
+    scheduleHideStrip();
+  } catch (err) {
+    showLoadingStrip('error', err instanceof Error ? err.message : String(err));
+  }
+}
+
+function onRemoveCustomRobot() {
+  const switched = store.removeCustomRobot();
+  if (switched) {
+    showLoadingStrip('success', t('customRobotRemoved'));
+    scheduleHideStrip();
+  }
+}
+
 watch(() => store.robotId, ensureRobotScene);
+watch(
+  () => store.robotLoadProgress,
+  ({ done, total }) => {
+    if (stripState.value === 'loading' && total > 0) {
+      loadingText.value = `${t('loadingRobot')} ${done}/${total}`;
+    }
+  },
+  { deep: true },
+);
 watch(() => motion.anim, rebuildSkeleton);
 watch([showLines, showHuman, activeTab, highlightBody], () => {
   if (showHuman.value && !skeleton.value) rebuildSkeleton();
@@ -282,6 +321,8 @@ onUnmounted(() => {
   <div class="page-root d-flex">
     <input ref="importInput" type="file" accept=".json" class="d-none" @change="onImportChosen" />
 
+    <CustomUrdfImportDialog v-model="urdfDialogOpen" @imported="onCustomUrdfImported" />
+
     <MobileSidePanel v-model="panelOpen">
       <div v-if="!motion.hasMotion" class="text-caption text-warning text-center">{{ t('noMotionHint') }}</div>
 
@@ -292,7 +333,28 @@ onUnmounted(() => {
         density="compact"
         hide-details
         @update:model-value="(v: string) => store.setRobot(v)"
-      />
+      >
+        <template #item="{ item, props: itemProps }">
+          <v-list-item v-bind="itemProps" :title="item.title">
+            <template v-if="item.raw.isCustom" #append>
+              <v-btn
+                :icon="mdiDelete"
+                variant="text"
+                size="x-small"
+                density="compact"
+                color="error"
+                :title="t('removeCustomRobot')"
+                :aria-label="t('removeCustomRobot')"
+                @click.stop="onRemoveCustomRobot"
+              />
+            </template>
+          </v-list-item>
+        </template>
+      </v-select>
+
+      <v-btn variant="tonal" color="secondary" :prepend-icon="mdiRobotOutline" @click="urdfDialogOpen = true">
+        {{ t('importUrdf') }}
+      </v-btn>
 
       <v-card variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('globalParams') }}</v-card-title>

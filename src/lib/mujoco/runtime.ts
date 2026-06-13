@@ -100,41 +100,7 @@ export async function loadRobot(
 
   const model = mujoco.MjModel.loadFromXML(`${dir}/${entry.xml}`);
   const data = new mujoco.MjData(model);
-
-  const bodyNames: string[] = [];
-  const bodyIds = new Map<string, number>();
-  for (let b = 0; b < model.nbody; b++) {
-    const name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY.value, b) ?? `body_${b}`;
-    bodyNames.push(name);
-    bodyIds.set(name, b);
-  }
-
-  const jointNames: string[] = [];
-  for (let j = 0; j < model.njnt; j++) {
-    jointNames.push(
-      mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT.value, j) ?? `joint_${j}`,
-    );
-  }
-
-  const FREE = 0; // mjJNT_FREE
-  const jntType = model.jnt_type as Int32Array;
-  const dofJointNames: string[] = [];
-  for (let j = 0; j < model.njnt; j++) {
-    if (jntType[j] !== FREE) dofJointNames.push(jointNames[j]);
-  }
-
-  const robot: RobotModel = {
-    id: robotId,
-    mujoco,
-    model,
-    data,
-    bodyNames,
-    bodyIds,
-    jointNames,
-    dofJointNames,
-    nq: model.nq,
-    nv: model.nv,
-  };
+  const robot = buildRobotModel(mujoco, robotId, model, data);
   loadedRobots.set(robotId, robot);
   return robot;
 }
@@ -146,7 +112,15 @@ export async function loadRobotFromXmlString(id: string, xml: string): Promise<R
   mujoco.FS.writeFile(path, xml);
   const model = mujoco.MjModel.loadFromXML(path);
   const data = new mujoco.MjData(model);
+  return buildRobotModel(mujoco, id, model, data);
+}
 
+export function buildRobotModel(
+  mujoco: MujocoModule,
+  id: string,
+  model: MjModel,
+  data: MjData,
+): RobotModel {
   const bodyNames: string[] = [];
   const bodyIds = new Map<string, number>();
   for (let b = 0; b < model.nbody; b++) {
@@ -160,10 +134,11 @@ export async function loadRobotFromXmlString(id: string, xml: string): Promise<R
       mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT.value, j) ?? `joint_${j}`,
     );
   }
+  const FREE = 0; // mjJNT_FREE
   const jntType = model.jnt_type as Int32Array;
   const dofJointNames: string[] = [];
   for (let j = 0; j < model.njnt; j++) {
-    if (jntType[j] !== 0) dofJointNames.push(jointNames[j]);
+    if (jntType[j] !== FREE) dofJointNames.push(jointNames[j]);
   }
   return {
     id,
@@ -179,7 +154,7 @@ export async function loadRobotFromXmlString(id: string, xml: string): Promise<R
   };
 }
 
-function ensureDir(mujoco: MujocoModule, path: string) {
+export function ensureDir(mujoco: MujocoModule, path: string) {
   const parts = path.split('/').filter(Boolean);
   let cur = '';
   for (const p of parts) {

@@ -1,8 +1,15 @@
 import { defineStore } from 'pinia';
 import { markRaw, toRaw } from 'vue';
-import { getDefaultConfig, validateConfig } from '@/lib/retarget/defaults';
+import { createBlankConfig, getDefaultConfig, validateConfig } from '@/lib/retarget/defaults';
 import { DEFAULT_SOLVER_OPTIONS, type GmrIkConfig, type RetargetResult, type SolverOptions } from '@/lib/retarget/types';
 import { loadRobot, type RobotModel } from '@/lib/mujoco/runtime';
+import {
+  CUSTOM_ROBOT_ID,
+  clearCustomRobotCache,
+  loadCustomRobot,
+  parseCustomRobotImport,
+  type CustomRobotBundle,
+} from '@/lib/mujoco/customRobot';
 import { runRetarget } from '@/lib/retarget/runner';
 import { findMissingBodies } from '@/lib/bvh/lafan1';
 import { useMotionStore } from './motion';
@@ -11,6 +18,7 @@ export type RetargetStatus = 'idle' | 'loading-robot' | 'running' | 'done' | 'er
 
 interface RetargetState {
   robotId: string;
+  customRobot: CustomRobotBundle | null;
   config: GmrIkConfig;
   solver: SolverOptions;
   status: RetargetStatus;
@@ -24,6 +32,7 @@ interface RetargetState {
 export const useRetargetStore = defineStore('retarget', {
   state: (): RetargetState => ({
     robotId: 'unitree_g1',
+    customRobot: null,
     config: getDefaultConfig('unitree_g1'),
     solver: { ...DEFAULT_SOLVER_OPTIONS },
     status: 'idle',
@@ -35,17 +44,60 @@ export const useRetargetStore = defineStore('retarget', {
   }),
   getters: {
     isBusy: (s) => s.status === 'loading-robot' || s.status === 'running',
+    isCustomRobot: (s) => s.robotId === CUSTOM_ROBOT_ID,
+    robotDisplayLabel: (s) =>
+      s.robotId === CUSTOM_ROBOT_ID && s.customRobot
+        ? `${s.customRobot.label} (custom)`
+        : s.robotId,
   },
   actions: {
     setRobot(robotId: string) {
       if (robotId === this.robotId) return;
+      if (robotId === CUSTOM_ROBOT_ID && !this.customRobot) return;
       this.robotId = robotId;
-      this.config = getDefaultConfig(robotId);
+      if (robotId === CUSTOM_ROBOT_ID) {
+        // Keep the custom ik_config when switching back from a built-in robot.
+      } else {
+        this.config = getDefaultConfig(robotId);
+      }
       this.result = null;
       this.status = 'idle';
       this.errorMessage = null;
     },
+    async importCustomRobot(file: File) {
+      const bundle = await parseCustomRobotImport(file);
+      clearCustomRobotCache();
+      this.customRobot = bundle;
+      this.robotId = CUSTOM_ROBOT_ID;
+      this.result = null;
+      this.status = 'idle';
+      this.errorMessage = null;
+
+      const robot = await this.ensureRobot();
+      this.config = createBlankConfig(bundle.baseBody, robot.bodyNames);
+    },
+    removeCustomRobot(fallbackRobotId = 'unitree_g1') {
+      if (!this.customRobot) return false;
+      const wasSelected = this.robotId === CUSTOM_ROBOT_ID;
+      clearCustomRobotCache();
+      this.customRobot = null;
+      if (wasSelected) {
+        this.robotId = fallbackRobotId;
+        this.config = getDefaultConfig(fallbackRobotId);
+      }
+      this.result = null;
+      this.status = 'idle';
+      this.errorMessage = null;
+      return wasSelected;
+    },
     resetConfig() {
+      if (this.robotId === CUSTOM_ROBOT_ID && this.customRobot) {
+        // Re-load body list if robot already cached.
+        this.ensureRobot().then((robot) => {
+          this.config = createBlankConfig(this.customRobot!.baseBody, robot.bodyNames);
+        });
+        return;
+      }
       this.config = getDefaultConfig(this.robotId);
     },
     importConfigJson(text: string) {
@@ -57,6 +109,13 @@ export const useRetargetStore = defineStore('retarget', {
     async ensureRobot(): Promise<RobotModel> {
       this.status = 'loading-robot';
       try {
+        if (this.robotId === CUSTOM_ROBOT_ID) {
+          if (!this.customRobot) throw new Error('No custom robot imported.');
+          const robot = await loadCustomRobot(this.customRobot, (done, total) => {
+            this.robotLoadProgress = { done, total };
+          });
+          return robot;
+        }
         const robot = await loadRobot(this.robotId, (done, total) => {
           this.robotLoadProgress = { done, total };
         });
@@ -120,3 +179,5 @@ export const useRetargetStore = defineStore('retarget', {
     },
   },
 });
+
+export { CUSTOM_ROBOT_ID };

@@ -95,6 +95,55 @@ const messages: Record<string, { zh: string; en: string }> = {
   themeDark: { zh: '切换到白天模式', en: 'Switch to light mode' },
   themeLight: { zh: '切换到黑夜模式', en: 'Switch to dark mode' },
 
+  importUrdf: { zh: '导入自定义 URDF', en: 'Import Custom URDF' },
+  customRobot: { zh: '自定义机器人', en: 'Custom robot' },
+  urdfSpecTitle: { zh: 'URDF / 模型导入规范', en: 'URDF / Model Import Spec' },
+  urdfSpecFormats: {
+    zh: '支持格式：单个 .urdf / .xml（MJCF）文件，或包含模型与网格资源的 .zip 压缩包。',
+    en: 'Supported formats: a single .urdf / .xml (MJCF) file, or a .zip archive containing the model and mesh assets.',
+  },
+  urdfSpecZip: {
+    zh: 'ZIP 结构：保留 URDF/MJCF 引用的相对路径（如 meshes/link.stl）。压缩包内只能有一个主模型文件，或将其命名为 robot.urdf / robot.xml 放在根目录。',
+    en: 'ZIP layout: preserve relative paths referenced by the URDF/MJCF (e.g. meshes/link.stl). Include only one main model file, or name it robot.urdf / robot.xml at the zip root.',
+  },
+  urdfSpecUrdf: {
+    zh: 'URDF 要求：标准 ROS URDF；每个 <link> 需含有效 <inertial>；旋转关节使用 type="revolute" 并设置 <limit>；网格路径使用相对路径（避免 package://）。建议在 <robot> 内加入 MuJoCo 编译器扩展：',
+    en: 'URDF requirements: standard ROS URDF; every <link> needs a valid <inertial>; use type="revolute" joints with <limit>; mesh paths must be relative (avoid package://). Recommended MuJoCo compiler block inside <robot>:',
+  },
+  urdfSpecCompilerSnippet: {
+    zh: '<mujoco><compiler angle="radian" meshdir="meshes" autolimits="true" balanceinertia="true"/></mujoco>',
+    en: '<mujoco><compiler angle="radian" meshdir="meshes" autolimits="true" balanceinertia="true"/></mujoco>',
+  },
+  urdfSpecMeshes: {
+    zh: '网格格式：.stl、.obj、.dae（与 MuJoCo 一致）。导入后需手动配置 IK 映射表；也可导入/导出 GMR ik_config JSON。',
+    en: 'Mesh formats: .stl, .obj, .dae (MuJoCo-supported). After import, configure the IK mapping tables manually, or import/export a GMR ik_config JSON.',
+  },
+  urdfSpecFloating: {
+    zh: '浮动基座：重定向需要 6-DoF 浮动基座。URDF 导入时会自动在根 link 下注入 free joint；MJCF 需在根 body 上包含 <freejoint/>（导入时会尝试自动补全）。',
+    en: 'Floating base: retargeting requires a 6-DoF floating base. URDF imports auto-inject a free joint on the root link; MJCF must include <freejoint/> on the root body (auto-patched on import when missing).',
+  },
+  urdfSpecLimits: {
+    zh: '不支持：Xacro（.xacro）、package:// URI、多个未指定主文件的 URDF。模型仅在浏览器内存中加载，不会上传到服务器。',
+    en: 'Not supported: Xacro (.xacro), package:// URIs, or multiple URDF files without a designated main file. Models are loaded in browser memory only — nothing is uploaded to a server.',
+  },
+  urdfImportSuccess: { zh: '自定义机器人导入成功', en: 'Custom robot imported successfully' },
+  urdfDropTitle: { zh: '拖拽文件到此处', en: 'Drop file here' },
+  urdfDropHint: {
+    zh: '支持 .urdf、.xml（MJCF）或 .zip；校验通过后将加入机器人下拉列表',
+    en: 'Supports .urdf, .xml (MJCF), or .zip; valid files are added to the robot dropdown',
+  },
+  urdfBrowse: { zh: '选择文件', en: 'Browse files' },
+  urdfInvalidFormat: {
+    zh: '不支持的文件类型，请上传 .urdf、.xml 或 .zip',
+    en: 'Unsupported file type — upload a .urdf, .xml, or .zip file',
+  },
+  urdfSessionHint: {
+    zh: '导入的自定义机器人仅保存在当前页面会话中，刷新页面后需重新导入。',
+    en: 'Imported custom robots exist only for this page session and are cleared on refresh.',
+  },
+  removeCustomRobot: { zh: '删除自定义机器人', en: 'Remove custom robot' },
+  customRobotRemoved: { zh: '已删除自定义机器人', en: 'Custom robot removed' },
+  baseBody: { zh: '根 body', en: 'Root body' },
   sponsorTitle: { zh: '赞助我', en: 'Support me' },
   sponsorHint: { zh: '微信扫一扫，赞助支持作者 ❤', en: 'Scan with WeChat to support the author ❤' },
   sponsorImgAlt: { zh: '微信收款码', en: 'WeChat payment QR code' },
