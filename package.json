@@ -10,7 +10,7 @@
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "vitest run --exclude 'tests/robots/**' && vitest run tests/robots --pool=forks --maxWorkers 4",
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
