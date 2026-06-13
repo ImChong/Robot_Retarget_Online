@@ -36,46 +36,52 @@ void locale.value;
 <template>
   <v-app>
     <v-app-bar density="comfortable" flat border class="app-bar">
-      <v-app-bar-title class="app-title">
-        <span class="app-logo mr-2" aria-hidden="true">🔄</span>
-        <span class="font-weight-bold d-none d-sm-inline">{{ t('appTitleBilingual') }}</span>
-        <span class="text-medium-emphasis ml-2 d-none d-lg-inline" style="font-size: 0.8em">
-          GMR
-        </span>
-      </v-app-bar-title>
+      <div class="app-bar-inner">
+        <div class="app-bar-brand" :aria-label="t('appTitleBilingual')">
+          <span class="app-logo" aria-hidden="true">🔄</span>
+          <span class="app-title-text font-weight-bold">{{ t('appTitleBilingual') }}</span>
+          <span class="text-medium-emphasis d-none d-lg-inline app-title-badge">GMR</span>
+        </div>
 
-      <v-tabs v-if="mdAndUp" v-model="currentTab" color="primary" class="app-bar-tabs">
-        <v-tab v-for="tab in tabs" :key="tab.value" :value="tab.value">{{ tab.label }}</v-tab>
-      </v-tabs>
+        <v-tabs v-if="mdAndUp" v-model="currentTab" color="primary" class="app-bar-tabs">
+          <v-tab v-for="tab in tabs" :key="tab.value" :value="tab.value">{{ tab.label }}</v-tab>
+        </v-tabs>
 
-      <v-spacer v-if="!mdAndUp" />
-
-      <div class="app-bar-actions">
-        <v-btn
-          :icon="isDark ? mdiWeatherSunny : mdiWeatherNight"
-          variant="text"
-          :aria-label="isDark ? t('themeDark') : t('themeLight')"
-          :title="isDark ? t('themeDark') : t('themeLight')"
-          @click="toggleAppTheme"
-        />
-        <v-btn variant="text" :prepend-icon="mdiTranslate" class="locale-btn" @click="toggleLocale">
-          {{ localeLabel }}
-        </v-btn>
-        <v-btn
-          :icon="mdiHeart"
-          variant="text"
-          class="sponsor-btn"
-          :aria-label="t('sponsorTitle')"
-          :title="t('sponsorTitle')"
-          @click="sponsorOpen = true"
-        />
-        <v-btn
-          :icon="mdiGithub"
-          variant="text"
-          href="https://github.com/ImChong/Robot_Retarget_Online"
-          target="_blank"
-          rel="noopener"
-        />
+        <div class="app-bar-actions">
+          <v-btn
+            :icon="isDark ? mdiWeatherSunny : mdiWeatherNight"
+            variant="text"
+            :aria-label="isDark ? t('themeDark') : t('themeLight')"
+            :title="isDark ? t('themeDark') : t('themeLight')"
+            @click="toggleAppTheme"
+          />
+          <v-btn
+            variant="text"
+            :icon="!mdAndUp ? mdiTranslate : undefined"
+            :prepend-icon="mdAndUp ? mdiTranslate : undefined"
+            class="locale-btn"
+            :aria-label="localeLabel"
+            :title="localeLabel"
+            @click="toggleLocale"
+          >
+            <span v-if="mdAndUp">{{ localeLabel }}</span>
+          </v-btn>
+          <v-btn
+            :icon="mdiHeart"
+            variant="text"
+            class="sponsor-btn"
+            :aria-label="t('sponsorTitle')"
+            :title="t('sponsorTitle')"
+            @click="sponsorOpen = true"
+          />
+          <v-btn
+            :icon="mdiGithub"
+            variant="text"
+            href="https://github.com/ImChong/Robot_Retarget_Online"
+            target="_blank"
+            rel="noopener"
+          />
+        </div>
       </div>
     </v-app-bar>
 
@@ -138,38 +144,99 @@ void locale.value;
   overflow: hidden;
 }
 
-.app-title {
-  flex: 0 0 auto;
+.app-bar :deep(.v-toolbar__content) {
+  width: 100%;
+  padding-inline: 12px;
+}
+
+.app-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
   min-width: 0;
 }
 
+.app-bar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.app-title-text {
+  line-height: 1.2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .app-logo {
+  flex: 0 0 auto;
   font-size: 1.35rem;
-  line-height: 1;
-  vertical-align: middle;
+  line-height: 1.2;
+}
+
+.app-title-badge {
+  flex: 0 0 auto;
+  font-size: 0.8em;
 }
 
 .app-bar-actions {
   display: flex;
   align-items: center;
-  padding-right: var(--app-bar-edge-inset);
+  flex: 0 0 auto;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .app-title-text {
+    font-size: 0.94rem;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .app-logo {
+    font-size: 1.15rem;
+  }
+
+  .app-bar-actions {
+    gap: 0;
+    padding-right: 2px;
+  }
 }
 
 @media (min-width: 960px) {
   .app-bar :deep(.v-toolbar__content) {
-    position: relative;
+    padding-inline: 16px;
+  }
+
+  .app-bar-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    column-gap: 16px;
+    align-items: center;
+  }
+
+  .app-bar-brand {
+    justify-self: start;
+    flex: initial;
   }
 
   .app-bar-tabs {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1;
+    justify-self: center;
+    flex-shrink: 0;
   }
 
   .app-bar-actions {
-    margin-left: auto;
+    justify-self: end;
+    padding-right: var(--app-bar-edge-inset);
   }
 }
 
