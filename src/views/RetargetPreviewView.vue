@@ -12,7 +12,7 @@ import { buildKeypointCloud, type KeypointCloud } from '@/lib/viewport/skeletonV
 import { usePlayback } from '@/composables/usePlayback';
 import PlaybackBar from '@/components/PlaybackBar.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
-import ErrorChart from '@/components/ErrorChart.vue';
+import MetricsPanel from '@/components/MetricsPanel.vue';
 import { exportCsv, exportJson, exportNpz, downloadBlob } from '@/lib/export/motion';
 
 const { t } = useI18n();
@@ -29,6 +29,7 @@ const ghost = shallowRef<KeypointCloud | null>(null);
 const showGhost = ref(true);
 const followCamera = ref(true);
 const panelOpen = ref(false);
+const currentFrame = computed(() => playback.frameIndex.value);
 
 const progressPct = computed(() =>
   store.runProgress.total > 0 ? (100 * store.runProgress.done) / store.runProgress.total : 0,
@@ -204,10 +205,7 @@ onUnmounted(() => {
 
     <div class="main-col d-flex flex-column flex-grow-1">
       <div ref="viewportEl" class="viewport flex-grow-1" />
-      <div v-if="store.result" class="chart-wrap px-3 py-2">
-        <div class="text-caption text-medium-emphasis mb-1">{{ t('errorChart') }}</div>
-        <ErrorChart :result="store.result" :frame="playback.frameIndex.value" />
-      </div>
+      <MetricsPanel v-if="store.result" :result="store.result" :frame="currentFrame" />
       <PlaybackBar v-if="store.result" :controller="playback" />
     </div>
 
@@ -237,10 +235,6 @@ onUnmounted(() => {
 .viewport {
   min-height: 0;
   position: relative;
-}
-.chart-wrap {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  flex-shrink: 0;
 }
 .info-line {
   display: flex;
