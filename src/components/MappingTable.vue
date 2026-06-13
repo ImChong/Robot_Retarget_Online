@@ -7,6 +7,7 @@ import type { IkMatchEntry } from '@/lib/retarget/types';
 const props = defineProps<{
   table: Record<string, IkMatchEntry>;
   humanJoints: string[];
+  robotBodies: string[];
 }>();
 const emit = defineEmits<{ highlight: [robotBody: string | null] }>();
 
@@ -22,6 +23,28 @@ const humanOptions = computed(() => {
   set.add('RightFootMod');
   return [...set];
 });
+
+const robotOptions = computed(() => {
+  const set = new Set(props.robotBodies.filter((name) => name !== 'world'));
+  for (const body of rows.value) set.add(body);
+  return [...set].sort();
+});
+
+function onRobotBodyChange(oldBody: string, newBody: string) {
+  if (oldBody === newBody || !newBody || props.table[newBody] !== undefined) return;
+  props.table[newBody] = props.table[oldBody];
+  delete props.table[oldBody];
+  if (expanded.value.has(oldBody)) {
+    const next = new Set(expanded.value);
+    next.delete(oldBody);
+    next.add(newBody);
+    expanded.value = next;
+  }
+  if (tappedRow.value === oldBody) {
+    tappedRow.value = newBody;
+    emit('highlight', newBody);
+  }
+}
 
 function toggleExpand(body: string) {
   const next = new Set(expanded.value);
@@ -70,7 +93,17 @@ function num(v: string | number): number {
                 @click="toggleExpand(body)"
               />
             </td>
-            <td class="mono">{{ body }}</td>
+            <td @click.stop>
+              <v-select
+                :model-value="body"
+                :items="robotOptions"
+                density="compact"
+                variant="plain"
+                hide-details
+                class="mono-select"
+                @update:model-value="(v: string) => onRobotBodyChange(body, v)"
+              />
+            </td>
             <td @click.stop>
               <v-select
                 v-model="table[body][0]"
@@ -146,6 +179,10 @@ function num(v: string | number): number {
   background: rgba(255, 255, 255, 0.06);
 }
 .mono {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.82rem;
+}
+.mono-select :deep(.v-field__input) {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-size: 0.82rem;
 }
