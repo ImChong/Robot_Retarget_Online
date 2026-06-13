@@ -154,7 +154,7 @@ void locale.value;
 
 .app-bar :deep(.v-toolbar__content) {
   width: 100%;
-  padding-inline: 12px;
+  padding-inline: 16px;
 }
 
 .app-bar-inner {
@@ -172,6 +172,7 @@ void locale.value;
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
+  padding-left: var(--app-bar-edge-inset);
 }
 
 .app-title-text {
