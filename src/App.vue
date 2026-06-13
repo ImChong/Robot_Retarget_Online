@@ -39,7 +39,13 @@ void locale.value;
       <div class="app-bar-inner">
         <div class="app-bar-brand" :aria-label="t('appTitleBilingual')">
           <span class="app-title-text font-weight-bold">{{ t('appTitleBilingual') }}</span>
-          <span class="text-medium-emphasis d-none d-lg-inline app-title-badge">GMR</span>
+          <a
+            class="text-medium-emphasis d-none d-lg-inline app-title-badge app-title-badge-link"
+            href="https://github.com/YanjieZe/GMR"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="GMR (General Motion Retargeting)"
+          >GMR</a>
         </div>
 
         <v-tabs v-if="mdAndUp" v-model="currentTab" color="primary" class="app-bar-tabs">
@@ -186,6 +192,15 @@ void locale.value;
 .app-title-badge {
   flex: 0 0 auto;
   font-size: 0.8em;
+}
+
+.app-title-badge-link {
+  text-decoration: none;
+}
+
+.app-title-badge-link:hover {
+  text-decoration: underline;
+  color: rgb(var(--v-theme-primary));
 }
 
 .app-bar-actions {
