@@ -21,7 +21,7 @@ Standard commands live in `package.json` `scripts` and `README.md` (`## Develop`
 
 Non-obvious caveats:
 
-- `tests/parity.test.ts` is **skipped by default** — it needs Python-generated GMR reference JSON (`python3 scripts/gmr_reference.py ...`). This is optional validation; skipped is the expected state.
+- `tests/robots/parity/*.test.ts` are **skipped by default** — they need Python-generated GMR reference JSON (`python3 scripts/gmr_reference_all.py`). This is optional validation; skipped is the expected state.
 - `scripts/e2e_smoke.mjs` is an optional headless smoke test that needs Chromium and a prior `npm run build`; it is not part of `npm test`.
 - `mujoco-js` ships an ~11 MB WASM bundle (excluded from Vite dep optimization). The build prints a `Module "module" has been externalized for browser compatibility` warning from `mujoco_wasm.js` and a large-chunk note — both are expected, not errors.
 - To exercise the app end-to-end without uploading files: BVH Viewer → "Loading example actions" → "Walk (sample)", then Retarget Preview → "Start redirection". Bundled samples live in `public/sample_motions/`.
