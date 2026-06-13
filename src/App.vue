@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useAppTheme } from '@/composables/useAppTheme';
-import { mdiTranslate, mdiGithub, mdiWeatherSunny, mdiWeatherNight } from '@mdi/js';
+import { mdiTranslate, mdiGithub, mdiWeatherSunny, mdiWeatherNight, mdiHeart } from '@mdi/js';
 
 const { t, toggleLocale, localeLabel, locale } = useI18n();
 const { isDark, toggleAppTheme } = useAppTheme();
@@ -24,6 +24,10 @@ const currentTab = computed({
     router.push({ name: v });
   },
 });
+
+// Sponsor popup — QR lives in public/ so it's served under the deploy base path.
+const sponsorOpen = ref(false);
+const sponsorQrSrc = `${import.meta.env.BASE_URL}sponsor/wechat-pay.png`;
 
 // re-render tab labels on locale change
 void locale.value;
@@ -58,6 +62,16 @@ void locale.value;
           {{ localeLabel }}
         </v-btn>
         <v-btn
+          variant="text"
+          class="sponsor-btn"
+          :prepend-icon="mdiHeart"
+          :aria-label="t('sponsorTitle')"
+          :title="t('sponsorTitle')"
+          @click="sponsorOpen = true"
+        >
+          <span class="d-none d-sm-inline">{{ t('sponsor') }}</span>
+        </v-btn>
+        <v-btn
           :icon="mdiGithub"
           variant="text"
           href="https://github.com/ImChong/Robot_Retarget_Online"
@@ -78,6 +92,21 @@ void locale.value;
         </keep-alive>
       </router-view>
     </v-main>
+
+    <v-dialog v-model="sponsorOpen" max-width="340">
+      <v-card rounded="xl" class="sponsor-card">
+        <v-card-item class="text-center pt-5 pb-1">
+          <div class="text-h6 font-weight-bold">{{ t('sponsorTitle') }}</div>
+          <div class="text-medium-emphasis text-body-2 mt-1">{{ t('sponsorHint') }}</div>
+        </v-card-item>
+        <v-card-text class="d-flex justify-center pb-2">
+          <img :src="sponsorQrSrc" :alt="t('sponsorImgAlt')" class="sponsor-qr" />
+        </v-card-text>
+        <v-card-actions class="justify-center pb-4">
+          <v-btn variant="tonal" @click="sponsorOpen = false">{{ t('close') }}</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-app>
 </template>
 
@@ -152,5 +181,22 @@ void locale.value;
 
 .locale-btn {
   min-width: 0 !important;
+}
+
+.sponsor-btn {
+  min-width: 0 !important;
+}
+
+/* Tint just the heart so the sponsor action stands out without recoloring the label. */
+.sponsor-btn :deep(.v-icon) {
+  color: #e2566a;
+}
+
+.sponsor-qr {
+  display: block;
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+  border-radius: 12px;
 }
 </style>
