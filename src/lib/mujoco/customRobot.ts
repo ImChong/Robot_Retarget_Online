@@ -6,8 +6,11 @@
 import { unzipSync } from 'fflate';
 import {
   buildRobotModel,
+  disposeRobotModel,
   ensureDir,
   getMujoco,
+  prepareRobotSlot,
+  removeVfsTree,
   type MujocoModule,
   type RobotModel,
 } from './runtime';
@@ -136,21 +139,25 @@ export async function urdfToMjcfWithFloatingBase(
   urdfRelPath: string,
   rootLink: string,
 ): Promise<string> {
-  const dir = '/working/_urdf_compile';
-  ensureDir(mujoco, dir);
-  const urdfPath = `${dir}/${urdfRelPath.split('/').pop() ?? 'robot.urdf'}`;
+  removeVfsTree(mujoco, URDF_COMPILE_DIR);
+  ensureDir(mujoco, URDF_COMPILE_DIR);
+  const urdfPath = `${URDF_COMPILE_DIR}/${urdfRelPath.split('/').pop() ?? 'robot.urdf'}`;
   mujoco.FS.writeFile(urdfPath, urdfText);
 
   const model = mujoco.MjModel.loadFromXML(urdfPath);
   if (!model) throw new Error('MuJoCo failed to compile the URDF model.');
 
-  const mjcfPath = `${dir}/compiled.xml`;
-  mujoco.mj_saveLastXML(mjcfPath, model);
-  let mjcf = mujoco.FS.readFile(mjcfPath, { encoding: 'utf8' }) as string;
+  try {
+    const mjcfPath = `${URDF_COMPILE_DIR}/compiled.xml`;
+    mujoco.mj_saveLastXML(mjcfPath, model);
+    let mjcf = mujoco.FS.readFile(mjcfPath, { encoding: 'utf8' }) as string;
 
-  const inertial = extractUrdfLinkInertial(urdfText, rootLink);
-  mjcf = injectFloatingBase(mjcf, rootLink, inertial ?? undefined);
-  return mjcf;
+    const inertial = extractUrdfLinkInertial(urdfText, rootLink);
+    mjcf = injectFloatingBase(mjcf, rootLink, inertial ?? undefined);
+    return mjcf;
+  } finally {
+    model.delete?.();
+  }
 }
 
 /** Ensure the model has a free joint on the retargeting root body. */
@@ -202,12 +209,39 @@ export function modelHasFreeJoint(mujoco: MujocoModule, model: { jnt_type: Int32
 }
 
 const CUSTOM_VFS_DIR = '/working/custom_robot';
+const URDF_COMPILE_DIR = '/working/_urdf_compile';
 
 let customRobotCache: RobotModel | null = null;
 let customBundleCache: CustomRobotBundle | null = null;
 
+function disposeCustomRobotCache(mujoco?: MujocoModule) {
+  if (customRobotCache) {
+    disposeRobotModel(customRobotCache);
+    customRobotCache = null;
+  }
+  customBundleCache = null;
+  if (mujoco) {
+    removeVfsTree(mujoco, CUSTOM_VFS_DIR);
+    removeVfsTree(mujoco, URDF_COMPILE_DIR);
+  }
+}
+
+let customRobotLoadChain: Promise<unknown> = Promise.resolve();
+
+function serializeCustomRobotLoad<T>(fn: () => Promise<T>): Promise<T> {
+  const run = customRobotLoadChain.then(fn, fn);
+  customRobotLoadChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 export function clearCustomRobotCache() {
-  customRobotCache = null;
+  if (customRobotCache) {
+    disposeCustomRobotCache(customRobotCache.mujoco);
+    return;
+  }
   customBundleCache = null;
 }
 
@@ -216,7 +250,17 @@ export async function loadCustomRobot(
   bundle: CustomRobotBundle,
   onProgress?: (loaded: number, total: number, file: string) => void,
 ): Promise<RobotModel> {
-  if (customRobotCache && customBundleCache === bundle) return customRobotCache;
+  return serializeCustomRobotLoad(() => loadCustomRobotImpl(bundle, onProgress));
+}
+
+async function loadCustomRobotImpl(
+  bundle: CustomRobotBundle,
+  onProgress?: (loaded: number, total: number, file: string) => void,
+): Promise<RobotModel> {
+  const reuse =
+    customRobotCache && customBundleCache === bundle ? customRobotCache : null;
+  const cached = await prepareRobotSlot(CUSTOM_ROBOT_ID, reuse);
+  if (cached) return cached;
 
   const mujoco = await getMujoco();
   ensureDir(mujoco, CUSTOM_VFS_DIR);
