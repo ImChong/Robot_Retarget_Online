@@ -111,6 +111,10 @@ watch(showGhost, (v) => {
 watch(mdAndUp, () => sceneManager.value?.resize());
 watch(panelOpen, () => nextTick(() => sceneManager.value?.resize()));
 
+function onMetricsResize() {
+  nextTick(() => sceneManager.value?.resize());
+}
+
 onMounted(() => {
   const sm = new SceneManager(viewportEl.value!, {
     cameraPos: [2.6, -2.6, 1.7],
@@ -205,7 +209,7 @@ onUnmounted(() => {
 
     <div class="main-col d-flex flex-column flex-grow-1">
       <div ref="viewportEl" class="viewport flex-grow-1" />
-      <MetricsPanel v-if="store.result" :result="store.result" :frame="currentFrame" />
+      <MetricsPanel v-if="store.result" :result="store.result" :frame="currentFrame" @resize="onMetricsResize" />
       <PlaybackBar v-if="store.result" :controller="playback" />
     </div>
 
