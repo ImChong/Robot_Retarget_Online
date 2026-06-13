@@ -45,6 +45,19 @@ const robotItems = computed(() =>
   manifest.value.map((m) => ({ title: m.label, value: m.id })),
 );
 
+function alignHumanSkeleton(sk: SkeletonView) {
+  if (!robotScene.value || !robotModel.value || !motion.anim) return;
+  alignSkeletonToRobot(
+    sk,
+    motion.anim,
+    store.config.human_root_name,
+    robotScene.value,
+    robotModel.value,
+    store.config.robot_root_name,
+    VIEWPORT_ANCHOR,
+  );
+}
+
 async function ensureRobotScene() {
   const sm = sceneManager.value;
   if (!sm) return;
@@ -66,15 +79,7 @@ async function ensureRobotScene() {
     sm.scene.add(scene.root);
     robotScene.value = scene;
     if (skeleton.value && motion.anim) {
-      alignSkeletonToRobot(
-        skeleton.value,
-        motion.anim,
-        store.config.human_root_name,
-        scene,
-        robot,
-        store.config.robot_root_name,
-        VIEWPORT_ANCHOR,
-      );
+      alignHumanSkeleton(skeleton.value);
     }
     refreshLines();
   } catch (err) {
@@ -98,15 +103,7 @@ function rebuildSkeleton() {
   sm.scene.add(sk.root);
   skeleton.value = sk;
   if (robotScene.value && robotModel.value) {
-    alignSkeletonToRobot(
-      sk,
-      motion.anim,
-      store.config.human_root_name,
-      robotScene.value,
-      robotModel.value,
-      store.config.robot_root_name,
-      VIEWPORT_ANCHOR,
-    );
+    alignHumanSkeleton(sk);
   } else {
     sk.lockJointToWorld(jointIndexByName(motion.anim, store.config.human_root_name), VIEWPORT_ANCHOR);
   }
@@ -208,15 +205,7 @@ watch(
       store.config.robot_root_name,
       VIEWPORT_ANCHOR,
     );
-    alignSkeletonToRobot(
-      skeleton.value,
-      motion.anim,
-      store.config.human_root_name,
-      robotScene.value,
-      robotModel.value,
-      store.config.robot_root_name,
-      VIEWPORT_ANCHOR,
-    );
+    alignHumanSkeleton(skeleton.value);
     refreshLines();
   },
 );

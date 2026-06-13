@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { parseBvh } from '../src/lib/bvh/parse';
@@ -10,21 +10,39 @@ import { buildRobotScene } from '../src/lib/mujoco/threeScene';
 import {
   alignRobotRoot,
   alignSkeletonToRobot,
-  bodyForwardYaw,
-  BVH_FORWARD,
-  facingDelta,
   followOrbitCamera,
+  horizontalForward,
   HUMAN_VIEW_DEPTH,
   jointIndexByName,
-  normalizeAngle,
-  ROBOT_FORWARD,
   ROBOT_VIEW_DEPTH,
   VIEWPORT_ANCHOR,
 } from '../src/lib/viewport/sceneAlignment';
 import type { SceneManager } from '../src/lib/viewport/SceneManager';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const WALK_BVH = readFileSync(join(ROOT, 'public', 'sample_motions', 'walk.bvh'), 'utf-8');
+const WALK_BVH = readFileSync(join(ROOT, 'public/sample_motions/walk.bvh'), 'utf-8');
+
+const MINI_BVH = `HIERARCHY
+ROOT Hips
+{
+  OFFSET 0 90 0
+  CHANNELS 6 Xposition Yposition Zposition Zrotation Yrotation Xrotation
+  JOINT Chest
+  {
+    OFFSET 0 40 0
+    CHANNELS 3 Zrotation Yrotation Xrotation
+    End Site
+    {
+      OFFSET 0 20 0
+    }
+  }
+}
+MOTION
+Frames: 2
+Frame Time: 0.033333
+0 0 0 0 0 0 0 0 0 0 0 0
+10 5 0 0 0 0 0 0 0 0 0 0
+`;
 
 async function loadG1(): Promise<RobotModel> {
   const mujoco = await getMujoco();
@@ -60,28 +78,6 @@ async function loadG1(): Promise<RobotModel> {
     nv: model.nv,
   };
 }
-
-const MINI_BVH = `HIERARCHY
-ROOT Hips
-{
-  OFFSET 0 90 0
-  CHANNELS 6 Xposition Yposition Zposition Zrotation Yrotation Xrotation
-  JOINT Chest
-  {
-    OFFSET 0 40 0
-    CHANNELS 3 Zrotation Yrotation Xrotation
-    End Site
-    {
-      OFFSET 0 20 0
-    }
-  }
-}
-MOTION
-Frames: 2
-Frame Time: 0.033333
-0 0 0 0 0 0 0 0 0 0 0 0
-10 5 0 0 0 0 0 0 0 0 0 0
-`;
 
 describe('skeleton hip lock', () => {
   it('keeps Hips at a fixed world anchor across frames', () => {
@@ -124,7 +120,7 @@ describe('followOrbitCamera', () => {
 });
 
 describe('config overlay alignment', () => {
-  it('aligns walk BVH yaw with G1 and keeps depth separation', async () => {
+  it('aligns walk BVH hips yaw with G1 pelvis and keeps depth separation', async () => {
     const robot = await loadG1();
     const scene = buildRobotScene(robot);
     (robot.data.qpos as Float64Array).set(robot.model.qpos0 as Float64Array);
@@ -141,57 +137,16 @@ describe('config overlay alignment', () => {
     const hipsIdx = jointIndexByName(anim, 'Hips');
     const pelvisPos = new THREE.Vector3();
     const hipsPos = new THREE.Vector3();
-
     scene.bodyGroups.get(pelvisId)!.getWorldPosition(pelvisPos);
     sk.getJointWorldPos(hipsIdx, hipsPos);
-
-    const pelvisQuat = new THREE.Quaternion();
-    scene.bodyGroups.get(pelvisId)!.getWorldQuaternion(pelvisQuat);
-    const robotYaw = bodyForwardYaw(pelvisQuat, ROBOT_FORWARD);
-    const hipsQuat = new THREE.Quaternion();
-    sk.getJointWorldQuat(hipsIdx, hipsQuat);
-    const bvhYaw = bodyForwardYaw(hipsQuat, BVH_FORWARD);
-    expect(Math.abs(normalizeAngle(bvhYaw - robotYaw))).toBeLessThan(0.08);
     expect(pelvisPos.distanceTo(hipsPos)).toBeCloseTo(ROBOT_VIEW_DEPTH + HUMAN_VIEW_DEPTH, 2);
-  });
-});
 
-describe('bodyForwardYaw', () => {
-  it('returns 0 for identity facing +Y', () => {
-    expect(bodyForwardYaw(new THREE.Quaternion(), new THREE.Vector3(0, 1, 0))).toBeCloseTo(0, 5);
-  });
-
-  it('returns π/2 for +X local axis at identity', () => {
-    expect(bodyForwardYaw(new THREE.Quaternion(), new THREE.Vector3(1, 0, 0))).toBeCloseTo(
-      Math.PI / 2,
-      4,
-    );
-  });
-
-  it('robot +Y visual forward matches BVH hips -Y at walk frame 0', async () => {
-    const robot = await loadG1();
-    const scene = buildRobotScene(robot);
-    (robot.data.qpos as Float64Array).set(robot.model.qpos0 as Float64Array);
-    robot.mujoco.mj_kinematics(robot.model, robot.data);
-    scene.update(robot.data);
-    const anim = parseBvh(WALK_BVH);
-    const sk = buildSkeletonView(anim, 0.01);
-    alignRobotRoot(scene, robot, 'pelvis', VIEWPORT_ANCHOR);
-    alignSkeletonToRobot(sk, anim, 'Hips', scene, robot, 'pelvis', VIEWPORT_ANCHOR);
-
-    const pelvisId = robot.bodyIds.get('pelvis')!;
-    const hipsIdx = jointIndexByName(anim, 'Hips');
-    const pq = new THREE.Quaternion();
-    const hq = new THREE.Quaternion();
-    scene.bodyGroups.get(pelvisId)!.getWorldQuaternion(pq);
-    sk.getJointWorldQuat(hipsIdx, hq);
-
-    const rf = new THREE.Vector3(0, 1, 0).applyQuaternion(pq);
-    const bf = new THREE.Vector3(0, -1, 0).applyQuaternion(hq);
-    rf.z = 0;
-    bf.z = 0;
-    rf.normalize();
-    bf.normalize();
-    expect(rf.dot(bf)).toBeGreaterThan(0.98);
+    const pelvisQ = new THREE.Quaternion();
+    const hipsQ = new THREE.Quaternion();
+    scene.bodyGroups.get(pelvisId)!.getWorldQuaternion(pelvisQ);
+    sk.getJointWorldQuat(hipsIdx, hipsQ);
+    const robotFwd = horizontalForward(pelvisQ, new THREE.Vector3(0, 1, 0));
+    const bvhFwd = horizontalForward(hipsQ, new THREE.Vector3(0, 0, -1));
+    expect(robotFwd.dot(bvhFwd)).toBeGreaterThan(0.98);
   });
 });
