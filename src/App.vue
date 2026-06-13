@@ -38,7 +38,6 @@ void locale.value;
     <v-app-bar density="comfortable" flat border class="app-bar">
       <div class="app-bar-inner">
         <div class="app-bar-brand" :aria-label="t('appTitleBilingual')">
-          <span class="app-logo" aria-hidden="true">🔄</span>
           <span class="app-title-text font-weight-bold">{{ t('appTitleBilingual') }}</span>
           <span class="text-medium-emphasis d-none d-lg-inline app-title-badge">GMR</span>
         </div>
@@ -56,16 +55,25 @@ void locale.value;
             @click="toggleAppTheme"
           />
           <v-btn
+            v-if="mdAndUp"
             variant="text"
-            :icon="!mdAndUp ? mdiTranslate : undefined"
-            :prepend-icon="mdAndUp ? mdiTranslate : undefined"
+            :prepend-icon="mdiTranslate"
             class="locale-btn"
             :aria-label="localeLabel"
             :title="localeLabel"
             @click="toggleLocale"
           >
-            <span v-if="mdAndUp">{{ localeLabel }}</span>
+            {{ localeLabel }}
           </v-btn>
+          <v-btn
+            v-else
+            variant="text"
+            :icon="mdiTranslate"
+            class="locale-btn"
+            :aria-label="localeLabel"
+            :title="localeLabel"
+            @click="toggleLocale"
+          />
           <v-btn
             :icon="mdiHeart"
             variant="text"
@@ -146,7 +154,7 @@ void locale.value;
 
 .app-bar :deep(.v-toolbar__content) {
   width: 100%;
-  padding-inline: 12px;
+  padding-inline: 16px;
 }
 
 .app-bar-inner {
@@ -164,6 +172,7 @@ void locale.value;
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
+  padding-left: var(--app-bar-edge-inset);
 }
 
 .app-title-text {
@@ -172,12 +181,6 @@ void locale.value;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.app-logo {
-  flex: 0 0 auto;
-  font-size: 1.35rem;
-  line-height: 1.2;
 }
 
 .app-title-badge {
@@ -200,10 +203,6 @@ void locale.value;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     line-clamp: 2;
-  }
-
-  .app-logo {
-    font-size: 1.15rem;
   }
 
   .app-bar-actions {
