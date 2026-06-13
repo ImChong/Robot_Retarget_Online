@@ -31,6 +31,7 @@ const messages: Record<string, { zh: string; en: string }> = {
 
   robot: { zh: '机器人', en: 'Robot' },
   loadingRobot: { zh: '正在加载机器人模型…', en: 'Loading robot model…' },
+  robotLoadComplete: { zh: '机器人模型加载完成', en: 'Robot model loaded' },
   loadingMujoco: { zh: '正在初始化 MuJoCo (WASM)…', en: 'Initializing MuJoCo (WASM)…' },
   globalParams: { zh: '全局参数', en: 'Global Parameters' },
   actualHumanHeight: { zh: '人体实际身高 (m)', en: 'Actual human height (m)' },

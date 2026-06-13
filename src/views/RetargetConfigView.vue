@@ -80,8 +80,10 @@ async function ensureRobotScene() {
   if (!sm) return;
   robotModel.value = null;
   showLoadingStrip('loading', t('loadingMujoco'));
+  let loadTotal = 0;
   try {
     const robot = await loadRobot(store.robotId, (done, total) => {
+      loadTotal = total;
       loadingText.value = `${t('loadingRobot')} ${done}/${total}`;
     });
     robotModel.value = robot;
@@ -107,6 +109,8 @@ async function ensureRobotScene() {
     }
     refreshLines();
     stripState.value = 'success';
+    loadingText.value =
+      loadTotal > 0 ? `${t('robotLoadComplete')} (${loadTotal}/${loadTotal})` : t('robotLoadComplete');
     scheduleHideStrip();
   } catch (err) {
     showLoadingStrip('error', err instanceof Error ? err.message : String(err));
