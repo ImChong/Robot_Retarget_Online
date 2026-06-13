@@ -141,6 +141,8 @@ const messages: Record<string, { zh: string; en: string }> = {
     zh: '导入的自定义机器人仅保存在当前页面会话中，刷新页面后需重新导入。',
     en: 'Imported custom robots exist only for this page session and are cleared on refresh.',
   },
+  removeCustomRobot: { zh: '删除自定义机器人', en: 'Remove custom robot' },
+  customRobotRemoved: { zh: '已删除自定义机器人', en: 'Custom robot removed' },
   baseBody: { zh: '根 body', en: 'Root body' },
   sponsorTitle: { zh: '赞助我', en: 'Support me' },
   sponsorHint: { zh: '微信扫一扫，赞助支持作者 ❤', en: 'Scan with WeChat to support the author ❤' },

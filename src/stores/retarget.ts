@@ -76,6 +76,20 @@ export const useRetargetStore = defineStore('retarget', {
       const robot = await this.ensureRobot();
       this.config = createBlankConfig(bundle.baseBody, robot.bodyNames);
     },
+    removeCustomRobot(fallbackRobotId = 'unitree_g1') {
+      if (!this.customRobot) return false;
+      const wasSelected = this.robotId === CUSTOM_ROBOT_ID;
+      clearCustomRobotCache();
+      this.customRobot = null;
+      if (wasSelected) {
+        this.robotId = fallbackRobotId;
+        this.config = getDefaultConfig(fallbackRobotId);
+      }
+      this.result = null;
+      this.status = 'idle';
+      this.errorMessage = null;
+      return wasSelected;
+    },
     resetConfig() {
       if (this.robotId === CUSTOM_ROBOT_ID && this.customRobot) {
         // Re-load body list if robot already cached.

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
 import * as THREE from 'three';
-import { mdiDownload, mdiUpload, mdiBackupRestore, mdiTune, mdiRobotOutline } from '@mdi/js';
+import { mdiDownload, mdiUpload, mdiBackupRestore, mdiTune, mdiRobotOutline, mdiDelete } from '@mdi/js';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
@@ -71,10 +71,16 @@ const urdfDialogOpen = ref(false);
 const activeTab = ref('stage1');
 const panelOpen = ref(false);
 
-const robotItems = computed(() => {
-  const items = manifest.value.map((m) => ({ title: m.label, value: m.id }));
+type RobotSelectItem = { title: string; value: string; isCustom?: boolean };
+
+const robotItems = computed((): RobotSelectItem[] => {
+  const items: RobotSelectItem[] = manifest.value.map((m) => ({ title: m.label, value: m.id }));
   if (store.customRobot) {
-    items.unshift({ title: `${store.customRobot.label} (${t('customRobot')})`, value: CUSTOM_ROBOT_ID });
+    items.unshift({
+      title: `${store.customRobot.label} (${t('customRobot')})`,
+      value: CUSTOM_ROBOT_ID,
+      isCustom: true,
+    });
   }
   return items;
 });
@@ -235,6 +241,14 @@ async function onCustomUrdfImported() {
   }
 }
 
+function onRemoveCustomRobot() {
+  const switched = store.removeCustomRobot();
+  if (switched) {
+    showLoadingStrip('success', t('customRobotRemoved'));
+    scheduleHideStrip();
+  }
+}
+
 watch(() => store.robotId, ensureRobotScene);
 watch(
   () => store.robotLoadProgress,
@@ -319,7 +333,24 @@ onUnmounted(() => {
         density="compact"
         hide-details
         @update:model-value="(v: string) => store.setRobot(v)"
-      />
+      >
+        <template #item="{ item, props: itemProps }">
+          <v-list-item v-bind="itemProps" :title="item.title">
+            <template v-if="item.raw.isCustom" #append>
+              <v-btn
+                :icon="mdiDelete"
+                variant="text"
+                size="x-small"
+                density="compact"
+                color="error"
+                :title="t('removeCustomRobot')"
+                :aria-label="t('removeCustomRobot')"
+                @click.stop="onRemoveCustomRobot"
+              />
+            </template>
+          </v-list-item>
+        </template>
+      </v-select>
 
       <v-btn variant="tonal" color="secondary" :prepend-icon="mdiRobotOutline" @click="urdfDialogOpen = true">
         {{ t('importUrdf') }}
