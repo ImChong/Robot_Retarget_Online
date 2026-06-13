@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { useI18n } from '@/i18n';
 import type { RetargetResult } from '@/lib/retarget/types';
 import { useChartZoom } from '@/composables/useChartZoom';
+import { computeVisibleDataYRange } from '@/lib/chartDataRange';
 
 const props = defineProps<{
   result: RetargetResult;
@@ -62,23 +63,12 @@ const series = computed(() => {
 
 const dataYRange = computed(() => {
   const { f0, f1 } = visibleFrameRange(props.result.frameCount);
-  const fStart = Math.max(0, Math.floor(f0));
-  const fEnd = Math.min(props.result.frameCount - 1, Math.ceil(f1));
-  let lo = 0;
-  let hi = props.mode === 'position' ? (props.unit === 'deg' ? 10 : 0.2) : props.unit === 'deg' ? 50 : 1;
-  for (const s of series.value) {
-    for (let f = fStart; f <= fEnd; f++) {
-      const v = s.values[f];
-      if (v < lo) lo = v;
-      if (v > hi) hi = v;
-    }
-  }
-  if (lo === hi) {
-    lo -= 1;
-    hi += 1;
-  }
-  const pad = (hi - lo) * 0.1 || 1;
-  return { lo: lo - pad, hi: hi + pad };
+  return computeVisibleDataYRange(
+    series.value.map((s) => s.values),
+    props.result.frameCount,
+    f0,
+    f1,
+  );
 });
 
 const yRange = computed(() => visibleYRange(dataYRange.value.lo, dataYRange.value.hi));
