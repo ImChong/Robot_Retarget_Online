@@ -1,0 +1,128 @@
+[
+  {
+    "id": "unitree_g1",
+    "label": "Unitree G1 (29 DoF)",
+    "xml": "g1_mocap_29dof.xml",
+    "selectable": true,
+    "fileCount": 36
+  },
+  {
+    "id": "unitree_g1_with_hands",
+    "label": "Unitree G1 with Hands (29 DoF)",
+    "xml": "g1_mocap_29dof_with_hands.xml",
+    "selectable": true,
+    "fileCount": 50
+  },
+  {
+    "id": "unitree_h1",
+    "label": "Unitree H1",
+    "xml": "h1.xml",
+    "selectable": false,
+    "fileCount": 22
+  },
+  {
+    "id": "unitree_h1_2",
+    "label": "Unitree H1-2",
+    "xml": "h1_2_handless.xml",
+    "selectable": false,
+    "fileCount": 29
+  },
+  {
+    "id": "booster_t1",
+    "label": "Booster T1",
+    "xml": "T1_serial.xml",
+    "selectable": false,
+    "fileCount": 25
+  },
+  {
+    "id": "booster_t1_29dof",
+    "label": "Booster T1 (29 DoF)",
+    "xml": "t1_mocap.xml",
+    "selectable": true,
+    "fileCount": 31
+  },
+  {
+    "id": "stanford_toddy",
+    "label": "Stanford ToddlerBot",
+    "xml": "toddy_mocap.xml",
+    "selectable": true,
+    "fileCount": 56
+  },
+  {
+    "id": "fourier_n1",
+    "label": "Fourier N1",
+    "xml": "n1_mocap.xml",
+    "selectable": true,
+    "fileCount": 30
+  },
+  {
+    "id": "engineai_pm01",
+    "label": "EngineAI PM01",
+    "xml": "pm_v2.xml",
+    "selectable": true,
+    "fileCount": 32
+  },
+  {
+    "id": "kuavo_s45",
+    "label": "Kuavo S45",
+    "xml": "biped_s45_collision.xml",
+    "selectable": false,
+    "fileCount": 32
+  },
+  {
+    "id": "hightorque_hi",
+    "label": "HighTorque Hi (25 DoF)",
+    "xml": "hi_25dof.xml",
+    "selectable": false,
+    "fileCount": 27
+  },
+  {
+    "id": "galaxea_r1pro",
+    "label": "Galaxea R1 Pro",
+    "xml": "r1_pro.xml",
+    "selectable": false,
+    "fileCount": 38
+  },
+  {
+    "id": "berkeley_humanoid_lite",
+    "label": "Berkeley Humanoid Lite",
+    "xml": "bhl_scene.xml",
+    "selectable": false,
+    "fileCount": 28
+  },
+  {
+    "id": "booster_k1",
+    "label": "Booster K1",
+    "xml": "K1_serial.xml",
+    "selectable": false,
+    "fileCount": 24
+  },
+  {
+    "id": "pnd_adam_lite",
+    "label": "PND Adam Lite",
+    "xml": "scene.xml",
+    "selectable": false,
+    "fileCount": 76
+  },
+  {
+    "id": "tienkung",
+    "label": "Tienkung",
+    "xml": "mjcf/tienkung.xml",
+    "selectable": false,
+    "fileCount": 22
+  },
+  {
+    "id": "pal_talos",
+    "label": "PAL Talos",
+    "xml": "talos.xml",
+    "selectable": true,
+    "fileCount": 49
+  },
+  {
+    "id": "fourier_gr3",
+    "label": "Fourier GR3",
+    "xml": "mjcf/gr3v2_1_1_dummy_hand.xml",
+    "selectable": false,
+    "fileCount": 38
+  }
+]

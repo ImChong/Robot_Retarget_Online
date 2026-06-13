@@ -53,10 +53,11 @@ export const useRetargetStore = defineStore('retarget', {
   actions: {
     setRobot(robotId: string) {
       if (robotId === this.robotId) return;
+      if (robotId === CUSTOM_ROBOT_ID && !this.customRobot) return;
       this.robotId = robotId;
-      if (robotId !== CUSTOM_ROBOT_ID) {
-        this.customRobot = null;
-        clearCustomRobotCache();
+      if (robotId === CUSTOM_ROBOT_ID) {
+        // Keep the custom ik_config when switching back from a built-in robot.
+      } else {
         this.config = getDefaultConfig(robotId);
       }
       this.result = null;

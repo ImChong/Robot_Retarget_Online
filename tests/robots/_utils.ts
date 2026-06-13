@@ -62,16 +62,14 @@ export async function loadRobotFromDisk(entry: ManifestEntry): Promise<RobotMode
   };
 }
 
-/** Load once; BVH-ready robots also verify ik_config body names against the model. */
+/** Load once and verify default ik_config body names exist in the MJCF model. */
 export async function smokeLoad(entry: ManifestEntry) {
   const robot = await loadRobotFromDisk(entry);
   const config = getDefaultConfig(entry.id);
   expect(robot.bodyIds.has(config.robot_root_name)).toBe(true);
-  if (entry.configKey === 'bvh_lafan1') {
-    const engine = new GmrRetargetEngine(robot, config, { ...DEFAULT_SOLVER_OPTIONS });
-    expect(engine.tasks1.length).toBeGreaterThan(0);
-    engine.dispose();
-  }
+  const engine = new GmrRetargetEngine(robot, config, { ...DEFAULT_SOLVER_OPTIONS });
+  expect(engine.tasks1.length).toBeGreaterThan(0);
+  engine.dispose();
 }
 
 export function entryById(id: string): ManifestEntry {

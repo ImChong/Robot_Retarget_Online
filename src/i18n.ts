@@ -127,6 +127,20 @@ const messages: Record<string, { zh: string; en: string }> = {
     en: 'Not supported: Xacro (.xacro), package:// URIs, or multiple URDF files without a designated main file. Models are loaded in browser memory only — nothing is uploaded to a server.',
   },
   urdfImportSuccess: { zh: '自定义机器人导入成功', en: 'Custom robot imported successfully' },
+  urdfDropTitle: { zh: '拖拽文件到此处', en: 'Drop file here' },
+  urdfDropHint: {
+    zh: '支持 .urdf、.xml（MJCF）或 .zip；校验通过后将加入机器人下拉列表',
+    en: 'Supports .urdf, .xml (MJCF), or .zip; valid files are added to the robot dropdown',
+  },
+  urdfBrowse: { zh: '选择文件', en: 'Browse files' },
+  urdfInvalidFormat: {
+    zh: '不支持的文件类型，请上传 .urdf、.xml 或 .zip',
+    en: 'Unsupported file type — upload a .urdf, .xml, or .zip file',
+  },
+  urdfSessionHint: {
+    zh: '导入的自定义机器人仅保存在当前页面会话中，刷新页面后需重新导入。',
+    en: 'Imported custom robots exist only for this page session and are cleared on refresh.',
+  },
   baseBody: { zh: '根 body', en: 'Root body' },
   sponsorTitle: { zh: '赞助我', en: 'Support me' },
   sponsorHint: { zh: '微信扫一扫，赞助支持作者 ❤', en: 'Scan with WeChat to support the author ❤' },

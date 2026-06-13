@@ -18,6 +18,7 @@ import {
 } from '@/lib/viewport/sceneAlignment';
 import MappingTable from '@/components/MappingTable.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
+import CustomUrdfImportDialog from '@/components/CustomUrdfImportDialog.vue';
 import { downloadBlob } from '@/lib/export/motion';
 
 const { t } = useI18n();
@@ -66,8 +67,7 @@ const showLines = ref(true);
 const showHuman = ref(true);
 const highlightBody = ref<string | null>(null);
 const importInput = ref<HTMLInputElement | null>(null);
-const urdfInput = ref<HTMLInputElement | null>(null);
-const urdfSpecOpen = ref<string | undefined>(undefined);
+const urdfDialogOpen = ref(false);
 const activeTab = ref('stage1');
 const panelOpen = ref(false);
 
@@ -224,13 +224,9 @@ function onImportChosen(e: Event) {
   (e.target as HTMLInputElement).value = '';
 }
 
-async function onUrdfChosen(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0];
-  if (!file) return;
-  (e.target as HTMLInputElement).value = '';
+async function onCustomUrdfImported() {
   showLoadingStrip('loading', t('loadingRobot'));
   try {
-    await store.importCustomRobot(file);
     await ensureRobotScene();
     showLoadingStrip('success', t('urdfImportSuccess'));
     scheduleHideStrip();
@@ -310,7 +306,8 @@ onUnmounted(() => {
 <template>
   <div class="page-root d-flex">
     <input ref="importInput" type="file" accept=".json" class="d-none" @change="onImportChosen" />
-    <input ref="urdfInput" type="file" accept=".urdf,.xml,.zip,.URDF,.XML,.ZIP" class="d-none" @change="onUrdfChosen" />
+
+    <CustomUrdfImportDialog v-model="urdfDialogOpen" @imported="onCustomUrdfImported" />
 
     <MobileSidePanel v-model="panelOpen">
       <div v-if="!motion.hasMotion" class="text-caption text-warning text-center">{{ t('noMotionHint') }}</div>
@@ -324,28 +321,9 @@ onUnmounted(() => {
         @update:model-value="(v: string) => store.setRobot(v)"
       />
 
-      <v-btn variant="tonal" color="secondary" :prepend-icon="mdiRobotOutline" @click="urdfInput?.click()">
+      <v-btn variant="tonal" color="secondary" :prepend-icon="mdiRobotOutline" @click="urdfDialogOpen = true">
         {{ t('importUrdf') }}
       </v-btn>
-
-      <v-expansion-panels v-model="urdfSpecOpen" variant="accordion" density="compact">
-        <v-expansion-panel value="spec" :title="t('urdfSpecTitle')">
-          <v-expansion-panel-text>
-            <ul class="spec-list text-caption text-medium-emphasis">
-              <li>{{ t('urdfSpecFormats') }}</li>
-              <li>{{ t('urdfSpecZip') }}</li>
-              <li>{{ t('urdfSpecUrdf') }}</li>
-              <li><code class="spec-code">{{ t('urdfSpecCompilerSnippet') }}</code></li>
-              <li>{{ t('urdfSpecMeshes') }}</li>
-              <li>{{ t('urdfSpecFloating') }}</li>
-              <li>{{ t('urdfSpecLimits') }}</li>
-            </ul>
-            <div v-if="store.customRobot" class="text-caption mt-2">
-              {{ t('baseBody') }}: <span class="mono">{{ store.customRobot.baseBody }}</span>
-            </div>
-          </v-expansion-panel-text>
-        </v-expansion-panel>
-      </v-expansion-panels>
 
       <v-card variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('globalParams') }}</v-card-title>
@@ -539,22 +517,5 @@ onUnmounted(() => {
   top: 12px;
   left: 12px;
   z-index: 4;
-}
-.spec-list {
-  padding-left: 1.1rem;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-}
-.spec-code {
-  display: block;
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 0.75rem;
-  padding: 0.35rem 0.5rem;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.06);
 }
 </style>
