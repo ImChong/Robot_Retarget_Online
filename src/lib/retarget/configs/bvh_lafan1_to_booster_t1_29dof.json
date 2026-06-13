@@ -1,5 +1,5 @@
 {
-    "robot_root_name": "Waist",
+    "robot_root_name": "pelvis",
     "human_root_name": "Hips",
     "ground_height": 0.0,
     "human_height_assumption": 1.8,
@@ -25,7 +25,7 @@
     },
 
     "ik_match_table1": {
-        "Waist": [
+        "pelvis": [
             "Hips",
             0,
             10,
@@ -251,7 +251,7 @@
         ]
     },
     "ik_match_table2": {
-        "Waist": [
+        "pelvis": [
             "Hips",
             10,
             5,
