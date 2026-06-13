@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { useI18n } from '@/i18n';
 import type { RetargetResult } from '@/lib/retarget/types';
 import { useChartZoom } from '@/composables/useChartZoom';
+import { computeVisibleDataYRange } from '@/lib/chartDataRange';
 
 const props = defineProps<{
   result: RetargetResult;
@@ -38,32 +39,21 @@ const series = computed(() => {
   return { mean, max };
 });
 
-const dataYMax = computed(() => {
+const dataYRange = computed(() => {
   const { f0, f1 } = visibleFrameRange(props.result.frameCount);
-  const fStart = Math.max(0, Math.floor(f0));
-  const fEnd = Math.min(props.result.frameCount - 1, Math.ceil(f1));
-  let m = 0.02;
-  for (let f = fStart; f <= fEnd; f++) {
-    const v = series.value.max[f];
-    if (v > m) m = v;
-  }
-  return m * 1.1;
+  const { mean, max } = series.value;
+  return computeVisibleDataYRange([mean, max], props.result.frameCount, f0, f1);
 });
 
-const yMax = computed(() => {
-  const { lo, hi } = visibleYRange(0, dataYMax.value);
-  return hi - lo;
-});
-
-const yBase = computed(() => visibleYRange(0, dataYMax.value).lo);
+const yRange = computed(() => visibleYRange(dataYRange.value.lo, dataYRange.value.hi));
 
 function toPath(values: Float32Array): string {
   const n = values.length;
   if (n === 0) return '';
   const innerW = W - PAD.l - PAD.r;
   const innerH = H - PAD.t - PAD.b;
-  const ymax = yMax.value || 1;
-  const base = yBase.value;
+  const { lo, hi } = yRange.value;
+  const span = hi - lo || 1;
   const { f0, f1 } = visibleFrameRange(n);
   let d = '';
   const step = Math.max(1, Math.floor((f1 - f0) / innerW));
@@ -72,7 +62,7 @@ function toPath(values: Float32Array): string {
   for (let f = start; f <= end; f += step) {
     const x = frameToX(f, n, W, PAD);
     if (x < PAD.l - 1 || x > W - PAD.r + 1) continue;
-    const y = PAD.t + innerH - ((values[f] - base) / ymax) * innerH;
+    const y = PAD.t + innerH - ((values[f] - lo) / span) * innerH;
     d += (d ? 'L' : 'M') + x.toFixed(1) + ',' + y.toFixed(1);
   }
   return d;
@@ -87,9 +77,8 @@ const cursorX = computed(() => {
 });
 
 const yTicks = computed(() => {
-  const base = yBase.value;
-  const ymax = yMax.value;
-  return [base, base + ymax * 0.5, base + ymax];
+  const { lo, hi } = yRange.value;
+  return [lo, (lo + hi) / 2, hi];
 });
 
 const stats = computed(() => {

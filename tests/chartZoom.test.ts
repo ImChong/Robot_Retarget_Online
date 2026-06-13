@@ -18,6 +18,24 @@ describe('useChartZoom', () => {
     expect(r.hi).toBeCloseTo(10, 5);
   });
 
+  it('resets y zoom when the x data window changes', () => {
+    const { zoom, onWheel } = useChartZoom();
+    zoom.value = { x0: 0, x1: 1, yZoom: 4, yPan: 0.2 };
+    const pad = { l: 40, r: 8, t: 8, b: 18 };
+    const rect = { left: 0, top: 0, width: 560, height: 120 } as DOMRect;
+    onWheel(
+      { clientX: 300, clientY: 110, deltaY: -1, preventDefault() {} } as WheelEvent,
+      rect,
+      560,
+      120,
+      pad,
+      101,
+    );
+    expect(zoom.value.yZoom).toBe(1);
+    expect(zoom.value.yPan).toBe(0);
+    expect(zoom.value.x1).toBeLessThan(1);
+  });
+
   it('maps frame to x with zoom window', () => {
     const { zoom, frameToX } = useChartZoom();
     zoom.value = { x0: 0, x1: 0.5, yZoom: 1, yPan: 0 };

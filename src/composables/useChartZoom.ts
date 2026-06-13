@@ -82,9 +82,10 @@ export function useChartZoom() {
       const newF0 = Math.max(0, Math.min(anchor - rel * span, n - 0.001));
       const newF1 = Math.min(n, newF0 + span);
       zoom.value = {
-        ...zoom.value,
         x0: newF0 / n,
         x1: newF1 / n,
+        yZoom: 1,
+        yPan: 0,
       };
     } else if (onYAxis) {
       zoom.value = {
