@@ -252,6 +252,8 @@ onUnmounted(() => {
         v-model="store.robotId"
         :items="robotItems"
         :label="t('robot')"
+        density="compact"
+        hide-details
         @update:model-value="(v: string) => store.setRobot(v)"
       />
 
