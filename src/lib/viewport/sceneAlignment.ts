@@ -21,10 +21,10 @@ export const CONFIG_VIEW_DIR = new THREE.Vector3(0, -3.1, 0.8).normalize();
 export const ROBOT_VIEW_DEPTH = 0.42;
 export const HUMAN_VIEW_DEPTH = 0.42;
 
-/** MuJoCo humanoid forward in pelvis body frame. */
-export const ROBOT_FORWARD = new THREE.Vector3(1, 0, 0);
-/** LAFAN1 BVH walking direction in hips joint frame (Y-up). */
-export const BVH_FORWARD = new THREE.Vector3(0, 0, 1);
+/** G1 visual / walking forward in pelvis body frame (+Y, not +X mesh axis). */
+export const ROBOT_FORWARD = new THREE.Vector3(0, 1, 0);
+/** BVH facing in hips joint frame after Y-up→Z-up (mocap +Z → world −Y). */
+export const BVH_FORWARD = new THREE.Vector3(0, -1, 0);
 
 const tmpPos = new THREE.Vector3();
 const tmpQuat = new THREE.Quaternion();
@@ -161,7 +161,7 @@ export function alignSkeletonToRobot(
   skeleton.root.updateMatrixWorld(true);
 
   const bvhYaw = skeletonFacingYaw(skeleton, hipsIdx);
-  skeleton.setYaw(facingDelta(bvhYaw, robotYaw));
+  skeleton.setYaw(normalizeAngle(robotYaw - bvhYaw));
 
   skeleton.setFrame(frame);
   skeleton.lockJointToWorld(hipsIdx, depthAnchor(anchor, viewDepth));
