@@ -168,6 +168,74 @@ def arm_chain(pre_upper, pre_fore, side):
     return upper, fore
 
 
+IDENT = (1.0, 0.0, 0.0, 0.0)
+
+
+def smoothstep(a, b, x):
+    if b <= a:
+        return 0.0 if x < a else 1.0
+    u = max(0.0, min(1.0, (x - a) / (b - a)))
+    return u * u * (3 - 2 * u)
+
+
+def piecewise(t, keys):
+    """Smoothstep interpolation through (time, value) keyframes."""
+    if t <= keys[0][0]:
+        return keys[0][1]
+    if t >= keys[-1][0]:
+        return keys[-1][1]
+    for i in range(len(keys) - 1):
+        t0, v0 = keys[i]
+        t1, v1 = keys[i + 1]
+        if t0 <= t <= t1:
+            return v0 + (v1 - v0) * smoothstep(t0, t1, t)
+    return keys[-1][1]
+
+
+def set_legs(pre, hipL, kneeL, footL, hipR, kneeR, footR):
+    """Leg articulation. hip>0 = thigh swings forward, knee>0 = shank folds back."""
+    pre["LeftUpLeg"] = qaxis(X, -hipL)
+    pre["LeftLeg"] = qaxis(X, -hipL + kneeL)
+    pre["LeftFoot"] = qaxis(X, footL)
+    pre["LeftToe"] = pre["LeftFoot"]
+    pre["RightUpLeg"] = qaxis(X, -hipR)
+    pre["RightLeg"] = qaxis(X, -hipR + kneeR)
+    pre["RightFoot"] = qaxis(X, footR)
+    pre["RightToe"] = pre["RightFoot"]
+
+
+def set_arms(pre, swingL, elbowL, swingR, elbowR):
+    """Arm articulation about X (swing>0 raises the arm forward; elbow<0 bends)."""
+    uL, fL = arm_chain(qaxis(X, swingL), qaxis(X, elbowL), "L")
+    uR, fR = arm_chain(qaxis(X, swingR), qaxis(X, elbowR), "R")
+    pre["LeftArm"], pre["LeftForeArm"], pre["LeftHand"] = uL, fL, fL
+    pre["RightArm"], pre["RightForeArm"], pre["RightHand"] = uR, fR, fR
+
+
+# ----------------------------------------------------------- grounding helpers
+GROUND_TARGET = 1.0  # cm clearance for the lowest contact point when grounded
+FEET = ("LeftToe", "RightToe", "LeftFoot", "RightFoot")
+BODY_POINTS = FEET + ("Hips", "Spine", "Spine2", "Head", "LeftHand", "RightHand")
+
+
+def _fk_positions(q_global, root):
+    pos = {NAMES[0]: root}
+    for n in NAMES[1:]:
+        p = PARENT[n]
+        pos[n] = tuple(a + b for a, b in zip(pos[p], qrot(q_global[p], OFFSET[n])))
+    return pos
+
+
+def _lowest_point(pos, q_global, joints):
+    lowest = float("inf")
+    for fn in joints:
+        lowest = min(lowest, pos[fn][1])
+        if fn in END_OFFSET:
+            end_y = pos[fn][1] + qrot(q_global[fn], END_OFFSET[fn])[1]
+            lowest = min(lowest, end_y)
+    return lowest
+
+
 # ------------------------------------------------------------------ motions
 def walk_globals(t):
     f = 1.1
@@ -216,7 +284,7 @@ def walk_globals(t):
 
     speed = 90.0  # cm/s along +Z
     root = (1.8 * s, 89.5 + 2.0 * math.sin(2 * w * t), speed * t)
-    return pre, root
+    return pre, root, IDENT
 
 
 def wave_globals(t):
@@ -246,7 +314,131 @@ def wave_globals(t):
     for n in ("LeftUpLeg", "LeftLeg", "RightUpLeg", "RightLeg"):
         pre[n] = legs
     root = (1.0 * sway, 91.3 + 0.3 * sway, 0.0)
-    return pre, root
+    return pre, root, IDENT
+
+
+def run_globals(t):
+    f = 2.4
+    w = 2 * math.pi * f
+    s = math.sin(w * t)
+    s_r = math.sin(w * t + math.pi)
+    lift_l = max(0.0, math.sin(w * t + math.pi / 2))
+    lift_r = max(0.0, math.sin(w * t + math.pi / 2 + math.pi))
+
+    pre = {n: IDENT for n in NAMES}
+    # whole-body forward lean
+    body = qaxis(X, 13)
+
+    pre["Hips"] = qmul(qaxis(Y, 7 * s), qaxis(Z, 3 * s))
+    pre["Spine"] = qaxis(X, -4)
+    pre["Spine1"] = qaxis(Y, -6 * s)
+    pre["Spine2"] = qmul(qaxis(Y, -8 * s), qaxis(X, -4))
+    pre["Neck"] = qaxis(X, 8)  # keep head level against the lean
+    pre["Head"] = qaxis(X, 8)
+
+    thigh_l = 46 * s - 6  # +s here = forward because hip uses -angle in set_legs
+    thigh_r = 46 * s_r - 6
+    set_legs(
+        pre,
+        hipL=thigh_l,
+        kneeL=22 + 70 * lift_l,
+        footL=8 - 18 * lift_l,
+        hipR=thigh_r,
+        kneeR=22 + 70 * lift_r,
+        footR=8 - 18 * lift_r,
+    )
+    # bent-elbow arm drive, opposite to legs
+    set_arms(pre, swingL=48 * s_r, elbowL=-95 + 18 * s_r, swingR=48 * s, elbowR=-95 + 18 * s)
+
+    speed = 295.0  # cm/s
+    root = (1.6 * s, 92.5 + 4.5 * abs(math.sin(w * t)), speed * t)
+    return pre, root, body
+
+
+def fall_getup_globals(t):
+    # scalar keyframes (seconds): pitch about X (deg, neg = fall backward),
+    # pelvis height (cm), pelvis z (cm, neg = slid back), hip/knee flex (deg),
+    # arm swing/elbow (deg). Recognizable: sit back -> supine -> tuck/rock ->
+    # squat -> stand.
+    pitch = piecewise(t, [(0, 0), (1.0, -12), (2.0, -58), (2.8, -90),
+                          (3.6, -78), (4.6, 16), (5.6, 6), (6.5, 0)])
+    hip = piecewise(t, [(0, 4), (1.0, 35), (2.0, 75), (2.8, 40),
+                        (3.6, 100), (4.6, 118), (5.6, 38), (6.5, 4)])
+    knee = piecewise(t, [(0, 8), (1.0, 45), (2.0, 80), (2.8, 35),
+                         (3.6, 110), (4.6, 122), (5.6, 48), (6.5, 8)])
+    arm_sw = piecewise(t, [(0, 4), (1.0, -25), (2.0, -55), (2.8, -70),
+                           (3.6, 20), (4.6, 70), (5.6, 30), (6.5, 4)])
+    arm_el = piecewise(t, [(0, -8), (1.0, -20), (2.0, -30), (2.8, -20),
+                           (3.6, -55), (4.6, -70), (5.6, -30), (6.5, -8)])
+
+    pre = {n: IDENT for n in NAMES}
+    body = qaxis(X, pitch)
+    pre["Spine"] = qaxis(X, max(-25, pitch * 0.12))
+    pre["Spine2"] = qaxis(X, max(-25, pitch * 0.12))
+    pre["Neck"] = qaxis(X, -pitch * 0.25)  # try to keep head tucked toward chest
+    pre["Head"] = qaxis(X, -pitch * 0.25)
+    set_legs(pre, hip, knee, 0, hip, knee, 0)
+    set_arms(pre, arm_sw, arm_el, arm_sw, arm_el)
+    return pre, (0.0, 0.0, 0.0), body  # height set by auto-ground
+
+
+def _flip_pose(t, spin_axis, spin_sign):
+    """Crouch -> launch -> 360 deg tucked air rotation -> land. Pose only."""
+    hip = piecewise(t, [(0, 6), (0.34, 52), (0.50, 8), (0.85, 118),
+                        (1.10, 16), (1.30, 48), (1.7, 6)])
+    knee = piecewise(t, [(0, 10), (0.34, 78), (0.50, 10), (0.85, 128),
+                         (1.10, 18), (1.30, 70), (1.7, 10)])
+    arm_sw = piecewise(t, [(0, -35), (0.34, -55), (0.50, 60), (0.85, 120),
+                           (1.10, 80), (1.30, 20), (1.7, 4)])
+    arm_el = piecewise(t, [(0, -10), (0.34, -20), (0.85, -120), (1.30, -40), (1.7, -10)])
+
+    pre = {n: IDENT for n in NAMES}
+    set_legs(pre, hip, knee, 0, hip, knee, 0)
+    set_arms(pre, arm_sw, arm_el, arm_sw, arm_el)
+
+    spin = spin_sign * 360.0 * smoothstep(0.50, 1.16, t)
+    lean = qaxis(X, -12 * smoothstep(0.0, 0.34, t) * (1 - smoothstep(0.5, 0.7, t)))
+    body = qmul(qaxis(spin_axis, spin), lean)
+    return pre, body
+
+
+def _grounded_y(t, spin_axis, spin_sign, joints=FEET):
+    """Pelvis height that rests the lowest foot of the t-pose on the ground."""
+    pre, body = _flip_pose(t, spin_axis, spin_sign)
+    q_global = {n: qmul(body, qmul(pre[n], BASE_Q[n])) for n in NAMES}
+    pos = _fk_positions(q_global, (0.0, 0.0, 0.0))
+    return GROUND_TARGET - _lowest_point(pos, q_global, joints)
+
+
+def _flip_height(t, stand_y, crouch_y, land_y):
+    apex_y = stand_y + 72.0
+    return piecewise(t, [
+        (0.0, stand_y), (0.34, crouch_y), (0.50, crouch_y + 8),
+        (0.85, apex_y), (1.12, land_y + 26), (1.30, land_y), (1.7, stand_y),
+    ])
+
+
+# Precompute grounded stance heights for each flip's crouch / stand / land poses.
+_BF = dict(stand_y=_grounded_y(0.0, X, -1), crouch_y=_grounded_y(0.34, X, -1),
+           land_y=_grounded_y(1.30, X, -1))
+_SF = dict(stand_y=_grounded_y(0.0, Z, 1), crouch_y=_grounded_y(0.34, Z, 1),
+           land_y=_grounded_y(1.30, Z, 1))
+
+
+def backflip_globals(t):
+    # backward spin about the left-right axis X; travels slightly backward (-Z)
+    pre, body = _flip_pose(t, X, -1)
+    ry = _flip_height(t, **_BF)
+    drift = -18.0 * smoothstep(0.5, 1.25, t)
+    return pre, (0.0, ry, drift), body
+
+
+def sideflip_globals(t):
+    # sideways aerial about the forward axis Z; drifts toward +X
+    pre, body = _flip_pose(t, Z, 1)
+    ry = _flip_height(t, **_SF)
+    drift = 18.0 * smoothstep(0.5, 1.25, t)
+    return pre, (drift, ry, 0.0), body
 
 
 # ------------------------------------------------------------------ writer
@@ -281,7 +473,7 @@ def hierarchy_lines():
     return lines
 
 
-def generate(path, seconds, globals_fn):
+def generate(path, seconds, globals_fn, ground_fn=None, ground_joints=FEET):
     frames = int(seconds * FPS)
     lines = hierarchy_lines()
     lines.append("MOTION")
@@ -289,21 +481,22 @@ def generate(path, seconds, globals_fn):
     lines.append(f"Frame Time: {1.0 / FPS:.7f}")
 
     min_foot_y = float("inf")
+    max_root_y = -float("inf")
     for i in range(frames):
         t = i / FPS
-        pre, root = globals_fn(t)
-        q_global = {n: qmul(pre[n], BASE_Q[n]) for n in NAMES}
-        pos_global = {NAMES[0]: root}
-        for n in NAMES[1:]:
-            p = PARENT[n]
-            pos_global[n] = tuple(
-                a + b for a, b in zip(pos_global[p], qrot(q_global[p], OFFSET[n]))
-            )
-        for fn in ("LeftToe", "RightToe"):
-            end = tuple(
-                a + b for a, b in zip(pos_global[fn], qrot(q_global[fn], END_OFFSET[fn]))
-            )
-            min_foot_y = min(min_foot_y, pos_global[fn][1], end[1])
+        pre, root, body = globals_fn(t)
+        q_global = {n: qmul(body, qmul(pre[n], BASE_Q[n])) for n in NAMES}
+
+        # Auto-ground stance frames: shift the whole body so the lowest foot
+        # rests at GROUND_TARGET (positions translate rigidly with the root).
+        if ground_fn is not None and ground_fn(t):
+            pos = _fk_positions(q_global, root)
+            delta = GROUND_TARGET - _lowest_point(pos, q_global, ground_joints)
+            root = (root[0], root[1] + delta, root[2])
+
+        pos_global = _fk_positions(q_global, root)
+        min_foot_y = min(min_foot_y, _lowest_point(pos_global, q_global, FEET))
+        max_root_y = max(max_root_y, root[1])
 
         vals = []
         for n in NAMES:
@@ -323,10 +516,19 @@ def generate(path, seconds, globals_fn):
 
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")
-    print(f"wrote {path} ({frames} frames, min foot height {min_foot_y:.1f} cm)")
+    print(
+        f"wrote {path} ({frames} frames, min foot {min_foot_y:.1f} cm, "
+        f"peak pelvis {max_root_y:.1f} cm)"
+    )
 
 
 if __name__ == "__main__":
     os.makedirs(OUT_DIR, exist_ok=True)
     generate(os.path.join(OUT_DIR, "walk.bvh"), 8.0, walk_globals)
     generate(os.path.join(OUT_DIR, "wave.bvh"), 6.0, wave_globals)
+    generate(os.path.join(OUT_DIR, "run.bvh"), 6.0, run_globals)
+    generate(os.path.join(OUT_DIR, "fall_getup.bvh"), 6.5, fall_getup_globals,
+             ground_fn=lambda _t: True, ground_joints=BODY_POINTS)
+    # flips author pelvis height directly (grounded crouch/land + air parabola)
+    generate(os.path.join(OUT_DIR, "backflip.bvh"), 1.7, backflip_globals)
+    generate(os.path.join(OUT_DIR, "sideflip.bvh"), 1.7, sideflip_globals)
