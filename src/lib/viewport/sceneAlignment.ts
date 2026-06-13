@@ -1,6 +1,7 @@
 /**
  * Shared viewport alignment: anchor humanoid roots (Hips / pelvis) at a fixed
- * world point, match facing yaw, and place robot in front of BVH along -Y.
+ * world point, match facing yaw, and place robot in front of BVH along the
+ * default config camera view axis.
  */
 
 import * as THREE from 'three';
@@ -13,9 +14,12 @@ import type { SkeletonView } from './skeletonView';
 /** Default world anchor for standing humanoids (Z-up, meters). */
 export const VIEWPORT_ANCHOR = new THREE.Vector3(0, 0, 0.9);
 
-/** Robot is toward the camera (-Y); BVH behind (+Y). */
-export const ROBOT_DEPTH_Y = -0.28;
-export const HUMAN_DEPTH_Y = 0.28;
+/** Matches RetargetConfigView camera (0,-3.1,1.7) looking at the anchor. */
+export const CONFIG_VIEW_DIR = new THREE.Vector3(0, -3.1, 0.8).normalize();
+
+/** Depth along view axis: robot toward camera, BVH away. */
+export const ROBOT_VIEW_DEPTH = 0.42;
+export const HUMAN_VIEW_DEPTH = 0.42;
 
 /** MuJoCo humanoid forward in pelvis body frame. */
 export const ROBOT_FORWARD = new THREE.Vector3(1, 0, 0);
@@ -53,13 +57,18 @@ export function bodyForwardYaw(quat: THREE.Quaternion, localForward: THREE.Vecto
   return Math.atan2(tmpFwd.x, tmpFwd.y);
 }
 
-/** @deprecated Use bodyForwardYaw with an explicit local forward axis. */
-export function horizontalYaw(quat: THREE.Quaternion): number {
-  return bodyForwardYaw(quat, new THREE.Vector3(0, 1, 0));
+/** Facing yaw from left/right hip positions (Z-up, projected to XY). */
+export function bodyForwardYawFromLegs(left: THREE.Vector3, right: THREE.Vector3): number {
+  tmpFwd.copy(right).sub(left);
+  return Math.atan2(-tmpFwd.y, tmpFwd.x);
 }
 
-export function depthAnchor(anchor: THREE.Vector3, depthY: number, out = new THREE.Vector3()): THREE.Vector3 {
-  return out.set(anchor.x, anchor.y + depthY, anchor.z);
+export function depthAnchor(
+  anchor: THREE.Vector3,
+  alongView: number,
+  out = new THREE.Vector3(),
+): THREE.Vector3 {
+  return out.copy(CONFIG_VIEW_DIR).multiplyScalar(alongView).add(anchor);
 }
 
 export function normalizeAngle(rad: number): number {
@@ -81,15 +90,35 @@ export function pelvisWorldPose(
   group.getWorldQuaternion(outQuat);
 }
 
+function robotFacingYaw(
+  scene: RobotSceneObject,
+  robot: RobotModel,
+  pelvisId: number,
+): number {
+  pelvisWorldPose(scene, pelvisId, tmpPos, tmpQuat);
+  return bodyForwardYaw(tmpQuat, ROBOT_FORWARD);
+}
+
+function skeletonFacingYaw(skeleton: SkeletonView, hipsIdx: number): number {
+  return bodyForwardYaw(skeleton.getJointWorldQuat(hipsIdx, new THREE.Quaternion()), BVH_FORWARD);
+}
+
+/** Pick the shorter rotation so characters face the same way, not opposite. */
+export function facingDelta(fromYaw: number, toYaw: number): number {
+  let d = normalizeAngle(toYaw - fromYaw);
+  if (Math.abs(d) > Math.PI / 2) d -= Math.sign(d) * Math.PI;
+  return d;
+}
+
 /**
- * Place the robot so its pelvis sits at anchor + (0, depthY, 0) with root at origin.
+ * Place the robot so its pelvis sits toward the camera along the view axis.
  */
 export function alignRobotRoot(
   scene: RobotSceneObject,
   robot: RobotModel,
   pelvisName: string,
   anchor: THREE.Vector3,
-  depthY = ROBOT_DEPTH_Y,
+  viewDepth = ROBOT_VIEW_DEPTH,
 ): void {
   const pelvisId = robot.bodyIds.get(pelvisName);
   if (pelvisId === undefined) return;
@@ -100,13 +129,13 @@ export function alignRobotRoot(
 
   pelvisWorldPose(scene, pelvisId, tmpPos, tmpQuat);
   const pelvisPos = tmpPos.clone();
-  depthAnchor(anchor, depthY, tmpPos);
+  depthAnchor(anchor, viewDepth, tmpPos);
   scene.root.position.copy(tmpPos).sub(pelvisPos);
   scene.root.updateMatrixWorld(true);
 }
 
 /**
- * Match BVH skeleton yaw to the robot pelvis and anchor Hips behind the robot.
+ * Match BVH skeleton yaw to the robot and anchor Hips behind along the view axis.
  */
 export function alignSkeletonToRobot(
   skeleton: SkeletonView,
@@ -116,7 +145,7 @@ export function alignSkeletonToRobot(
   robot: RobotModel,
   pelvisName: string,
   anchor: THREE.Vector3,
-  depthY = HUMAN_DEPTH_Y,
+  viewDepth = -HUMAN_VIEW_DEPTH,
   frame = 0,
 ): void {
   const pelvisId = robot.bodyIds.get(pelvisName);
@@ -125,17 +154,15 @@ export function alignSkeletonToRobot(
   const hipsIdx = jointIndexByName(anim, humanRootName);
 
   robotScene.root.updateMatrixWorld(true);
-  pelvisWorldPose(robotScene, pelvisId, tmpPos, tmpQuat);
-  const robotYaw = bodyForwardYaw(tmpQuat, ROBOT_FORWARD);
+  const robotYaw = robotFacingYaw(robotScene, robot, pelvisId);
 
   skeleton.setFrame(frame);
   skeleton.setYaw(0);
   skeleton.root.updateMatrixWorld(true);
 
-  const hipsQuat = skeleton.getJointWorldQuat(hipsIdx, new THREE.Quaternion());
-  const bvhYaw = bodyForwardYaw(hipsQuat, BVH_FORWARD);
-  skeleton.setYaw(normalizeAngle(robotYaw - bvhYaw));
+  const bvhYaw = skeletonFacingYaw(skeleton, hipsIdx);
+  skeleton.setYaw(facingDelta(bvhYaw, robotYaw));
 
   skeleton.setFrame(frame);
-  skeleton.lockJointToWorld(hipsIdx, depthAnchor(anchor, depthY));
+  skeleton.lockJointToWorld(hipsIdx, depthAnchor(anchor, viewDepth));
 }

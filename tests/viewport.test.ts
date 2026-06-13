@@ -12,12 +12,12 @@ import {
   alignSkeletonToRobot,
   bodyForwardYaw,
   BVH_FORWARD,
+  facingDelta,
   followOrbitCamera,
-  HUMAN_DEPTH_Y,
+  HUMAN_VIEW_DEPTH,
   jointIndexByName,
-  normalizeAngle,
-  ROBOT_DEPTH_Y,
   ROBOT_FORWARD,
+  ROBOT_VIEW_DEPTH,
   VIEWPORT_ANCHOR,
 } from '../src/lib/viewport/sceneAlignment';
 import type { SceneManager } from '../src/lib/viewport/SceneManager';
@@ -138,20 +138,20 @@ describe('config overlay alignment', () => {
 
     const pelvisId = robot.bodyIds.get('pelvis')!;
     const hipsIdx = jointIndexByName(anim, 'Hips');
-    const pelvisQuat = new THREE.Quaternion();
-    const hipsQuat = new THREE.Quaternion();
     const pelvisPos = new THREE.Vector3();
     const hipsPos = new THREE.Vector3();
 
-    scene.bodyGroups.get(pelvisId)!.getWorldQuaternion(pelvisQuat);
-    sk.getJointWorldQuat(hipsIdx, hipsQuat);
     scene.bodyGroups.get(pelvisId)!.getWorldPosition(pelvisPos);
     sk.getJointWorldPos(hipsIdx, hipsPos);
 
+    const pelvisQuat = new THREE.Quaternion();
+    scene.bodyGroups.get(pelvisId)!.getWorldQuaternion(pelvisQuat);
     const robotYaw = bodyForwardYaw(pelvisQuat, ROBOT_FORWARD);
+    const hipsQuat = new THREE.Quaternion();
+    sk.getJointWorldQuat(hipsIdx, hipsQuat);
     const bvhYaw = bodyForwardYaw(hipsQuat, BVH_FORWARD);
-    expect(Math.abs(normalizeAngle(bvhYaw - robotYaw))).toBeLessThan(0.08);
-    expect(pelvisPos.y - hipsPos.y).toBeCloseTo(ROBOT_DEPTH_Y - HUMAN_DEPTH_Y, 2);
+    expect(Math.abs(facingDelta(bvhYaw, robotYaw))).toBeLessThan(0.08);
+    expect(pelvisPos.distanceTo(hipsPos)).toBeCloseTo(ROBOT_VIEW_DEPTH + HUMAN_VIEW_DEPTH, 2);
   });
 });
 
