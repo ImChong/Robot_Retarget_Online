@@ -45,9 +45,12 @@ const robotItems = computed(() =>
   manifest.value.map((m) => ({ title: m.label, value: m.id })),
 );
 
+const robotBodies = computed(() => robotModel.value?.bodyNames ?? []);
+
 async function ensureRobotScene() {
   const sm = sceneManager.value;
   if (!sm) return;
+  robotModel.value = null;
   loading.value = true;
   loadingText.value = t('loadingMujoco');
   try {
@@ -334,12 +337,14 @@ onUnmounted(() => {
             v-if="activeTab === 'stage1'"
             :table="store.config.ik_match_table1"
             :human-joints="motion.jointNames"
+            :robot-bodies="robotBodies"
             @highlight="(b) => (highlightBody = b)"
           />
           <MappingTable
             v-else-if="activeTab === 'stage2'"
             :table="store.config.ik_match_table2"
             :human-joints="motion.jointNames"
+            :robot-bodies="robotBodies"
             @highlight="(b) => (highlightBody = b)"
           />
           <div v-else class="table-x-scroll">
