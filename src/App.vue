@@ -3,9 +3,11 @@ import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
-import { mdiTranslate, mdiGithub, mdiRobotExcited } from '@mdi/js';
+import { useAppTheme } from '@/composables/useAppTheme';
+import { mdiTranslate, mdiGithub, mdiRobotExcited, mdiWeatherSunny, mdiWeatherNight } from '@mdi/js';
 
 const { t, toggleLocale, localeLabel, locale } = useI18n();
+const { isDark, toggleAppTheme } = useAppTheme();
 const { mdAndUp } = useDisplay();
 const route = useRoute();
 const router = useRouter();
@@ -44,6 +46,13 @@ void locale.value;
 
       <v-spacer />
 
+      <v-btn
+        :icon="isDark ? mdiWeatherSunny : mdiWeatherNight"
+        variant="text"
+        :aria-label="isDark ? t('themeDark') : t('themeLight')"
+        :title="isDark ? t('themeDark') : t('themeLight')"
+        @click="toggleAppTheme"
+      />
       <v-btn variant="text" :prepend-icon="mdiTranslate" class="locale-btn" @click="toggleLocale">
         {{ localeLabel }}
       </v-btn>

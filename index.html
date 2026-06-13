@@ -9,6 +9,14 @@
     />
     <title>Robot Retarget Online | 在线动作重定向</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13'%3E%F0%9F%A6%BE%3C/text%3E%3C/svg%3E" />
+    <script>
+      (function () {
+        try {
+          var theme = localStorage.getItem('rro-theme');
+          document.documentElement.style.background = theme === 'light' ? '#f5f6f8' : '#14161a';
+        } catch (e) {}
+      })();
+    </script>
     <style>
       html,
       body {
