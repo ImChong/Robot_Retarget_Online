@@ -73,7 +73,7 @@ try {
   await page.getByText('Walk 行走', { exact: false }).click();
   await page.waitForTimeout(2500);
   await page.screenshot({ path: `${OUT_DIR}/1_bvh_viewer.png` });
-  const frameLabel = await page.getByText(/帧 \d+ \/ 900/).count();
+  const frameLabel = await page.getByText(/帧 \d+ \/ 1799/).count();
   console.log('bvh viewer: playback bar present =', frameLabel > 0);
 
   // ---- Page 2: config (loads MuJoCo + robot) ----

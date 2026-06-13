@@ -5,7 +5,7 @@ Source: Ubisoft La Forge Animation Dataset (LAFAN1), non-commercial license.
 https://github.com/ubisoft/ubisoft-laforge-animation-dataset
 
 Requires the dataset zip at LAFAN1_ZIP (default: /tmp/lafan1-dataset/lafan1/lafan1.zip).
-Clips are trimmed to at least 30 s each while keeping the static bundle reasonable.
+Clips are trimmed to at least 60 s each while keeping the static bundle reasonable.
 
 Usage: python3 scripts/prepare_lafan_samples.py
 """
@@ -19,8 +19,8 @@ LAFAN1_ZIP = os.environ.get(
 )
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "public", "sample_motions")
 
-# LAFAN1 clips are 30 fps; keep at least 30 s per bundled sample.
-MIN_FRAMES = 900  # 30 s @ 30 fps
+# LAFAN1 clips are 30 fps; keep at least 60 s per bundled sample.
+MIN_FRAMES = 1800  # 60 s @ 30 fps
 
 # output name -> (source bvh in zip, start frame, frame count)
 SAMPLES = {

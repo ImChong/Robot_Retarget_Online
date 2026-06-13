@@ -73,7 +73,7 @@ node scripts/e2e_smoke.mjs   # headless full-pipeline smoke test (needs chromium
 `public/sample_motions/*.bvh` are **trimmed clips from the
 [Ubisoft LAFAN1](https://github.com/ubisoft/ubisoft-laforge-animation-dataset)
 dataset (non-commercial license): **walk, run, dance, fall & get up, jumps**
-(30 s each). Regenerate from a local LAFAN1 zip via
+(60 s each). Regenerate from a local LAFAN1 zip via
 `python3 scripts/prepare_lafan_samples.py`.
 
 The legacy procedural generator (`scripts/gen_sample_bvh.py`) is kept for

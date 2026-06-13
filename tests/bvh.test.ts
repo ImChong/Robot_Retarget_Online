@@ -77,14 +77,14 @@ describe('sample motions (LAFAN1-compatible)', () => {
     ]) {
       expect(names).toContain(required);
     }
-    expect(anim.frameCount).toBe(900);
+    expect(anim.frameCount).toBe(1800);
     expect(1 / anim.frameTime).toBeCloseTo(30, 3);
   });
 
   it('converts to Z-up meters with plausible proportions', () => {
     const anim = parseBvh(text);
     const motion = bvhToLafan1Frames(anim, 0.01);
-    expect(motion.frames).toHaveLength(900);
+    expect(motion.frames).toHaveLength(1800);
     expect(motion.missingFootJoints).toHaveLength(0);
 
     const f0 = motion.frames[0];
