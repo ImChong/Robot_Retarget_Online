@@ -133,7 +133,7 @@
                     </body>
                 </body>
             </body>
-            <body name="pelvis" pos="0.0625 0 -0.1155">
+            <body name="Waist" pos="0.0625 0 -0.1155">
                 <inertial pos="0.002284 3e-06 0.007301" quat="0.983649 0.000360386 -0.180076 0.00269791" mass="2.581" diaginertia="0.00536742 0.005299 0.00474258" />
                 <joint name="Waist" pos="0 0 0" axis="0 0 1" limited="true" range="-1.57 1.57" />
                 <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="0.4 0.4 0.4 1.0" mesh="Waist" />
