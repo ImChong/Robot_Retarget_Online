@@ -61,6 +61,7 @@ async function ensureRobotScene() {
     robot.mujoco.mj_kinematics(robot.model, robot.data);
     scene.update(robot.data);
     alignRobotRoot(scene, robot, store.config.robot_root_name, VIEWPORT_ANCHOR);
+    scene.setOpacity(0.72);
     scene.root.renderOrder = 1;
     sm.scene.add(scene.root);
     robotScene.value = scene;

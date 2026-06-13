@@ -31,12 +31,15 @@ export interface SkeletonView {
 export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonView {
   const root = new THREE.Group();
   root.name = 'bvh-skeleton';
+  const yawGroup = new THREE.Group();
+  yawGroup.name = 'bvh-yaw';
   const coord = new THREE.Group();
   coord.name = 'bvh-coord';
   // Y-up (BVH) -> Z-up (world): rotate +90° about X, then scale units -> meters.
   coord.rotation.x = Math.PI / 2;
   coord.scale.setScalar(unitScale);
-  root.add(coord);
+  root.add(yawGroup);
+  yawGroup.add(coord);
 
   const J = anim.joints.length;
   const jointGroups: THREE.Group[] = [];
@@ -144,7 +147,7 @@ export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonVie
   }
 
   function setYaw(radians: number) {
-    root.rotation.z = radians;
+    yawGroup.rotation.set(0, 0, radians);
   }
 
   function lockJointToWorld(jointIndex: number, anchor: THREE.Vector3) {

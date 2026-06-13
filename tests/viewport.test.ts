@@ -1,14 +1,64 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { parseBvh } from '../src/lib/bvh/parse';
 import { buildSkeletonView } from '../src/lib/viewport/skeletonView';
+import { getMujoco, type RobotModel } from '../src/lib/mujoco/runtime';
+import { buildRobotScene } from '../src/lib/mujoco/threeScene';
 import {
+  alignRobotRoot,
+  alignSkeletonToRobot,
+  bodyForwardYaw,
+  BVH_FORWARD,
   followOrbitCamera,
-  horizontalYaw,
+  HUMAN_DEPTH_Y,
   jointIndexByName,
+  normalizeAngle,
+  ROBOT_DEPTH_Y,
+  ROBOT_FORWARD,
   VIEWPORT_ANCHOR,
 } from '../src/lib/viewport/sceneAlignment';
 import type { SceneManager } from '../src/lib/viewport/SceneManager';
+
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const WALK_BVH = readFileSync(join(ROOT, 'public', 'sample_motions', 'walk.bvh'), 'utf-8');
+
+async function loadG1(): Promise<RobotModel> {
+  const mujoco = await getMujoco();
+  const dir = join(ROOT, 'public', 'robots', 'unitree_g1');
+  const vdir = '/working/viewport_g1';
+  if (!mujoco.FS.analyzePath(vdir).exists) {
+    mujoco.FS.mkdir(vdir);
+    mujoco.FS.mkdir(`${vdir}/meshes`);
+    for (const f of readdirSync(join(dir, 'meshes'))) {
+      mujoco.FS.writeFile(`${vdir}/meshes/${f}`, readFileSync(join(dir, 'meshes', f)));
+    }
+    mujoco.FS.writeFile(`${vdir}/g1_mocap_29dof.xml`, readFileSync(join(dir, 'g1_mocap_29dof.xml')));
+  }
+  const model = mujoco.MjModel.loadFromXML(`${vdir}/g1_mocap_29dof.xml`);
+  const data = new mujoco.MjData(model);
+  const bodyIds = new Map<string, number>();
+  const bodyNames: string[] = [];
+  for (let b = 0; b < model.nbody; b++) {
+    const name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY.value, b) ?? `body_${b}`;
+    bodyNames.push(name);
+    bodyIds.set(name, b);
+  }
+  return {
+    id: 'unitree_g1',
+    mujoco,
+    model,
+    data,
+    bodyNames,
+    bodyIds,
+    jointNames: [],
+    dofJointNames: [],
+    nq: model.nq,
+    nv: model.nv,
+  };
+}
 
 const MINI_BVH = `HIERARCHY
 ROOT Hips
@@ -72,13 +122,48 @@ describe('followOrbitCamera', () => {
   });
 });
 
-describe('horizontalYaw', () => {
+describe('config overlay alignment', () => {
+  it('aligns walk BVH yaw with G1 and keeps depth separation', async () => {
+    const robot = await loadG1();
+    const scene = buildRobotScene(robot);
+    (robot.data.qpos as Float64Array).set(robot.model.qpos0 as Float64Array);
+    robot.mujoco.mj_kinematics(robot.model, robot.data);
+    scene.update(robot.data);
+
+    const anim = parseBvh(WALK_BVH);
+    const sk = buildSkeletonView(anim, 0.01);
+
+    alignRobotRoot(scene, robot, 'pelvis', VIEWPORT_ANCHOR);
+    alignSkeletonToRobot(sk, anim, 'Hips', scene, robot, 'pelvis', VIEWPORT_ANCHOR);
+
+    const pelvisId = robot.bodyIds.get('pelvis')!;
+    const hipsIdx = jointIndexByName(anim, 'Hips');
+    const pelvisQuat = new THREE.Quaternion();
+    const hipsQuat = new THREE.Quaternion();
+    const pelvisPos = new THREE.Vector3();
+    const hipsPos = new THREE.Vector3();
+
+    scene.bodyGroups.get(pelvisId)!.getWorldQuaternion(pelvisQuat);
+    sk.getJointWorldQuat(hipsIdx, hipsQuat);
+    scene.bodyGroups.get(pelvisId)!.getWorldPosition(pelvisPos);
+    sk.getJointWorldPos(hipsIdx, hipsPos);
+
+    const robotYaw = bodyForwardYaw(pelvisQuat, ROBOT_FORWARD);
+    const bvhYaw = bodyForwardYaw(hipsQuat, BVH_FORWARD);
+    expect(Math.abs(normalizeAngle(bvhYaw - robotYaw))).toBeLessThan(0.08);
+    expect(pelvisPos.y - hipsPos.y).toBeCloseTo(ROBOT_DEPTH_Y - HUMAN_DEPTH_Y, 2);
+  });
+});
+
+describe('bodyForwardYaw', () => {
   it('returns 0 for identity facing +Y', () => {
-    expect(horizontalYaw(new THREE.Quaternion())).toBeCloseTo(0, 5);
+    expect(bodyForwardYaw(new THREE.Quaternion(), new THREE.Vector3(0, 1, 0))).toBeCloseTo(0, 5);
   });
 
-  it('returns ±π/2 for facing ±X', () => {
-    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
-    expect(Math.abs(horizontalYaw(q))).toBeCloseTo(Math.PI / 2, 4);
+  it('returns π/2 for +X local axis at identity', () => {
+    expect(bodyForwardYaw(new THREE.Quaternion(), new THREE.Vector3(1, 0, 0))).toBeCloseTo(
+      Math.PI / 2,
+      4,
+    );
   });
 });
