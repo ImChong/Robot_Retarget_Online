@@ -94,6 +94,11 @@ const messages: Record<string, { zh: string; en: string }> = {
   openPanel: { zh: '打开控制面板', en: 'Open control panel' },
   themeDark: { zh: '切换到白天模式', en: 'Switch to light mode' },
   themeLight: { zh: '切换到黑夜模式', en: 'Switch to dark mode' },
+
+  sponsorTitle: { zh: '赞助我', en: 'Support me' },
+  sponsorHint: { zh: '微信扫一扫，赞助支持作者 ❤', en: 'Scan with WeChat to support the author ❤' },
+  sponsorImgAlt: { zh: '微信收款码', en: 'WeChat payment QR code' },
+  close: { zh: '关闭', en: 'Close' },
 };
 
 const stored =
