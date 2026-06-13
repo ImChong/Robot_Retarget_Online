@@ -252,7 +252,7 @@ onUnmounted(() => {
 
     <MobileSidePanel v-model="panelOpen">
       <v-select
-        v-model="store.robotId"
+        :model-value="store.robotId"
         :items="robotItems"
         :label="t('robot')"
         density="compact"
