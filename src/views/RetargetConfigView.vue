@@ -228,7 +228,7 @@ watch(panelOpen, () => nextTick(() => sceneManager.value?.resize()));
 onMounted(async () => {
   manifest.value = await getRobotManifest().catch(() => []);
   const sm = new SceneManager(viewportEl.value!, {
-    cameraPos: [0, -3.1, 1.7],
+    cameraPos: [1.6, -2.9, 1.7],
     target: [VIEWPORT_ANCHOR.x, VIEWPORT_ANCHOR.y, VIEWPORT_ANCHOR.z],
   });
   sm.start();
