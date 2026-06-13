@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import type { BvhAnim } from '../bvh/parse';
 import type { RobotModel } from '../mujoco/runtime';
 import type { RobotSceneObject } from '../mujoco/threeScene';
+import type { SceneManager } from './SceneManager';
 import type { SkeletonView } from './skeletonView';
 
 /** Default world anchor for standing humanoids (Z-up, meters). */
@@ -19,6 +20,21 @@ export const HUMAN_DEPTH_Y = 0.1;
 const FORWARD = new THREE.Vector3(0, 1, 0);
 const tmpPos = new THREE.Vector3();
 const tmpQuat = new THREE.Quaternion();
+
+/** Smoothly move orbit target and camera together so the view tracks a world point. */
+export function followOrbitCamera(sm: SceneManager, worldPos: THREE.Vector3, smooth = 0.08): void {
+  const tgt = sm.controls.target;
+  const cam = sm.camera;
+  const dx = (worldPos.x - tgt.x) * smooth;
+  const dy = (worldPos.y - tgt.y) * smooth;
+  const dz = (worldPos.z - tgt.z) * smooth;
+  tgt.x += dx;
+  tgt.y += dy;
+  tgt.z += dz;
+  cam.position.x += dx;
+  cam.position.y += dy;
+  cam.position.z += dz;
+}
 
 export function jointIndexByName(anim: BvhAnim, name: string): number {
   const idx = anim.joints.findIndex((j) => j.name === name);

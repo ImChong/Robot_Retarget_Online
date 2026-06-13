@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
+import * as THREE from 'three';
 import { mdiFolderOpen, mdiRun, mdiTune } from '@mdi/js';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
@@ -7,7 +8,7 @@ import { useMotionStore } from '@/stores/motion';
 import { usePlayback } from '@/composables/usePlayback';
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
-import { jointIndexByName, VIEWPORT_ANCHOR } from '@/lib/viewport/sceneAlignment';
+import { followOrbitCamera, jointIndexByName } from '@/lib/viewport/sceneAlignment';
 import FileDropZone from '@/components/FileDropZone.vue';
 import PlaybackBar from '@/components/PlaybackBar.vue';
 import JointTreePanel from '@/components/JointTreePanel.vue';
@@ -97,13 +98,19 @@ function rebuildSkeleton() {
   }
   playback.setMotion(motion.frameCount, motion.fps);
   playback.state.playing = true;
+  applyFrame(0);
 }
 
-function applyHipLock(frame: number) {
+const hipPos = new THREE.Vector3();
+
+function applyFrame(frame: number) {
   const sk = skeleton.value;
+  const sm = sceneManager.value;
   if (!sk || hipsIndex.value < 0) return;
   sk.setFrame(frame);
-  sk.lockJointToWorld(hipsIndex.value, VIEWPORT_ANCHOR);
+  if (!sm) return;
+  sk.getJointWorldPos(hipsIndex.value, hipPos);
+  followOrbitCamera(sm, hipPos);
 }
 
 watch(() => motion.anim, rebuildSkeleton);
@@ -113,13 +120,10 @@ watch(panelOpen, () => nextTick(() => sceneManager.value?.resize()));
 
 onMounted(() => {
   const el = viewportEl.value!;
-  const sm = new SceneManager(el, {
-    cameraPos: [2.4, -2.6, 1.6],
-    target: [VIEWPORT_ANCHOR.x, VIEWPORT_ANCHOR.y, VIEWPORT_ANCHOR.z],
-  });
+  const sm = new SceneManager(el, { cameraPos: [2.4, -2.6, 1.6], target: [0, 0, 0.9] });
   sm.onTick((dt) => {
     playback.tick(dt);
-    applyHipLock(playback.frameIndex.value);
+    applyFrame(playback.frameIndex.value);
   });
   sm.start();
   sceneManager.value = sm;
