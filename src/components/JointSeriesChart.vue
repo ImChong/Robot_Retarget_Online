@@ -1,17 +1,22 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from '@/i18n';
 import type { RetargetResult } from '@/lib/retarget/types';
+import { useChartZoom } from '@/composables/useChartZoom';
 
 const props = defineProps<{
   result: RetargetResult;
   /** Joint names to plot (must exist in result.dofNames). */
   joints: string[];
   mode: 'position' | 'velocity';
+  unit: 'deg' | 'rad';
   frame?: number;
 }>();
 
 const { t } = useI18n();
+const { isZoomed, reset, visibleYRange, frameToX, visibleFrameRange, onWheel } = useChartZoom();
+
+const svgEl = ref<SVGSVGElement | null>(null);
 
 const W = 560;
 const H = 120;
@@ -19,6 +24,8 @@ const PAD = { l: 46, r: 8, t: 8, b: 18 };
 
 const COLORS = ['#4fc3f7', '#81c784', '#ffb74d', '#ba68c8', '#ef5350', '#4dd0e1'];
 const RAD2DEG = 180 / Math.PI;
+
+const unitScale = computed(() => (props.unit === 'deg' ? RAD2DEG : 1));
 
 const jointIndices = computed(() => {
   const { dofNames } = props.result;
@@ -30,6 +37,7 @@ const jointIndices = computed(() => {
 const series = computed(() => {
   const { qpos, frameCount, nq, fps } = props.result;
   const indices = jointIndices.value;
+  const scale = unitScale.value;
   const out: { name: string; values: Float32Array }[] = [];
 
   for (let s = 0; s < indices.length; s++) {
@@ -38,12 +46,12 @@ const series = computed(() => {
 
     if (props.mode === 'position') {
       for (let f = 0; f < frameCount; f++) {
-        values[f] = qpos[f * nq + dof] * RAD2DEG;
+        values[f] = qpos[f * nq + dof] * scale;
       }
     } else {
       for (let f = 0; f < frameCount; f++) {
         const next = Math.min(f + 1, frameCount - 1);
-        const v = (qpos[next * nq + dof] - qpos[f * nq + dof]) * fps * RAD2DEG;
+        const v = (qpos[next * nq + dof] - qpos[f * nq + dof]) * fps * scale;
         values[f] = v;
       }
     }
@@ -52,11 +60,15 @@ const series = computed(() => {
   return out;
 });
 
-const yRange = computed(() => {
+const dataYRange = computed(() => {
+  const { f0, f1 } = visibleFrameRange(props.result.frameCount);
+  const fStart = Math.max(0, Math.floor(f0));
+  const fEnd = Math.min(props.result.frameCount - 1, Math.ceil(f1));
   let lo = 0;
-  let hi = props.mode === 'position' ? 10 : 50;
+  let hi = props.mode === 'position' ? (props.unit === 'deg' ? 10 : 0.2) : props.unit === 'deg' ? 50 : 1;
   for (const s of series.value) {
-    for (const v of s.values) {
+    for (let f = fStart; f <= fEnd; f++) {
+      const v = s.values[f];
       if (v < lo) lo = v;
       if (v > hi) hi = v;
     }
@@ -69,7 +81,12 @@ const yRange = computed(() => {
   return { lo: lo - pad, hi: hi + pad };
 });
 
-const yUnit = computed(() => (props.mode === 'position' ? '°' : '°/s'));
+const yRange = computed(() => visibleYRange(dataYRange.value.lo, dataYRange.value.hi));
+
+const yUnit = computed(() => {
+  if (props.mode === 'position') return props.unit === 'deg' ? '°' : ' rad';
+  return props.unit === 'deg' ? '°/s' : ' rad/s';
+});
 
 function toPath(values: Float32Array): string {
   const n = values.length;
@@ -78,10 +95,14 @@ function toPath(values: Float32Array): string {
   const innerH = H - PAD.t - PAD.b;
   const { lo, hi } = yRange.value;
   const span = hi - lo || 1;
+  const { f0, f1 } = visibleFrameRange(n);
   let d = '';
-  const step = Math.max(1, Math.floor(n / innerW));
-  for (let f = 0; f < n; f += step) {
-    const x = PAD.l + (f / Math.max(n - 1, 1)) * innerW;
+  const step = Math.max(1, Math.floor((f1 - f0) / innerW));
+  const start = Math.max(0, Math.floor(f0));
+  const end = Math.min(n - 1, Math.ceil(f1));
+  for (let f = start; f <= end; f += step) {
+    const x = frameToX(f, n, W, PAD);
+    if (x < PAD.l - 1 || x > W - PAD.r + 1) continue;
     const y = PAD.t + innerH - ((values[f] - lo) / span) * innerH;
     d += (d ? 'L' : 'M') + x.toFixed(1) + ',' + y.toFixed(1);
   }
@@ -98,8 +119,7 @@ const paths = computed(() =>
 
 const cursorX = computed(() => {
   if (props.frame === undefined) return null;
-  const n = props.result.frameCount;
-  return PAD.l + (props.frame / Math.max(n - 1, 1)) * (W - PAD.l - PAD.r);
+  return frameToX(props.frame, props.result.frameCount, W, PAD);
 });
 
 const yTicks = computed(() => {
@@ -110,18 +130,39 @@ const yTicks = computed(() => {
 function shortName(name: string): string {
   return name.replace(/_joint$/, '').replace(/^left_/, 'L_').replace(/^right_/, 'R_');
 }
+
+function formatTick(v: number): string {
+  if (props.unit === 'deg') return v.toFixed(0);
+  return props.mode === 'position' ? v.toFixed(2) : v.toFixed(1);
+}
+
+function handleWheel(e: WheelEvent) {
+  const el = svgEl.value;
+  if (!el) return;
+  onWheel(e, el.getBoundingClientRect(), W, H, PAD, props.result.frameCount);
+}
+
+defineExpose({ resetZoom: reset, isZoomed });
 </script>
 
 <template>
   <div>
-    <div v-if="paths.length" class="d-flex flex-wrap align-center ga-3 mb-1 text-caption">
+    <div v-if="paths.length" class="d-flex flex-wrap align-center ga-3 mb-1 text-caption chart-toolbar">
       <span v-for="p in paths" :key="p.name">
         <span class="legend" :style="{ background: p.color }" />
         {{ shortName(p.name) }}
       </span>
     </div>
-    <div v-else class="text-caption text-disabled mb-1">{{ t('selectJointsHint') }}</div>
-    <svg :viewBox="`0 0 ${W} ${H}`" class="chart" preserveAspectRatio="none">
+    <div v-if="!paths.length" class="text-caption text-disabled mb-1">{{ t('selectJointsHint') }}</div>
+    <svg
+      ref="svgEl"
+      :viewBox="`0 0 ${W} ${H}`"
+      class="chart"
+      preserveAspectRatio="none"
+      @wheel="handleWheel"
+    >
+      <rect :x="0" :y="0" :width="PAD.l" :height="H" class="axis-hit y-axis-hit" />
+      <rect :x="0" :y="H - PAD.b" :width="W" :height="PAD.b" class="axis-hit x-axis-hit" />
       <line
         v-for="(tick, i) in yTicks"
         :key="i"
@@ -141,7 +182,7 @@ function shortName(name: string): string {
         font-size="9"
         text-anchor="end"
       >
-        {{ tick.toFixed(0) }}{{ yUnit }}
+        {{ formatTick(tick) }}{{ yUnit }}
       </text>
       <path
         v-for="p in paths"
@@ -152,7 +193,7 @@ function shortName(name: string): string {
         stroke-width="1.3"
       />
       <line
-        v-if="cursorX !== null"
+        v-if="cursorX !== null && cursorX >= PAD.l && cursorX <= W - PAD.r"
         :x1="cursorX"
         :x2="cursorX"
         :y1="PAD.t"
@@ -167,10 +208,14 @@ function shortName(name: string): string {
 <style scoped>
 .chart {
   width: 100%;
-  height: 120px;
+  height: 100%;
+  min-height: 120px;
   display: block;
   background: rgba(0, 0, 0, 0.18);
   border-radius: 6px;
+}
+.chart-toolbar {
+  min-height: 20px;
 }
 .legend {
   display: inline-block;
@@ -178,5 +223,15 @@ function shortName(name: string): string {
   height: 3px;
   vertical-align: middle;
   margin-right: 4px;
+}
+.axis-hit {
+  fill: transparent;
+  pointer-events: all;
+}
+.y-axis-hit {
+  cursor: ns-resize;
+}
+.x-axis-hit {
+  cursor: ew-resize;
 }
 </style>
