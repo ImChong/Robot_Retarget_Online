@@ -35,8 +35,8 @@ async function waitServer(url, ms = 30000) {
 const JOBS = [
   { file: 'run.bvh', label: '跑步', shots: 4, every: 160 },
   { file: 'fall_getup.bvh', label: '倒地起身', shots: 8, every: 360 },
-  { file: 'backflip.bvh', label: '后空翻', shots: 12, every: 130 },
-  { file: 'sideflip.bvh', label: '侧空翻', shots: 12, every: 130 },
+  { file: 'jumps.bvh', label: '跳跃', shots: 8, every: 160 },
+  { file: 'dance.bvh', label: '舞蹈', shots: 6, every: 200 },
 ];
 
 mkdirSync(OUT, { recursive: true });

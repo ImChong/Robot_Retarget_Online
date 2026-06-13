@@ -1,8 +1,6 @@
 /**
- * Behavioural regression for the bundled sample motions: each must parse with
- * the LAFAN1 skeleton and retarget to Unitree G1 with finite, in-range qpos.
- * The acrobatic clips must additionally make the robot pelvis invert and land
- * upright; fall_getup must reach a low/lying pose and end standing.
+ * Behavioural regression for the bundled LAFAN1 sample motions: each must parse
+ * with the LAFAN1 skeleton and retarget to Unitree G1 with finite, in-range qpos.
  */
 
 import { readFileSync, readdirSync } from 'node:fs';
@@ -17,7 +15,7 @@ import { getDefaultConfig } from '../src/lib/retarget/defaults';
 import { DEFAULT_SOLVER_OPTIONS } from '../src/lib/retarget/types';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const SAMPLES = ['walk', 'run', 'wave', 'fall_getup', 'backflip', 'sideflip'];
+const SAMPLES = ['walk', 'run', 'dance', 'fall_getup', 'jumps'];
 
 let robot: RobotModel;
 let pelvisId: number;
@@ -62,7 +60,7 @@ function pelvisUpright(): number {
   return xmat[pelvisId * 9 + 8];
 }
 
-describe('bundled sample motions retarget to G1', () => {
+describe('bundled LAFAN1 sample motions retarget to G1', () => {
   for (const name of SAMPLES) {
     it(`${name}: finite, in-range, expected dynamics`, () => {
       const text = readFileSync(join(ROOT, 'public', 'sample_motions', `${name}.bvh`), 'utf-8');
@@ -84,7 +82,6 @@ describe('bundled sample motions retarget to G1', () => {
       for (let f = 0; f < motion.frames.length; f++) {
         const q = engine.retargetFrame(motion.frames[f]);
         for (const v of q) expect(Number.isFinite(v)).toBe(true);
-        // joint-limit compliance
         for (let j = 0; j < model.njnt; j++) {
           if (jntType[j] === 0 || !jntLimited[j]) continue;
           const adr = jntQposadr[j];
@@ -97,15 +94,13 @@ describe('bundled sample motions retarget to G1', () => {
       }
       engine.dispose();
 
-      if (name === 'backflip' || name === 'sideflip') {
-        expect(minUp).toBeLessThan(-0.3); // passes through inversion
-        expect(endUp).toBeGreaterThan(0.8); // lands upright
-      } else if (name === 'fall_getup') {
-        expect(minUp).toBeLessThan(0.2); // lies down
-        expect(endUp).toBeGreaterThan(0.8); // gets up
-      } else {
-        expect(minUp).toBeGreaterThan(0.7); // stays upright
+      if (name === 'fall_getup') {
+        expect(minUp).toBeLessThan(0.2);
+        expect(endUp).toBeGreaterThan(0.8);
+      } else if (name === 'walk' || name === 'run') {
+        expect(minUp).toBeGreaterThan(0.7);
       }
+      // dance / jumps: only require finite, in-range qpos (airborne / stylized poses).
     });
   }
 });

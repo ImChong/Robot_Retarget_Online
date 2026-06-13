@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
-"""Generate license-free sample BVH motions with a LAFAN1-compatible skeleton.
+"""Legacy: procedurally generated sample BVH motions (replaced by LAFAN1 clips).
 
-The skeleton (22 joints, names, offsets and neutral orientations) matches the
-raw LAFAN1 rig conventions so GMR's bvh_lafan1 ik_configs work out of the box:
-Y-up centimeters, CHANNELS 6 with Z Y X rotation order, T-pose stance facing
-+Z (+X = character's left), and "X-along-bone" local frames (every joint's +X
-axis points along its bone, mirroring lives in the rotation data).
-
-Neutral T-pose constants (quaternions/positions below) follow the standard
-LAFAN1 calibration stance; all motion curves are procedural and original.
+Bundled web samples are now prepared via scripts/prepare_lafan_samples.py from the
+Ubisoft LAFAN1 dataset. This generator is kept for reference / local experiments.
 
 Usage: python3 scripts/gen_sample_bvh.py
 """

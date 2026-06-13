@@ -26,12 +26,11 @@ const loadErrorSnack = ref(false);
 const panelOpen = ref(false);
 
 const samples = [
-  { title: 'Walk 行走', file: 'walk.bvh' },
-  { title: 'Run 跑步', file: 'run.bvh' },
-  { title: 'Wave 挥手', file: 'wave.bvh' },
-  { title: 'Fall & get up 倒地起身', file: 'fall_getup.bvh' },
-  { title: 'Backflip 后空翻', file: 'backflip.bvh' },
-  { title: 'Side flip 侧空翻', file: 'sideflip.bvh' },
+  { title: 'Walk 行走 (LAFAN1)', file: 'walk.bvh' },
+  { title: 'Run 跑步 (LAFAN1)', file: 'run.bvh' },
+  { title: 'Dance 舞蹈 (LAFAN1)', file: 'dance.bvh' },
+  { title: 'Fall & get up 倒地起身 (LAFAN1)', file: 'fall_getup.bvh' },
+  { title: 'Jumps 跳跃 (LAFAN1)', file: 'jumps.bvh' },
 ];
 const sampleLoading = ref(false);
 

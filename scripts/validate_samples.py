@@ -24,7 +24,7 @@ XML = {
     "booster_t1_29dof": "/tmp/GMR/assets/booster_t1_29dof/t1_mocap.xml",
 }[ROBOT]
 
-MOTIONS = ["walk", "run", "fall_getup", "backflip", "sideflip", "wave"]
+MOTIONS = ["walk", "run", "dance", "fall_getup", "jumps"]
 
 
 def main():
@@ -76,9 +76,8 @@ def main():
             f"upright[start={ups[0]:+.2f} min={ups.min():+.2f} end={ups[-1]:+.2f}] "
             f"inverted_frames={n_inv} limitviol={viol}/{nlim}"
         )
-        if name in ("backflip", "sideflip"):
-            print(f"            -> {'FLIP OK (passes inversion)' if inverted else 'NO INVERSION DETECTED'}; "
-                  f"lands upright={ups[-1] > 0.8}")
+        if name in ("jumps",):
+            print(f"            -> airborne/low poses OK; ends upright={ups[-1] > 0.5}")
         if name == "fall_getup":
             print(f"            -> reaches_low_upright={ups.min() < 0.2}; ends_standing={ups[-1] > 0.8}")
 

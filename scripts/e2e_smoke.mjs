@@ -70,10 +70,10 @@ try {
   // ---- Page 1: BVH viewer + sample motion ----
   await page.goto(`http://localhost:${PORT}/#/bvh`);
   await page.getByText('加载示例动作').click();
-  await page.getByText('Walk (sample)').click();
+  await page.getByText('Walk 行走', { exact: false }).click();
   await page.waitForTimeout(2500);
   await page.screenshot({ path: `${OUT_DIR}/1_bvh_viewer.png` });
-  const frameLabel = await page.getByText(/帧 \d+ \/ 239/).count();
+  const frameLabel = await page.getByText(/帧 \d+ \/ 240/).count();
   console.log('bvh viewer: playback bar present =', frameLabel > 0);
 
   // ---- Page 2: config (loads MuJoCo + robot) ----

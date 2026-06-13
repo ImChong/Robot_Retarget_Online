@@ -64,18 +64,15 @@ node scripts/e2e_smoke.mjs   # headless full-pipeline smoke test (needs chromium
 
 ### Sample motions
 
-`public/sample_motions/*.bvh` are procedurally generated, license-free clips
-with a LAFAN1-compatible skeleton (`scripts/gen_sample_bvh.py`): **walk, run,
-wave, fall & get up, backflip, side flip**. The acrobatic clips author the
-whole-body rotation through the BVH root (6-DoF Hips), so the retargeted robot
-genuinely inverts and lands on its feet. `scripts/validate_samples.py` runs the
-original Python GMR on each clip and checks the result is sane (finite qpos, no
-joint-limit violations, correct inversion/landing for the flips).
+`public/sample_motions/*.bvh` are **trimmed clips from the
+[Ubisoft LAFAN1](https://github.com/ubisoft/ubisoft-laforge-animation-dataset)
+dataset (non-commercial license): **walk, run, dance, fall & get up, jumps**
+(8–12 s each). Regenerate from a local LAFAN1 zip via
+`python3 scripts/prepare_lafan_samples.py`.
 
-For real mocap, get LAFAN1 from
-[ubisoft-laforge-animation-dataset](https://github.com/ubisoft/ubisoft-laforge-animation-dataset)
-(non-commercial license — not bundled here; it has `run`, `sprint`,
-`fallAndGetUp`, `jumps`, …) and drop any `.bvh` into the app.
+The legacy procedural generator (`scripts/gen_sample_bvh.py`) is kept for
+reference only. For the full dataset, download LAFAN1 and drop any `.bvh` into
+the app.
 
 ## Deploy
 
