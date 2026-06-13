@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useAppTheme } from '@/composables/useAppTheme';
-import { mdiTranslate, mdiGithub, mdiRobotExcited, mdiWeatherSunny, mdiWeatherNight } from '@mdi/js';
+import { mdiTranslate, mdiGithub, mdiWeatherSunny, mdiWeatherNight } from '@mdi/js';
 
 const { t, toggleLocale, localeLabel, locale } = useI18n();
 const { isDark, toggleAppTheme } = useAppTheme();
@@ -33,8 +33,8 @@ void locale.value;
   <v-app>
     <v-app-bar density="comfortable" flat border class="app-bar">
       <v-app-bar-title class="app-title">
-        <v-icon :icon="mdiRobotExcited" color="primary" class="mr-2" />
-        <span class="font-weight-bold d-none d-sm-inline">{{ t('appTitle') }}</span>
+        <span class="app-logo mr-2" aria-hidden="true">🔄</span>
+        <span class="font-weight-bold d-none d-sm-inline">{{ t('appTitleBilingual') }}</span>
         <span class="text-medium-emphasis ml-2 d-none d-lg-inline" style="font-size: 0.8em">
           GMR
         </span>
@@ -114,6 +114,12 @@ void locale.value;
 .app-title {
   flex: 0 0 auto;
   min-width: 0;
+}
+
+.app-logo {
+  font-size: 1.35rem;
+  line-height: 1;
+  vertical-align: middle;
 }
 
 .app-bar-actions {
