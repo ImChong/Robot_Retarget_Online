@@ -136,7 +136,7 @@ defineExpose({ resetZoom: reset, isZoomed });
 </script>
 
 <template>
-  <div>
+  <div class="chart-root">
     <div v-if="paths.length" class="d-flex flex-wrap align-center ga-3 mb-1 text-caption chart-toolbar">
       <span v-for="p in paths" :key="p.name">
         <span class="legend" :style="{ background: p.color }" />
@@ -196,15 +196,22 @@ defineExpose({ resetZoom: reset, isZoomed });
 </template>
 
 <style scoped>
-.chart {
-  width: 100%;
+.chart-root {
   height: 100%;
-  min-height: 120px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chart {
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
   display: block;
   background: rgba(0, 0, 0, 0.18);
   border-radius: 6px;
 }
 .chart-toolbar {
+  flex-shrink: 0;
   min-height: 20px;
 }
 .legend {
