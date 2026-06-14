@@ -13,6 +13,7 @@ import { usePlayback } from '@/composables/usePlayback';
 import PlaybackBar from '@/components/PlaybackBar.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import MetricsPanel from '@/components/MetricsPanel.vue';
+import { blendQpos } from '@/lib/viewport/poseBlend';
 import { exportCsv, exportJson, exportNpz, downloadBlob } from '@/lib/export/motion';
 
 const { t } = useI18n();
@@ -74,24 +75,33 @@ async function setupResultScene() {
   applyFrame(0);
 }
 
+let blendedQpos = new Float64Array(0);
+
 function applyFrame(f: number) {
   const result = store.result;
   const robot = robotModel.value;
   const scene = robotScene.value;
   if (!result || !robot || !scene) return;
-  const frame = Math.max(0, Math.min(f, result.frameCount - 1));
+  const playing = playback.state.playing;
+  const frame = playing ? f : Math.max(0, Math.min(Math.floor(f), result.frameCount - 1));
   const qpos = robot.data.qpos as Float64Array;
-  qpos.set(result.qpos.subarray(frame * result.nq, (frame + 1) * result.nq));
+  if (blendedQpos.length !== result.nq) blendedQpos = new Float64Array(result.nq);
+  if (playing) blendQpos(blendedQpos, result.qpos, result.nq, result.frameCount, frame);
+  else blendedQpos.set(result.qpos.subarray(frame * result.nq, (frame + 1) * result.nq));
+  qpos.set(blendedQpos);
   robot.mujoco.mj_kinematics(robot.model, robot.data);
   scene.update(robot.data);
-  ghost.value?.update(result.scaledHuman, frame, result.humanBodyNames.length);
+  if (playing) ghost.value?.updateBlend(result.scaledHuman, frame, result.humanBodyNames.length, result.frameCount);
+  else ghost.value?.update(result.scaledHuman, frame, result.humanBodyNames.length);
 
   if (followCamera.value && sceneManager.value) {
     const sm = sceneManager.value;
     const tx = qpos[0];
     const ty = qpos[1];
-    sm.controls.target.x += (tx - sm.controls.target.x) * 0.08;
-    sm.controls.target.y += (ty - sm.controls.target.y) * 0.08;
+    const smooth = playing ? 1 : 0.08;
+    sm.controls.target.x += (tx - sm.controls.target.x) * smooth;
+    sm.controls.target.y += (ty - sm.controls.target.y) * smooth;
+    sm.setDampingEnabled(!playing);
   }
 }
 
@@ -122,7 +132,7 @@ onMounted(() => {
   });
   sm.onTick((dt) => {
     playback.tick(dt);
-    applyFrame(playback.frameIndex.value);
+    applyFrame(playback.poseFrame.value);
   });
   sm.start();
   sceneManager.value = sm;

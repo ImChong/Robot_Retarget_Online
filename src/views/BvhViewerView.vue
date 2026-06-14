@@ -109,10 +109,14 @@ function applyFrame(frame: number) {
   const sk = skeleton.value;
   const sm = sceneManager.value;
   if (!sk || hipsIndex.value < 0) return;
-  sk.setFrame(frame);
+  const playing = playback.state.playing;
+  if (playing) sk.setFrameBlend(frame);
+  else sk.setFrame(frame);
   if (!sm) return;
   sk.getJointWorldPos(hipsIndex.value, hipPos);
-  followOrbitCamera(sm, hipPos);
+  // Snap camera to interpolated hips during playback to avoid trailing ghosting.
+  followOrbitCamera(sm, hipPos, playing ? 1 : 0.08);
+  sm.setDampingEnabled(!playing);
 }
 
 watch(() => motion.anim, rebuildSkeleton);
@@ -125,7 +129,7 @@ onMounted(() => {
   const sm = new SceneManager(el, { cameraPos: [2.4, -2.6, 1.6], target: [0, 0, 0.9] });
   sm.onTick((dt) => {
     playback.tick(dt);
-    applyFrame(playback.frameIndex.value);
+    applyFrame(playback.poseFrame.value);
   });
   sm.start();
   sceneManager.value = sm;

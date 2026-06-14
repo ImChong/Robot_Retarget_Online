@@ -26,10 +26,22 @@ export function usePlayback() {
     }
   }
 
+  /** Fractional frame for sub-frame pose interpolation during playback. */
+  const poseFrame = computed(() => {
+    if (state.frameCount <= 0) return 0;
+    if (state.loop) {
+      let f = state.frame % state.frameCount;
+      if (f < 0) f += state.frameCount;
+      return f;
+    }
+    return Math.min(state.frame, state.frameCount - 1);
+  });
+
   return {
     state,
     tick,
     frameIndex: computed(() => Math.min(Math.floor(state.frame), Math.max(state.frameCount - 1, 0))),
+    poseFrame,
     toggle: () => (state.playing = !state.playing),
     seek: (f: number) => (state.frame = f),
     setMotion: (frameCount: number, fps: number) => {

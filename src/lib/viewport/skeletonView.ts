@@ -8,6 +8,7 @@
 
 import * as THREE from 'three';
 import { estimateSkeletonSize, type BvhAnim } from '../bvh/parse';
+import { blendKeypoints, frameBlendIndices } from './poseBlend';
 
 const BONE_COLOR = 0x8d99ae;
 const BONE_EMISSIVE = 0x10151c;
@@ -17,6 +18,8 @@ const SELECT_COLOR = 0xffb74d;
 export interface SkeletonView {
   root: THREE.Group;
   setFrame(frame: number): void;
+  /** Interpolate between adjacent frames for smooth playback. */
+  setFrameBlend(frame: number): void;
   setSelected(jointIndex: number | null): void;
   /** Extra yaw (radians) about world Z applied after the Y-up→Z-up rotation. */
   setYaw(radians: number): void;
@@ -108,6 +111,10 @@ export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonVie
     if (es.parent >= 0) addBone(es.parent, es.offset);
   }
 
+  const qA = new THREE.Quaternion();
+  const qB = new THREE.Quaternion();
+  const qBlend = new THREE.Quaternion();
+
   function setFrame(frame: number) {
     const f = Math.max(0, Math.min(frame, anim.frameCount - 1));
     for (let j = 0; j < J; j++) {
@@ -125,6 +132,30 @@ export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonVie
         anim.localQuat[qBase + 3],
         anim.localQuat[qBase],
       );
+    }
+  }
+
+  function setFrameBlend(frame: number) {
+    const { f0, f1, t } = frameBlendIndices(frame, anim.frameCount);
+    if (t < 1e-6 || f0 === f1) {
+      setFrame(f0);
+      return;
+    }
+    for (let j = 0; j < J; j++) {
+      const p0 = (f0 * J + j) * 3;
+      const p1 = (f1 * J + j) * 3;
+      const q0 = (f0 * J + j) * 4;
+      const q1 = (f1 * J + j) * 4;
+      const group = jointGroups[j];
+      group.position.set(
+        anim.localPos[p0] * (1 - t) + anim.localPos[p1] * t,
+        anim.localPos[p0 + 1] * (1 - t) + anim.localPos[p1 + 1] * t,
+        anim.localPos[p0 + 2] * (1 - t) + anim.localPos[p1 + 2] * t,
+      );
+      qA.set(anim.localQuat[q0 + 1], anim.localQuat[q0 + 2], anim.localQuat[q0 + 3], anim.localQuat[q0]);
+      qB.set(anim.localQuat[q1 + 1], anim.localQuat[q1 + 2], anim.localQuat[q1 + 3], anim.localQuat[q1]);
+      qBlend.copy(qA).slerp(qB, t);
+      group.quaternion.copy(qBlend);
     }
   }
 
@@ -164,6 +195,7 @@ export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonVie
   return {
     root,
     setFrame,
+    setFrameBlend,
     setSelected,
     setYaw,
     lockJointToWorld,
@@ -177,6 +209,7 @@ export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonVie
 export interface KeypointCloud {
   root: THREE.Group;
   update(positions: Float32Array, frame: number, count: number): void;
+  updateBlend(positions: Float32Array, frame: number, count: number, frameCount: number): void;
   dispose(): void;
 }
 
@@ -189,6 +222,7 @@ export function buildKeypointCloud(names: string[], color = 0xef6c80): KeypointC
     color,
     transparent: true,
     opacity: 0.85,
+    depthWrite: false,
     roughness: 0.4,
   });
   const spheres: THREE.Mesh[] = [];
@@ -198,10 +232,19 @@ export function buildKeypointCloud(names: string[], color = 0xef6c80): KeypointC
     spheres.push(s);
   }
 
+  const blendPos = new THREE.Vector3();
+
   function update(positions: Float32Array, frame: number, count: number) {
     for (let k = 0; k < Math.min(K, count); k++) {
       const base = (frame * count + k) * 3;
       spheres[k].position.set(positions[base], positions[base + 1], positions[base + 2]);
+    }
+  }
+
+  function updateBlend(positions: Float32Array, frame: number, count: number, frameCount: number) {
+    for (let k = 0; k < Math.min(K, count); k++) {
+      blendKeypoints(blendPos, positions, count, frameCount, frame, k);
+      spheres[k].position.copy(blendPos);
     }
   }
 
@@ -211,5 +254,5 @@ export function buildKeypointCloud(names: string[], color = 0xef6c80): KeypointC
     root.removeFromParent();
   }
 
-  return { root, update, dispose };
+  return { root, update, updateBlend, dispose };
 }
