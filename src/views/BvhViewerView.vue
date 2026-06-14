@@ -110,8 +110,11 @@ function applyFrame(frame: number) {
   const sm = sceneManager.value;
   if (!sk || hipsIndex.value < 0) return;
   const playing = playback.state.playing;
-  if (playing) sk.setFrameBlend(frame);
-  else sk.setFrame(frame);
+  const poseFrame = playing
+    ? frame
+    : Math.max(0, Math.min(Math.floor(frame), motion.frameCount - 1));
+  if (playing) sk.setFrameBlend(poseFrame);
+  else sk.setFrame(poseFrame);
   if (!sm) return;
   sk.getJointWorldPos(hipsIndex.value, hipPos);
   // Snap camera to interpolated hips during playback to avoid trailing ghosting.

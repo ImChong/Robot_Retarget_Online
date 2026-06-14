@@ -116,7 +116,7 @@ export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonVie
   const qBlend = new THREE.Quaternion();
 
   function setFrame(frame: number) {
-    const f = Math.max(0, Math.min(frame, anim.frameCount - 1));
+    const f = Math.max(0, Math.min(Math.floor(frame), anim.frameCount - 1));
     for (let j = 0; j < J; j++) {
       const pBase = (f * J + j) * 3;
       const qBase = (f * J + j) * 4;

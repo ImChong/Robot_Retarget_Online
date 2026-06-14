@@ -74,6 +74,25 @@ describe('setFrameBlend', () => {
   });
 });
 
+describe('setFrame', () => {
+  it('floors fractional frame indices instead of reading invalid pose data', () => {
+    const anim = parseBvh(MINI_BVH);
+    const sk = buildSkeletonView(anim, 0.01);
+    const hips = jointIndexByName(anim, 'Hips');
+    const at0 = new THREE.Vector3();
+    const atHalf = new THREE.Vector3();
+
+    sk.setFrame(0);
+    sk.getJointWorldPos(hips, at0);
+    sk.setFrame(0.9);
+    sk.getJointWorldPos(hips, atHalf);
+
+    expect(atHalf.x).toBeCloseTo(at0.x, 4);
+    expect(atHalf.y).toBeCloseTo(at0.y, 4);
+    expect(atHalf.z).toBeCloseTo(at0.z, 4);
+  });
+});
+
 describe('blendQpos', () => {
   it('lerps root translation and slerps quaternion', () => {
     const nq = 8;
