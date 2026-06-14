@@ -59,9 +59,12 @@ function scheduleHideStrip() {
   clearHideStripTimer();
   hideStripTimer = setTimeout(() => {
     stripVisible.value = false;
-    loadingText.value = '';
     hideStripTimer = null;
   }, LOADING_STRIP_HIDE_MS);
+}
+
+function onLoadingStripAfterLeave() {
+  loadingText.value = '';
 }
 const showLines = ref(true);
 const showHuman = ref(true);
@@ -421,17 +424,19 @@ onUnmounted(() => {
 
     <div class="main-col d-flex flex-column flex-grow-1">
       <div ref="viewportEl" class="viewport" />
-      <div
-        v-if="stripVisible && loadingText"
-        class="loading-strip text-caption px-3 py-1"
-        :class="{
-          'loading-strip--success': stripState === 'success',
-          'loading-strip--error': stripState === 'error',
-        }"
-      >
-        <v-progress-circular v-if="stripState === 'loading'" indeterminate size="12" width="2" class="mr-2" />
-        {{ loadingText }}
-      </div>
+      <Transition name="loading-strip-slide" @after-leave="onLoadingStripAfterLeave">
+        <div
+          v-if="stripVisible && loadingText"
+          class="loading-strip text-caption px-3 py-1"
+          :class="{
+            'loading-strip--success': stripState === 'success',
+            'loading-strip--error': stripState === 'error',
+          }"
+        >
+          <v-progress-circular v-if="stripState === 'loading'" indeterminate size="12" width="2" class="mr-2" />
+          {{ loadingText }}
+        </div>
+      </Transition>
 
       <div class="tables-panel">
         <v-tabs v-model="activeTab" density="compact" color="primary" show-arrows>
@@ -530,6 +535,29 @@ onUnmounted(() => {
 .table-x-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+}
+.loading-strip-slide-enter-active,
+.loading-strip-slide-leave-active {
+  transition:
+    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+.loading-strip-slide-enter-from {
+  transform: translateY(-100%);
+  opacity: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.loading-strip-slide-leave-to {
+  transform: translateY(100%);
+  opacity: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 .loading-strip {
   background: rgba(79, 195, 247, 0.08);
