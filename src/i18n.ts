@@ -31,6 +31,39 @@ const messages: Record<string, { zh: string; en: string }> = {
   noMotionHint: { zh: '请先在「BVH 预览」页加载动作', en: 'Load a motion in the BVH Viewer page first' },
   frame: { zh: '帧', en: 'Frame' },
 
+  // Video → BVH (in-browser MediaPipe pose capture)
+  videoToBvh: { zh: '视频生成 BVH', en: 'Video → BVH' },
+  videoToBvhTitle: { zh: '从视频生成 BVH（实验性）', en: 'Generate BVH from Video (experimental)' },
+  videoToBvhHint: {
+    zh: '在浏览器内用 MediaPipe 姿态估计从单人视频提取动作，生成 LAFAN1 兼容的 BVH，可直接预览与重定向。',
+    en: 'Extracts motion from a single-person video using in-browser MediaPipe pose estimation and produces a LAFAN1-compatible BVH ready for preview and retargeting.',
+  },
+  selectVideo: { zh: '选择视频', en: 'Select video' },
+  videoDropTitle: { zh: '拖拽视频到此处', en: 'Drop a video here' },
+  videoDropHint: {
+    zh: '或点击选择（mp4 / webm / mov）',
+    en: 'or click to choose (mp4 / webm / mov)',
+  },
+  videoChangeFile: { zh: '更换视频', en: 'Change video' },
+  generateBvh: { zh: '生成 BVH', en: 'Generate BVH' },
+  processingVideo: { zh: '正在分析视频…', en: 'Analyzing video…' },
+  videoQualityWarning: {
+    zh: '检测质量较低：较多画面未识别到人体。建议使用单人、全身入镜、光照良好、较为正面的视频。',
+    en: 'Low detection quality: many frames had no detected person. Use a single-person, full-body, well-lit, mostly front-facing video.',
+  },
+  videoPrivacyNote: {
+    zh: '视频在本地浏览器中处理，不会上传到任何服务器。',
+    en: 'The video is processed locally in your browser and is never uploaded.',
+  },
+  videoLimitations: {
+    zh: '单目估计为草稿级：深度、自转与全局位移有限，动作为原地播放。',
+    en: 'Monocular estimation is draft quality: limited depth, twist and global translation; motion plays in place.',
+  },
+  videoInvalidFormat: {
+    zh: '不支持的文件类型，请选择 mp4 / webm / mov 视频',
+    en: 'Unsupported file type — choose an mp4 / webm / mov video',
+  },
+
   robot: { zh: '机器人', en: 'Robot' },
   loadingRobot: { zh: '正在加载机器人模型…', en: 'Loading robot model…' },
   robotLoadComplete: { zh: '机器人模型加载完成', en: 'Robot model loaded' },

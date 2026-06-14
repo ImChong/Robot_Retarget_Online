@@ -125,6 +125,34 @@ Scope when picked up / 启动时的范围:
 
 ---
 
+## Input formats: Video → BVH · 输入格式：视频生成 BVH  ✅ Experimental / 实验性
+
+In-browser monocular motion capture. MediaPipe Pose Landmarker
+(`@mediapipe/tasks-vision`, Apache-2.0, dynamically imported; WASM runtime +
+pose model served from the app's own origin — no third-party CDN) estimates 33
+3D world landmarks per frame; a position→rotation solver maps
+them onto the fixed LAFAN1 skeleton and emits a BVH that flows through the
+normal `loadBvhText` → viewer → retargeting path. Only bone *directions* are
+read (lengths stay at the rest offsets), with One-Euro smoothing + visibility
+gating. Pure-frontend; the video never leaves the browser.
+
+浏览器内单目动捕：MediaPipe 姿态估计 → 关键点 → 旋转求解到固定 LAFAN1 骨架，生成 BVH
+复用既有 `loadBvhText` → 预览 → 重定向链路。仅取骨头方向（长度用静止骨架），含 One-Euro
+平滑与置信度门控。保持纯前端，视频不离开浏览器。
+
+Files / 相关文件: `src/lib/mocap/` (pipeline), `src/components/VideoToBvhDialog.vue`
+(UI), `tests/mocap.test.ts`.
+
+Known limits / 已知局限: monocular depth & axial twist are weak and global
+translation is not recovered (motion plays in place) — **draft quality**.
+Higher-fidelity world-grounded capture (e.g. WHAM / GVHMR / TRAM) needs a
+backend + GPU and is out of scope for the static deployment; if a backend track
+is ever opened (see Phase 2 option b), it could host such a model.
+单目深度/自转弱、无全局位移（原地播放），为草稿级。更高保真的世界坐标动捕需后端+GPU，
+超出纯静态部署范围。
+
+---
+
 ## Architecture invariants · 架构约束（改动时请保持）
 
 - **Pure frontend, no backend.** All compute (MuJoCo FK/Jacobian/IK) runs in the
