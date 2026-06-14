@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { parseBvh } from '../src/lib/bvh/parse';
 import { buildSkeletonView } from '../src/lib/viewport/skeletonView';
+import { blendQpos } from '../src/lib/viewport/poseBlend';
 import {
   followOrbitCamera,
   horizontalYaw,
@@ -48,6 +49,42 @@ describe('skeleton hip lock', () => {
       expect(out.y).toBeCloseTo(anchor.y, 4);
       expect(out.z).toBeCloseTo(anchor.z, 4);
     }
+  });
+});
+
+describe('setFrameBlend', () => {
+  it('interpolates hip position halfway between frames', () => {
+    const anim = parseBvh(MINI_BVH);
+    const sk = buildSkeletonView(anim, 0.01);
+    const hips = jointIndexByName(anim, 'Hips');
+    const p0 = new THREE.Vector3();
+    const p1 = new THREE.Vector3();
+    const mid = new THREE.Vector3();
+
+    sk.setFrame(0);
+    sk.getJointWorldPos(hips, p0);
+    sk.setFrame(1);
+    sk.getJointWorldPos(hips, p1);
+    sk.setFrameBlend(0.5);
+    sk.getJointWorldPos(hips, mid);
+
+    expect(mid.x).toBeCloseTo((p0.x + p1.x) / 2, 4);
+    expect(mid.y).toBeCloseTo((p0.y + p1.y) / 2, 4);
+    expect(mid.z).toBeCloseTo((p0.z + p1.z) / 2, 4);
+  });
+});
+
+describe('blendQpos', () => {
+  it('lerps root translation and slerps quaternion', () => {
+    const nq = 8;
+    const qpos = new Float64Array([
+      0, 0, 0, 1, 0, 0, 0, 0,
+      2, 0, 0, 1, 0, 0, 0, 0,
+    ]);
+    const out = new Float64Array(nq);
+    blendQpos(out, qpos, nq, 2, 0.5);
+    expect(out[0]).toBeCloseTo(1, 5);
+    expect(out[3]).toBeCloseTo(1, 5);
   });
 });
 

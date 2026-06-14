@@ -119,6 +119,10 @@ export class SceneManager {
     return () => this.tickCallbacks.delete(cb);
   }
 
+  setDampingEnabled(enabled: boolean) {
+    this.controls.enableDamping = enabled;
+  }
+
   start() {
     if (this.running) return;
     this.running = true;
