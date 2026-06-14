@@ -108,7 +108,7 @@ function applyFrame(f: number) {
 function onExport(kind: 'npz' | 'csv' | 'json') {
   const result = store.result;
   if (!result) return;
-  const base = (motion.fileName ?? 'motion').replace(/\.bvh$/i, '');
+  const base = (motion.fileName ?? 'motion').replace(/\.(bvh|json)$/i, '').replace(/\.motion$/i, '');
   const name = `${base}_${result.robotId}`;
   if (kind === 'npz') downloadBlob(exportNpz(result), `${name}.npz`);
   else if (kind === 'csv') downloadBlob(exportCsv(result), `${name}.csv`);

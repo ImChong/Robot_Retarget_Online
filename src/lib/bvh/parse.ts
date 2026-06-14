@@ -197,7 +197,7 @@ export function parseBvh(text: string): BvhAnim {
 }
 
 /** Flip quaternion signs along time so consecutive frames stay in the same hemisphere. */
-function removeQuatDiscontinuities(anim: BvhAnim) {
+export function removeQuatDiscontinuities(anim: BvhAnim) {
   const { frameCount, joints, localQuat } = anim;
   const J = joints.length;
   for (let f = 1; f < frameCount; f++) {

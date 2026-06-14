@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
 import * as THREE from 'three';
-import { mdiFolderOpen, mdiRun, mdiTune, mdiVideoOutline } from '@mdi/js';
+import { mdiCodeJson, mdiFolderOpen, mdiRun, mdiTune, mdiVideoOutline } from '@mdi/js';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
@@ -14,6 +14,8 @@ import PlaybackBar from '@/components/PlaybackBar.vue';
 import JointTreePanel from '@/components/JointTreePanel.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import VideoToBvhDialog from '@/components/VideoToBvhDialog.vue';
+import { serializeMotionJson } from '@/lib/motion/motionJson';
+import { downloadBlob } from '@/lib/export/motion';
 
 const { t } = useI18n();
 const { mdAndUp } = useDisplay();
@@ -31,11 +33,15 @@ const panelOpen = ref(false);
 const videoDialogOpen = ref(false);
 
 const samples = [
-  { title: 'Walk 行走 (LAFAN1)', file: 'walk.bvh' },
-  { title: 'Run 跑步 (LAFAN1)', file: 'run.bvh' },
-  { title: 'Dance 舞蹈 (LAFAN1)', file: 'dance.bvh' },
-  { title: 'Fall & get up 倒地起身 (LAFAN1)', file: 'fall_getup.bvh' },
-  { title: 'Jumps 跳跃 (LAFAN1)', file: 'jumps.bvh' },
+  { title: 'Walk 行走 (BVH · LAFAN1)', file: 'walk.bvh' },
+  { title: 'Run 跑步 (BVH · LAFAN1)', file: 'run.bvh' },
+  { title: 'Dance 舞蹈 (BVH · LAFAN1)', file: 'dance.bvh' },
+  { title: 'Fall & get up 倒地起身 (BVH · LAFAN1)', file: 'fall_getup.bvh' },
+  { title: 'Jumps 跳跃 (BVH · LAFAN1)', file: 'jumps.bvh' },
+  { title: 'Walk 行走 (JSON · from LAFAN1)', file: 'walk.motion.json' },
+  { title: 'Wave 挥手 (JSON · procedural)', file: 'wave.motion.json' },
+  { title: 'Squat 深蹲 (JSON · procedural)', file: 'squat.motion.json' },
+  { title: 'T-pose calibration 校准 (JSON · procedural)', file: 'tpose_calibration.motion.json' },
 ];
 const sampleLoading = ref(false);
 
@@ -64,10 +70,17 @@ function onFileChosen(e: Event) {
 
 function loadText(text: string, name: string) {
   try {
-    motion.loadBvhText(text, name);
+    motion.loadMotion(text, name);
   } catch {
     loadErrorSnack.value = true;
   }
+}
+
+function exportMotionJson() {
+  if (!motion.anim) return;
+  const base = (motion.fileName ?? 'motion').replace(/\.[^.]+$/, '').replace(/\.motion$/i, '');
+  const json = serializeMotionJson(motion.anim, { unitScale: motion.unitScale, name: base });
+  downloadBlob(new Blob([json], { type: 'application/json' }), `${base}.motion.json`);
 }
 
 async function loadSample(file: string) {
@@ -149,11 +162,11 @@ onUnmounted(() => {
 
 <template>
   <div class="page-root d-flex">
-    <input ref="fileInput" type="file" accept=".bvh" class="d-none" @change="onFileChosen" />
+    <input ref="fileInput" type="file" accept=".bvh,.json" class="d-none" @change="onFileChosen" />
 
     <MobileSidePanel v-model="panelOpen">
       <v-btn color="primary" :prepend-icon="mdiFolderOpen" block @click="openFilePicker">
-        {{ t('openBvh') }}
+        {{ t('openMotion') }}
       </v-btn>
 
       <v-menu
@@ -175,10 +188,21 @@ onUnmounted(() => {
         {{ t('videoToBvh') }}
       </v-btn>
 
+      <v-btn
+        v-if="motion.hasMotion"
+        variant="tonal"
+        :prepend-icon="mdiCodeJson"
+        block
+        @click="exportMotionJson"
+      >
+        {{ t('exportMotionJson') }}
+      </v-btn>
+
       <v-card v-if="motion.hasMotion" variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('motionInfo') }}</v-card-title>
         <v-card-text class="text-body-2">
           <div class="info-line"><span>{{ t('fileName') }}</span><b class="text-truncate">{{ motion.fileName }}</b></div>
+          <div class="info-line"><span>{{ t('format') }}</span><b>{{ motion.sourceFormat === 'json' ? 'Motion JSON' : 'BVH' }}</b></div>
           <div class="info-line"><span>{{ t('frames') }}</span><b>{{ motion.frameCount }} @ {{ motion.fps.toFixed(0) }} fps</b></div>
           <div class="info-line"><span>{{ t('duration') }}</span><b>{{ motion.duration.toFixed(2) }} s</b></div>
           <div class="info-line"><span>{{ t('joints') }}</span><b>{{ motion.jointNames.length }}</b></div>
@@ -213,7 +237,7 @@ onUnmounted(() => {
           <div class="text-h6 text-medium-emphasis mb-1">{{ t('noMotion') }}</div>
           <div class="text-body-2 text-disabled px-4 text-center">{{ t('dropHint') }}</div>
           <v-btn class="mt-4 mobile-open-btn" color="primary" variant="tonal" :prepend-icon="mdiFolderOpen" @click="openFilePicker">
-            {{ t('openBvh') }}
+            {{ t('openMotion') }}
           </v-btn>
         </div>
         <PlaybackBar v-if="motion.hasMotion" :controller="playback" />
@@ -234,7 +258,7 @@ onUnmounted(() => {
     <VideoToBvhDialog v-model="videoDialogOpen" @generated="loadText" />
 
     <v-snackbar v-model="loadErrorSnack" color="error" timeout="5000">
-      {{ motion.loadError ?? 'Failed to load BVH' }}
+      {{ motion.loadError ?? 'Failed to load motion file' }}
     </v-snackbar>
   </div>
 </template>

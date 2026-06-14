@@ -125,6 +125,41 @@ Scope when picked up / 启动时的范围:
 
 ---
 
+## Input formats: Motion JSON · 输入格式：Motion JSON  ✅ Shipped / 已交付
+
+A format-agnostic input pipeline. The loader (`src/stores/motion.ts` →
+`loadMotion`) auto-detects by file name/content and dispatches to either the BVH
+parser or **Retarget Motion JSON** (`src/lib/motion/motionJson.ts`); both resolve
+to the same `BvhAnim`, so the viewer, the LAFAN1 → human-frame conversion and the
+retargeting engine consume either unchanged. Motion JSON is a clean,
+self-describing schema (joint hierarchy + rest offsets + per-frame root
+translation and **local quaternions** — no Euler channel-order ambiguity), is
+fully self-contained (bundleable), and can be **exported** from the BVH Viewer
+("Export as JSON").
+
+格式无关的输入管线：`loadMotion` 按文件名/内容自动识别，分发到 BVH 解析器或 Motion JSON
+加载器，二者都归一到同一 `BvhAnim`，下游（预览/转换/重定向）无需改动。Motion JSON 是干净、
+自描述的骨架动画格式（层级 + 静止偏移 + 逐帧根平移与局部四元数），自包含可打包，并可从
+BVH 预览页一键导出。
+
+Files / 相关文件: `src/lib/motion/motionJson.ts` (format + parse/serialize),
+`src/stores/motion.ts` (`loadMotion` dispatch), `scripts/gen_motion_json_samples.ts`
+(bundled-sample generator), `tests/motionJson.test.ts`, `tests/samples.test.ts`
+(JSON-sample retarget regression).
+
+Bundled examples / 自带案例: `public/sample_motions/*.motion.json` —
+`walk` (LAFAN1 walk re-encoded into the format), plus self-contained procedural
+clips `wave` / `squat` / `tpose_calibration` authored on the LAFAN1 rest
+skeleton. They preview upright and retarget to the robots like the BVH samples.
+
+Next opportunistic adds / 后续机会式扩展: a generic per-frame **keypoint
+trajectory** (CSV/JSON) that targets the human-frame contract directly (no
+skeleton needed), and FBX import via three.js `FBXLoader` (needs a joint-name
+remap to LAFAN1). 后续可加：直达 human-frame 契约的关键点轨迹（CSV/JSON）、以及经
+three.js `FBXLoader` 的 FBX 导入（需关节名映射到 LAFAN1）。
+
+---
+
 ## Input formats: Video → BVH · 输入格式：视频生成 BVH  ✅ Experimental / 实验性
 
 In-browser monocular motion capture. MediaPipe Pose Landmarker

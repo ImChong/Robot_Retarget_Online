@@ -19,7 +19,7 @@ No backend, no installation.
 
 | Page | 功能 |
 | --- | --- |
-| **BVH Viewer** | BVHView 风格的动捕预览：拖拽打开 `.bvh`、胶囊体骨架渲染、播放/拖动时间轴/变速、关节层级树与关节信息；**视频生成 BVH（浏览器内 MediaPipe 姿态估计，实验性）** |
+| **BVH Viewer** | BVHView 风格的动捕预览：拖拽打开 `.bvh` 或 `.json`（Motion JSON）、胶囊体骨架渲染、播放/拖动时间轴/变速、关节层级树与关节信息、一键导出为 Motion JSON；**视频生成 BVH（浏览器内 MediaPipe 姿态估计，实验性）** |
 | **Retarget Config** | 机器人选择（Unitree G1 / Booster T1）、IK 关键点映射表（两阶段权重/偏移）、人体缩放表、求解器参数；配置 JSON 与 GMR `ik_config` 双向兼容 |
 | **Retarget Preview** | 一键重定向（带进度）、机器人动作回放、人体关键点叠加对比、逐帧误差曲线、导出 NPZ / CSV / JSON |
 
@@ -34,6 +34,13 @@ No backend, no installation.
 - **BVH pipeline**: LAFAN1-convention loader (matches GMR's `lafan_vendor`):
   euler→quat per channel order, FK, Y-up→Z-up, cm→m, virtual
   `LeftFootMod`/`RightFootMod` joints.
+- **Input formats**: the loader auto-detects by name/content and is
+  format-agnostic — `.bvh` (LAFAN1) and **Retarget Motion JSON** (`.json`) both
+  resolve to the same skeletal-animation representation, so the viewer and
+  retargeting consume either unchanged. Motion JSON (`src/lib/motion/motionJson.ts`)
+  is a clean, self-describing schema — joint hierarchy + rest offsets + per-frame
+  root translation and local quaternions — that the app can also **export**
+  (BVH Viewer → "Export as JSON"). 输入格式可插拔：`.bvh` 与 Motion JSON 共用同一管线。
 - **Video → BVH (experimental)**: in-browser MediaPipe Pose
   (`@mediapipe/tasks-vision`, Apache-2.0, lazy-loaded) estimates 33 3D
   landmarks/frame; a position→rotation solver (`src/lib/mocap/`) maps them onto
@@ -83,9 +90,16 @@ dataset (non-commercial license): **walk, run, dance, fall & get up, jumps**
 (60 s each). Regenerate from a local LAFAN1 zip via
 `python3 scripts/prepare_lafan_samples.py`.
 
+`public/sample_motions/*.motion.json` are **bundled Motion JSON examples** that
+exercise the JSON input path: `walk` (a slice of the LAFAN1 walk clip re-encoded
+into the format) plus three self-contained procedural clips — `wave`, `squat`,
+`tpose_calibration` — authored on the LAFAN1 rest skeleton. Regenerate with
+`npx vite-node scripts/gen_motion_json_samples.ts` (reuses the real
+loader/FK/serializer). They retarget to the robots exactly like the BVH samples.
+
 The legacy procedural generator (`scripts/gen_sample_bvh.py`) is kept for
-reference only. For the full dataset, download LAFAN1 and drop any `.bvh` into
-the app.
+reference only. For the full dataset, download LAFAN1 and drop any `.bvh` (or a
+Motion JSON file) into the app.
 
 ## Deploy
 
@@ -98,6 +112,8 @@ Pages → Source: GitHub Actions**.
 Full plan of record in **[`ROADMAP.md`](ROADMAP.md)**. Headlines:
 
 - [x] Phase 1 — GMR online (BVH/LAFAN1 → Unitree G1, Booster T1), parity-validated
+- [x] Format-agnostic input: **Motion JSON** (`.json`) alongside BVH, with
+  bundled examples + in-app export
 - [x] Video → BVH input (experimental, in-browser MediaPipe pose capture)
 - [ ] More GMR robots (assets are drop-in: `public/robots/` + manifest entry)
 - [ ] Phase 2 — [holosoma](https://github.com/amazon-far/holosoma) as a second pluggable engine

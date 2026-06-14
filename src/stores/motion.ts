@@ -2,9 +2,14 @@ import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
 import { parseBvh, estimateSkeletonSize, type BvhAnim } from '@/lib/bvh/parse';
 import { bvhToLafan1Frames, type Lafan1Motion } from '@/lib/bvh/lafan1';
+import { looksLikeMotionJson, parseMotionJson } from '@/lib/motion/motionJson';
+
+export type MotionFormat = 'bvh' | 'json';
 
 export interface MotionState {
   fileName: string | null;
+  /** Input format the current motion was loaded from. */
+  sourceFormat: MotionFormat | null;
   anim: BvhAnim | null;
   lafan: Lafan1Motion | null;
   /** file units -> meters */
@@ -16,6 +21,7 @@ export interface MotionState {
 export const useMotionStore = defineStore('motion', {
   state: (): MotionState => ({
     fileName: null,
+    sourceFormat: null,
     anim: null,
     lafan: null,
     unitScale: 0.01,
@@ -34,28 +40,49 @@ export const useMotionStore = defineStore('motion', {
     estHeightMeters: (s) => s.skeletonSizeUnits * s.unitScale,
   },
   actions: {
-    loadBvhText(text: string, fileName: string) {
+    /**
+     * Load a motion file, auto-detecting the format from its name/content.
+     * Supports BVH (LAFAN1 convention) and Retarget Motion JSON; both resolve to
+     * the same `BvhAnim` + human-frame representation downstream.
+     */
+    loadMotion(text: string, fileName: string) {
       try {
-        const anim = parseBvh(text);
-        const size = estimateSkeletonSize(anim);
-        // Heuristic: skeletons taller than 10 units are in cm (LAFAN1), else meters.
-        const unitScale = size > 10 ? 0.01 : 1.0;
+        let anim: BvhAnim;
+        let unitScale: number;
+        let format: MotionFormat;
+        if (looksLikeMotionJson(text, fileName)) {
+          const parsed = parseMotionJson(text);
+          anim = parsed.anim;
+          unitScale = parsed.unitScale;
+          format = 'json';
+        } else {
+          anim = parseBvh(text);
+          // Heuristic: skeletons taller than 10 units are in cm (LAFAN1), else meters.
+          unitScale = estimateSkeletonSize(anim) > 10 ? 0.01 : 1.0;
+          format = 'bvh';
+        }
         const lafan = bvhToLafan1Frames(anim, unitScale);
         this.anim = markRaw(anim);
         this.lafan = markRaw(lafan);
         this.unitScale = unitScale;
-        this.skeletonSizeUnits = size;
+        this.skeletonSizeUnits = estimateSkeletonSize(anim);
         this.fileName = fileName;
+        this.sourceFormat = format;
         this.loadError = null;
       } catch (err) {
         this.loadError = err instanceof Error ? err.message : String(err);
         throw err;
       }
     },
+    /** Back-compat alias; prefer `loadMotion` (auto-detects format). */
+    loadBvhText(text: string, fileName: string) {
+      this.loadMotion(text, fileName);
+    },
     clear() {
       this.anim = null;
       this.lafan = null;
       this.fileName = null;
+      this.sourceFormat = null;
       this.loadError = null;
     },
   },

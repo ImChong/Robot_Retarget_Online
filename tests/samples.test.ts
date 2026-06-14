@@ -10,12 +10,14 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { getMujoco, type RobotModel } from '../src/lib/mujoco/runtime';
 import { parseBvh } from '../src/lib/bvh/parse';
 import { bvhToLafan1Frames } from '../src/lib/bvh/lafan1';
+import { parseMotionJson } from '../src/lib/motion/motionJson';
 import { GmrRetargetEngine } from '../src/lib/retarget/engine';
 import { getDefaultConfig } from '../src/lib/retarget/defaults';
 import { DEFAULT_SOLVER_OPTIONS } from '../src/lib/retarget/types';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SAMPLES = ['walk', 'run', 'dance', 'fall_getup', 'jumps'];
+const JSON_SAMPLES = ['walk', 'wave', 'squat', 'tpose_calibration'];
 
 let robot: RobotModel;
 let pelvisId: number;
@@ -101,6 +103,44 @@ describe('bundled LAFAN1 sample motions retarget to G1', () => {
         expect(minUp).toBeGreaterThan(0.7);
       }
       // dance / jumps: only require finite, in-range qpos (airborne / stylized poses).
+    });
+  }
+});
+
+describe('bundled Motion JSON sample clips retarget to G1', () => {
+  for (const name of JSON_SAMPLES) {
+    it(`${name}.motion.json: finite, in-range qpos`, () => {
+      const text = readFileSync(join(ROOT, 'public', 'sample_motions', `${name}.motion.json`), 'utf-8');
+      const { anim, unitScale } = parseMotionJson(text);
+      const motion = bvhToLafan1Frames(anim, unitScale);
+      expect(motion.missingFootJoints).toHaveLength(0);
+
+      const engine = new GmrRetargetEngine(robot, getDefaultConfig('unitree_g1'), {
+        ...DEFAULT_SOLVER_OPTIONS,
+      });
+
+      const model = robot.model;
+      const jntType = model.jnt_type as Int32Array;
+      const jntLimited = model.jnt_limited as Uint8Array;
+      const jntQposadr = model.jnt_qposadr as Int32Array;
+      const jntRange = model.jnt_range as Float64Array;
+
+      let minUp = Infinity;
+      for (let f = 0; f < motion.frames.length; f++) {
+        const q = engine.retargetFrame(motion.frames[f]);
+        for (const v of q) expect(Number.isFinite(v)).toBe(true);
+        for (let j = 0; j < model.njnt; j++) {
+          if (jntType[j] === 0 || !jntLimited[j]) continue;
+          const adr = jntQposadr[j];
+          expect(q[adr]).toBeGreaterThanOrEqual(jntRange[j * 2] - 1e-3);
+          expect(q[adr]).toBeLessThanOrEqual(jntRange[j * 2 + 1] + 1e-3);
+        }
+        minUp = Math.min(minUp, pelvisUpright());
+      }
+      engine.dispose();
+
+      // Every clip stays roughly upright (no falling / inversion).
+      expect(minUp).toBeGreaterThan(0.6);
     });
   }
 });
