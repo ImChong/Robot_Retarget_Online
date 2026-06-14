@@ -6,3 +6,7 @@ dist/
 .vite/
 coverage/
 probe*.mjs
+
+# MediaPipe WASM runtime is copied from node_modules at build time
+# (scripts/setup-mediapipe-wasm.mjs); the npm package is the source of truth.
+public/mediapipe/wasm/

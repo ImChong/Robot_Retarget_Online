@@ -96,6 +96,51 @@ export function eulerToQuat(e: Vec3, order: string): Quat {
   return quatMul(q0, quatMul(q1, q2));
 }
 
+/**
+ * Minimal (swing-only) rotation taking unit vector `a` onto unit vector `b`.
+ * Returns identity for parallel inputs; a 180° rotation about an arbitrary
+ * perpendicular axis for anti-parallel inputs.
+ */
+export function quatFromTo(a: Vec3, b: Vec3): Quat {
+  const d = Math.max(-1, Math.min(1, vDot(a, b)));
+  if (d > 1 - 1e-9) return [1, 0, 0, 0];
+  if (d < -1 + 1e-9) {
+    // a and b oppose: rotate 180° about any axis perpendicular to a.
+    let axis = vCross(a, [1, 0, 0]);
+    if (vNorm(axis) < 1e-6) axis = vCross(a, [0, 1, 0]);
+    const n = vNorm(axis) || 1;
+    return [0, axis[0] / n, axis[1] / n, axis[2] / n];
+  }
+  const axis = vCross(a, b);
+  const n = vNorm(axis) || 1;
+  const angle = Math.acos(d);
+  return quatFromAxisAngle([axis[0] / n, axis[1] / n, axis[2] / n], angle);
+}
+
+/**
+ * Decompose a unit quaternion into ZYX Euler angles (radians) such that
+ * `q = R_z(z) ⊗ R_y(y) ⊗ R_x(x)` — the exact inverse of
+ * `eulerToQuat([z, y, x], 'zyx')`. Returns `[z, y, x]` so callers writing BVH
+ * `Zrotation Yrotation Xrotation` channels can emit the array directly.
+ */
+export function quatToEulerZYX(q: Quat): Vec3 {
+  const [w, x, y, z] = quatNormalize(q);
+  // Rotation-matrix entries needed for the ZYX extraction.
+  const r00 = 1 - 2 * (y * y + z * z);
+  const r10 = 2 * (x * y + w * z);
+  const r20 = 2 * (x * z - w * y);
+  const r21 = 2 * (y * z + w * x);
+  const r22 = 1 - 2 * (x * x + y * y);
+  const cy = Math.hypot(r21, r22);
+  if (cy < 1e-6) {
+    // Gimbal lock: pitch ≈ ±90°, fold roll into yaw.
+    const ez = Math.atan2(-2 * (x * y - w * z), 1 - 2 * (y * y + z * z));
+    const ey = Math.atan2(-r20, cy);
+    return [ez, ey, 0];
+  }
+  return [Math.atan2(r10, r00), Math.atan2(-r20, cy), Math.atan2(r21, r22)];
+}
+
 /** Rotation-vector (axis-angle, length = angle) from unit quaternion. */
 export function quatToRotVec(q: Quat): Vec3 {
   let [w, x, y, z] = q;

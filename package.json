@@ -7,7 +7,9 @@
     "node": ">=20"
   },
   "scripts": {
+    "predev": "node scripts/setup-mediapipe-wasm.mjs",
     "dev": "vite --host",
+    "prebuild": "node scripts/setup-mediapipe-wasm.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run --exclude 'tests/robots/**' && vitest run tests/robots --pool=forks --maxWorkers 4",
@@ -15,6 +17,7 @@
   },
   "dependencies": {
     "@mdi/js": "^7.4.47",
+    "@mediapipe/tasks-vision": "^0.10.35",
     "fflate": "^0.8.2",
     "mujoco-js": "^0.0.7",
     "pinia": "^3.0.2",

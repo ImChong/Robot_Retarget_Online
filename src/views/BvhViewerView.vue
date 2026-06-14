@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
 import * as THREE from 'three';
-import { mdiFolderOpen, mdiRun, mdiTune } from '@mdi/js';
+import { mdiFolderOpen, mdiRun, mdiTune, mdiVideoOutline } from '@mdi/js';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
@@ -13,6 +13,7 @@ import FileDropZone from '@/components/FileDropZone.vue';
 import PlaybackBar from '@/components/PlaybackBar.vue';
 import JointTreePanel from '@/components/JointTreePanel.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
+import VideoToBvhDialog from '@/components/VideoToBvhDialog.vue';
 
 const { t } = useI18n();
 const { mdAndUp } = useDisplay();
@@ -27,6 +28,7 @@ const hipsIndex = ref(-1);
 const selectedJoint = ref<number | null>(null);
 const loadErrorSnack = ref(false);
 const panelOpen = ref(false);
+const videoDialogOpen = ref(false);
 
 const samples = [
   { title: 'Walk 行走 (LAFAN1)', file: 'walk.bvh' },
@@ -162,6 +164,10 @@ onUnmounted(() => {
         </v-list>
       </v-menu>
 
+      <v-btn variant="tonal" :prepend-icon="mdiVideoOutline" block @click="videoDialogOpen = true">
+        {{ t('videoToBvh') }}
+      </v-btn>
+
       <v-card v-if="motion.hasMotion" variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('motionInfo') }}</v-card-title>
         <v-card-text class="text-body-2">
@@ -217,6 +223,8 @@ onUnmounted(() => {
       :title="t('openPanel')"
       @click="panelOpen = true"
     />
+
+    <VideoToBvhDialog v-model="videoDialogOpen" @generated="loadText" />
 
     <v-snackbar v-model="loadErrorSnack" color="error" timeout="5000">
       {{ motion.loadError ?? 'Failed to load BVH' }}
