@@ -100,7 +100,7 @@ defineExpose({ resetZoom: reset, isZoomed });
 </script>
 
 <template>
-  <div>
+  <div class="chart-root">
     <div class="d-flex align-center ga-4 mb-1 text-caption chart-toolbar">
       <span><span class="legend mean" /> {{ t('meanError') }}: {{ (stats.mean * 100).toFixed(2) }} cm</span>
       <span><span class="legend max" /> {{ t('maxError') }}: {{ (stats.maxAll * 100).toFixed(2) }} cm</span>
@@ -151,15 +151,22 @@ defineExpose({ resetZoom: reset, isZoomed });
 </template>
 
 <style scoped>
-.chart {
-  width: 100%;
+.chart-root {
   height: 100%;
-  min-height: 120px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chart {
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
   display: block;
   background: rgba(0, 0, 0, 0.18);
   border-radius: 6px;
 }
 .chart-toolbar {
+  flex-shrink: 0;
   min-height: 20px;
 }
 .legend {

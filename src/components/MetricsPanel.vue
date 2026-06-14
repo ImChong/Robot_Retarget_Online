@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { mdiChevronDown, mdiChevronUp, mdiMagnifyRemoveOutline, mdiDragHorizontalVariant } from '@mdi/js';
 import { useI18n } from '@/i18n';
 import type { RetargetResult } from '@/lib/retarget/types';
@@ -123,6 +123,7 @@ onUnmounted(() => ro?.disconnect());
 
 watch(panelBodyH, () => emit('resize'));
 watch(expanded, () => emit('resize'));
+watch(activeTab, () => nextTick(() => emit('resize')));
 </script>
 
 <template>
@@ -282,15 +283,26 @@ watch(expanded, () => emit('resize'));
   flex-shrink: 0;
 }
 .chart-window {
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.chart-window :deep(.v-window) {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chart-window :deep(.v-window__container) {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
 }
 .chart-window :deep(.v-window-item) {
-  height: 100%;
-}
-.chart-window :deep(.v-window-item > div) {
-  height: 100%;
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
