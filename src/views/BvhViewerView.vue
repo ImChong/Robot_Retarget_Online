@@ -36,6 +36,9 @@ const samples = [
   { title: 'Dance 舞蹈 (LAFAN1)', file: 'dance.bvh' },
   { title: 'Fall & get up 倒地起身 (LAFAN1)', file: 'fall_getup.bvh' },
   { title: 'Jumps 跳跃 (LAFAN1)', file: 'jumps.bvh' },
+  { title: 'Dog walk 狗·行走 (Quadruped)', file: 'dog_walk.bvh' },
+  { title: 'Dog run 狗·奔跑 (Quadruped)', file: 'dog_run.bvh' },
+  { title: 'Dog idle 狗·站立 (Quadruped)', file: 'dog_idle.bvh' },
 ];
 const sampleLoading = ref(false);
 
