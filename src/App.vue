@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useAppTheme } from '@/composables/useAppTheme';
-import { mdiTranslate, mdiGithub, mdiWeatherSunny, mdiWeatherNight, mdiHeart } from '@mdi/js';
+import { mdiTranslate, mdiGithub, mdiWeatherSunny, mdiWeatherNight, mdiCoffee } from '@mdi/js';
 
 const { t, toggleLocale, localeLabel, locale } = useI18n();
 const { isDark, toggleAppTheme } = useAppTheme();
@@ -81,7 +81,7 @@ void locale.value;
             @click="toggleLocale"
           />
           <v-btn
-            :icon="mdiHeart"
+            :icon="mdiCoffee"
             variant="text"
             class="sponsor-btn"
             :aria-label="t('sponsorTitle')"
@@ -111,7 +111,12 @@ void locale.value;
       </router-view>
     </v-main>
 
-    <v-dialog v-model="sponsorOpen" max-width="340">
+    <v-dialog
+      v-model="sponsorOpen"
+      max-width="340"
+      scrim="rgba(0, 0, 0, 0.55)"
+      class="sponsor-dialog"
+    >
       <v-card rounded="xl" class="sponsor-card">
         <v-card-item class="text-center pt-5 pb-1">
           <div class="text-h6 font-weight-bold">{{ t('sponsorTitle') }}</div>
@@ -268,6 +273,11 @@ void locale.value;
 
 .sponsor-btn :deep(.v-icon) {
   color: #e2566a;
+}
+
+.sponsor-dialog :deep(.v-overlay__scrim) {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .sponsor-qr {
