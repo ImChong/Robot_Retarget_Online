@@ -115,6 +115,7 @@ void locale.value;
       v-model="sponsorOpen"
       max-width="340"
       scrim="rgba(0, 0, 0, 0.55)"
+      :opacity="1"
       class="sponsor-dialog"
     >
       <v-card rounded="xl" class="sponsor-card">
@@ -275,7 +276,13 @@ void locale.value;
   color: #e2566a;
 }
 
+.sponsor-dialog {
+  --v-overlay-opacity: 1;
+}
+
 .sponsor-dialog :deep(.v-overlay__scrim) {
+  background: rgba(0, 0, 0, 0.55) !important;
+  opacity: 1 !important;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
