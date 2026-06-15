@@ -14,9 +14,9 @@
 import { quatConj, quatMul, quatRotate, quatToRotVec, type Quat, type Vec3 } from '../math3d';
 import type { HumanFrame, HumanFrameBody } from '../bvh/lafan1';
 import type { RobotModel } from '../mujoco/runtime';
-import type { GmrIkConfig, SolverOptions } from './types';
+import type { GmrIkConfig, RetargetEngine, SolverOptions } from './types';
 
-interface IkTask {
+export interface IkTask {
   robotBody: string;
   bodyId: number;
   humanBody: string;
@@ -33,7 +33,7 @@ const MJ_JNT_FREE = 0;
 const MJ_JNT_HINGE = 3;
 const MJ_JNT_SLIDE = 2;
 
-export class GmrRetargetEngine {
+export class GmrRetargetEngine implements RetargetEngine {
   readonly robot: RobotModel;
   readonly config: GmrIkConfig;
   readonly opts: SolverOptions;
@@ -45,15 +45,15 @@ export class GmrRetargetEngine {
   /** offsets keyed by human body name (from table1, like GMR) */
   readonly offsets: Map<string, BodyOffsets> = new Map();
 
-  private jacp: any;
-  private jacr: any;
-  private jacpView!: Float64Array;
-  private jacrView!: Float64Array;
+  protected jacp: any;
+  protected jacr: any;
+  protected jacpView!: Float64Array;
+  protected jacrView!: Float64Array;
   private H: Float64Array;
   private g: Float64Array;
   private L: Float64Array;
   private dq: number[];
-  private nv: number;
+  protected nv: number;
 
   /** human keypoints of the last processed frame (scaled + offset), for overlays */
   lastScaledHuman: Map<string, HumanFrameBody> = new Map();
@@ -349,6 +349,10 @@ export class GmrRetargetEngine {
       lmTerm += this.opts.lmDamping * (wp * epSq + wr * erSq);
     }
 
+    // Engine-specific extra objectives (e.g. OmniRetarget interaction mesh).
+    // Accumulates into the upper triangle of H and into g, returns its LM term.
+    lmTerm += this.accumulateExtraTerms(tasks, human, H, g);
+
     // Symmetrize lower triangle + regularize diagonal.
     const reg = this.opts.damping + lmTerm;
     for (let i = 0; i < nv; i++) {
@@ -371,6 +375,22 @@ export class GmrRetargetEngine {
     // qpos <- integrate(qpos, Δq) with proper quaternion handling.
     mujoco.mj_integratePos(model, data.qpos, this.dq, 1.0);
     this.clampJointLimits();
+  }
+
+  /**
+   * Hook for engine-specific Gauss-Newton terms, called once per step after the
+   * task blocks are accumulated and before H is symmetrized. Implementations
+   * must add `w·JᵀJ` into the **upper triangle** of `H` (H[i*nv+k], k ≥ i) and
+   * `w·Jᵀe` into `g`, mirroring the task accumulation, and return their
+   * Levenberg-Marquardt contribution. The base GMR engine adds nothing.
+   */
+  protected accumulateExtraTerms(
+    _tasks: IkTask[],
+    _human: Map<string, HumanFrameBody>,
+    _H: Float64Array,
+    _g: Float64Array,
+  ): number {
+    return 0;
   }
 
   /** Clamp limited slide/hinge joints to jnt_range (mink ConfigurationLimit analogue). */

@@ -3,6 +3,11 @@
  * configs can be exchanged in both directions).
  */
 
+import type { HumanFrame, HumanFrameBody } from '../bvh/lafan1';
+
+/** Retargeting engines selectable behind the same UI / ik_config. */
+export type RetargetEngineId = 'gmr' | 'omniretarget';
+
 /** [human_body, pos_weight, rot_weight, pos_offset(3), rot_offset_wxyz(4)] */
 export type IkMatchEntry = [string, number, number, number[], number[]];
 
@@ -36,6 +41,17 @@ export interface SolverOptions {
   offsetToGround: boolean;
   /** Constant z offset subtracted from human data (GMR ground_offset). */
   groundOffset: number;
+
+  // ---- OmniRetarget-only (ignored by the GMR engine) ----
+  /**
+   * Weight of the interaction-mesh (Laplacian) preservation term. The
+   * OmniRetarget engine adds a soft objective that keeps the *relative* spatial
+   * arrangement of the matched keypoints — robot vs. (scaled) human — close,
+   * reducing self-penetration and limb-shape distortion. 0 ⇒ behaves like GMR.
+   */
+  meshWeight: number;
+  /** Neighbors used to build the per-frame interaction mesh (k-nearest). */
+  meshNeighbors: number;
 }
 
 export const DEFAULT_SOLVER_OPTIONS: SolverOptions = {
@@ -48,10 +64,14 @@ export const DEFAULT_SOLVER_OPTIONS: SolverOptions = {
   velocityLimit: 3 * Math.PI,
   offsetToGround: false,
   groundOffset: 0,
+  meshWeight: 16,
+  meshNeighbors: 4,
 };
 
 export interface RetargetResult {
   robotId: string;
+  /** Engine that produced this result. */
+  engine: RetargetEngineId;
   fps: number;
   frameCount: number;
   nq: number;
@@ -71,4 +91,25 @@ export interface RetargetResult {
   humanBodyNames: string[];
   /** Wall-clock processing time in ms. */
   elapsedMs: number;
+}
+
+/**
+ * Common contract every retargeting engine implements so GMR and OmniRetarget
+ * are interchangeable behind the runner / store / UI (the `RetargetEngine`
+ * interface called for in ROADMAP.md). Both engines consume the same
+ * `GmrIkConfig` + `SolverOptions` and emit per-frame robot `qpos`.
+ */
+export interface RetargetEngine {
+  /** Stage-2 tasks (robot body ↔ human body), used for the error series. */
+  readonly tasks2: ReadonlyArray<{ robotBody: string; humanBody: string }>;
+  /** Human keypoints of the last processed frame (scaled + offset), for overlays. */
+  lastScaledHuman: Map<string, HumanFrameBody>;
+  /** Human bodies required by the active config. */
+  requiredHumanBodies(): string[];
+  /** Retarget a single frame; returns a copy of qpos. */
+  retargetFrame(frame: HumanFrame): Float64Array;
+  /** Final per-task position errors (m) against the last preprocessed frame. */
+  taskPositionErrors(): Float32Array;
+  /** Release native (WASM) allocations. */
+  dispose(): void;
 }

@@ -6,12 +6,31 @@
 import type { HumanFrame } from '../bvh/lafan1';
 import type { RobotModel } from '../mujoco/runtime';
 import { GmrRetargetEngine } from './engine';
-import type { GmrIkConfig, RetargetResult, SolverOptions } from './types';
+import { OmniRetargetEngine } from './omniEngine';
+import type {
+  GmrIkConfig,
+  RetargetEngine,
+  RetargetEngineId,
+  RetargetResult,
+  SolverOptions,
+} from './types';
 
 const SLICE_MS = 28; // yield to UI roughly every two display frames
 
 function nextTick(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/** Instantiate the requested retargeting engine (both share config + solver). */
+export function createEngine(
+  engineId: RetargetEngineId,
+  robot: RobotModel,
+  config: GmrIkConfig,
+  solver: SolverOptions,
+): RetargetEngine {
+  return engineId === 'omniretarget'
+    ? new OmniRetargetEngine(robot, config, solver)
+    : new GmrRetargetEngine(robot, config, solver);
 }
 
 export interface RunOptions {
@@ -20,13 +39,15 @@ export interface RunOptions {
   solver: SolverOptions;
   frames: HumanFrame[];
   fps: number;
+  engine?: RetargetEngineId;
   onProgress?: (done: number, total: number) => void;
   signal?: AbortSignal;
 }
 
 export async function runRetarget(options: RunOptions): Promise<RetargetResult> {
   const { robot, config, solver, frames, fps, onProgress, signal } = options;
-  const engine = new GmrRetargetEngine(robot, config, solver);
+  const engineId: RetargetEngineId = options.engine ?? 'gmr';
+  const engine = createEngine(engineId, robot, config, solver);
   try {
     const T = frames.length;
     const nq = robot.nq;
@@ -67,6 +88,7 @@ export async function runRetarget(options: RunOptions): Promise<RetargetResult> 
 
     return {
       robotId: robot.id,
+      engine: engineId,
       fps,
       frameCount: T,
       nq,

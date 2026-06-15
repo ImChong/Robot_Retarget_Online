@@ -13,6 +13,7 @@ import { usePlayback } from '@/composables/usePlayback';
 import PlaybackBar from '@/components/PlaybackBar.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import MetricsPanel from '@/components/MetricsPanel.vue';
+import EngineToggle from '@/components/EngineToggle.vue';
 import { blendQpos } from '@/lib/viewport/poseBlend';
 import { exportCsv, exportJson, exportNpz, downloadBlob } from '@/lib/export/motion';
 
@@ -109,7 +110,7 @@ function onExport(kind: 'npz' | 'csv' | 'json') {
   const result = store.result;
   if (!result) return;
   const base = (motion.fileName ?? 'motion').replace(/\.bvh$/i, '');
-  const name = `${base}_${result.robotId}`;
+  const name = `${base}_${result.robotId}_${result.engine}`;
   if (kind === 'npz') downloadBlob(exportNpz(result), `${name}.npz`);
   else if (kind === 'csv') downloadBlob(exportCsv(result), `${name}.csv`);
   else downloadBlob(exportJson(result), `${name}.json`);
@@ -156,6 +157,8 @@ onUnmounted(() => {
     <MobileSidePanel v-model="panelOpen">
       <div v-if="!motion.hasMotion" class="text-caption text-warning text-center">{{ t('noMotionHint') }}</div>
 
+      <EngineToggle :disabled="store.isBusy" />
+
       <v-btn
         v-if="!store.isBusy"
         color="primary"
@@ -191,6 +194,10 @@ onUnmounted(() => {
         <v-card-title class="text-subtitle-2">{{ t('statsTitle') }}</v-card-title>
         <v-card-text class="text-body-2">
           <div class="info-line"><span>{{ t('robot') }}</span><b>{{ store.result?.robotId }}</b></div>
+          <div class="info-line">
+            <span>{{ t('engine') }}</span>
+            <b>{{ store.result?.engine === 'omniretarget' ? t('engineOmni') : t('engineGmr') }}</b>
+          </div>
           <div class="info-line"><span>{{ t('frames') }}</span><b>{{ stats.frames }}</b></div>
           <div class="info-line"><span>{{ t('solveTime') }}</span><b>{{ stats.time }}</b></div>
           <div class="info-line"><span>{{ t('procSpeed') }}</span><b>{{ stats.speed }}</b></div>
