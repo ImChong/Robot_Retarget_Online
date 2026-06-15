@@ -182,7 +182,7 @@ const messages: Record<string, { zh: string; en: string }> = {
   customRobotRemoved: { zh: '已删除自定义机器人', en: 'Custom robot removed' },
   baseBody: { zh: '根 body', en: 'Root body' },
   sponsorTitle: { zh: '赞助我', en: 'Support me' },
-  sponsorHint: { zh: '微信扫一扫，赞助支持作者 ❤', en: 'Scan with WeChat to support the author ❤' },
+  sponsorHint: { zh: '微信扫一扫，赞助支持作者 ☕', en: 'Scan with WeChat to support the author ☕' },
   sponsorImgAlt: { zh: '微信收款码', en: 'WeChat payment QR code' },
   close: { zh: '关闭', en: 'Close' },
 };

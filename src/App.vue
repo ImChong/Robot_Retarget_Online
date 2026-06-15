@@ -283,8 +283,8 @@ void locale.value;
 .sponsor-dialog :deep(.v-overlay__scrim) {
   background: rgba(0, 0, 0, 0.55) !important;
   opacity: 1 !important;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .sponsor-qr {
