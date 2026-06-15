@@ -76,6 +76,22 @@ const messages: Record<string, { zh: string; en: string }> = {
   damping: { zh: '阻尼 (damping)', en: 'Damping' },
   maxIter: { zh: '每帧最大迭代', en: 'Max iterations / frame' },
   velocityLimit: { zh: '关节速度限制', en: 'Joint velocity limit' },
+
+  // Engine selection (GMR / OmniRetarget)
+  engine: { zh: '重定向引擎', en: 'Retarget engine' },
+  engineGmr: { zh: 'GMR', en: 'GMR' },
+  engineOmni: { zh: 'OmniRetarget', en: 'OmniRetarget' },
+  engineGmrDesc: {
+    zh: 'GMR：逐关键点的两阶段微分 IK（与原版 GMR 数值对齐）。',
+    en: 'GMR: per-keypoint two-stage differential IK (numerically aligned with upstream GMR).',
+  },
+  engineOmniDesc: {
+    zh: 'OmniRetarget：在 GMR 之上增加交互网格（拉普拉斯）约束，保持关键点之间的相对结构，减少自穿插与肢体形变。',
+    en: 'OmniRetarget: adds an interaction-mesh (Laplacian) term on top of GMR to preserve the relative structure between keypoints, reducing self-penetration and limb distortion.',
+  },
+  omniParams: { zh: 'OmniRetarget 参数', en: 'OmniRetarget Parameters' },
+  meshWeight: { zh: '交互网格权重', en: 'Interaction-mesh weight' },
+  meshNeighbors: { zh: '网格邻居数 (k)', en: 'Mesh neighbors (k)' },
   scaleTable: { zh: '人体缩放表', en: 'Human Scale Table' },
   stage1: { zh: '阶段 1（姿态主导）', en: 'Stage 1 (orientation-driven)' },
   stage2: { zh: '阶段 2（位置精调）', en: 'Stage 2 (position refinement)' },

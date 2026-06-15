@@ -19,6 +19,7 @@ import {
 import MappingTable from '@/components/MappingTable.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import CustomUrdfImportDialog from '@/components/CustomUrdfImportDialog.vue';
+import EngineToggle from '@/components/EngineToggle.vue';
 import { downloadBlob } from '@/lib/export/motion';
 
 const { t } = useI18n();
@@ -364,6 +365,8 @@ onUnmounted(() => {
         {{ t('importUrdf') }}
       </v-btn>
 
+      <EngineToggle />
+
       <v-card variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('globalParams') }}</v-card-title>
         <v-card-text class="d-flex flex-column ga-2">
@@ -400,6 +403,26 @@ onUnmounted(() => {
             color="primary"
             density="compact"
             hide-details
+          />
+        </v-card-text>
+      </v-card>
+
+      <v-card v-if="store.engine === 'omniretarget'" variant="tonal" density="compact">
+        <v-card-title class="text-subtitle-2">{{ t('omniParams') }}</v-card-title>
+        <v-card-text class="d-flex flex-column ga-2">
+          <v-text-field
+            v-model.number="store.solver.meshWeight"
+            type="number"
+            step="0.5"
+            min="0"
+            :label="t('meshWeight')"
+          />
+          <v-text-field
+            v-model.number="store.solver.meshNeighbors"
+            type="number"
+            step="1"
+            min="1"
+            :label="t('meshNeighbors')"
           />
         </v-card-text>
       </v-card>

@@ -11,13 +11,17 @@
 
 A pure-frontend, backend-free humanoid **motion retargeting** web app. Phase 1
 ships the **GMR** engine entirely in the browser (BVH → humanoid robot via
-MuJoCo-WASM differential IK). Phase 2 adds **holosoma** as a second, pluggable
-retargeting engine behind the same UI. SMPL-X / AMASS input is a parallel
-input-format track deferred for licensing reasons.
+MuJoCo-WASM differential IK). Phase 2 makes the engine **pluggable** and ships
+**OmniRetarget** as a second, user-selectable engine (an in-browser
+interaction-mesh adaptation layered on GMR's solver); **holosoma** remains a
+heavier future option behind the same `RetargetEngine` interface. SMPL-X / AMASS
+input is a parallel input-format track deferred for licensing reasons.
 
 纯前端、无后端的人形机器人**动作重定向**网页应用。Phase 1 已把 **GMR** 引擎完整搬进浏览器
-（BVH → 人形机器人，基于 MuJoCo-WASM 的微分 IK）。Phase 2 在同一套 UI 后面接入 **holosoma**
-作为第二个可插拔重定向引擎。SMPL-X / AMASS 输入是一条独立的输入格式分支，因许可证原因后置。
+（BVH → 人形机器人，基于 MuJoCo-WASM 的微分 IK）。Phase 2 把引擎做成**可插拔**，并接入
+**OmniRetarget** 作为第二个可在 UI 切换的引擎（在 GMR 求解器之上叠加交互网格约束的浏览器内实现）；
+**holosoma** 作为更重的方案保留在同一套 `RetargetEngine` 接口之后。SMPL-X / AMASS 输入是一条
+独立的输入格式分支，因许可证原因后置。
 
 ---
 
@@ -70,12 +74,44 @@ Robots shipped today / 当前已支持机器人: `unitree_g1`, `booster_t1_29dof
 
 ---
 
-## Phase 2 — holosoma engine · holosoma 引擎  🔜 Planned / 计划中
+## Phase 2 — pluggable engines · 可插拔引擎
 
-Reuse the **same UI** and wire [holosoma](https://github.com/amazon-far/holosoma)
-in as a **second retargeting engine** selectable alongside GMR. holosoma is a
-trajectory-level **convex optimization** (`cvxpy` + `torch`), heavier than GMR's
-per-frame IK, so the in-browser story needs a decision:
+The engine is now selectable behind one UI via a `RetargetEngine` interface.
+**OmniRetarget** ships as the second engine; **holosoma** is kept as a heavier
+future option behind the same interface.
+
+引擎已通过 `RetargetEngine` 接口在同一套 UI 后面可切换。**OmniRetarget** 作为第二个引擎交付；
+**holosoma** 作为更重的方案保留在同一接口之后。
+
+### OmniRetarget (interaction mesh) · OmniRetarget（交互网格）  ✅ Shipped / 已交付
+
+A per-frame, in-browser adaptation of
+[OmniRetarget](https://omni-retarget.github.io/)'s interaction-preserving idea,
+layered directly on GMR's two-stage differential IK. Each frame it builds a
+small k-nearest-neighbour **interaction mesh** over the (scaled) human keypoints
+and adds a soft Gauss-Newton objective driving the robot's **Laplacian
+coordinates** `δ_i = p_i − Σ_j w_ij p_j` (translation-invariant — local *shape*,
+not absolute placement) onto the human's. This preserves the relative structure
+between keypoints, curbing self-penetration and limb-shape distortion, and
+matters most on noisy / self-contact-heavy motion. With `meshWeight = 0` it
+reduces **exactly** to GMR (asserted in `tests/omni.test.ts`).
+
+在 GMR 两阶段微分 IK 之上的浏览器内逐帧实现：每帧在（缩放后的）人体关键点上构建 k 近邻**交互网格**，
+增加一个软目标，使机器人的**拉普拉斯坐标** `δ_i = p_i − Σ_j w_ij p_j`（平移不变，编码局部*形状*）
+逼近人体的，从而保持关键点间的相对结构、抑制自穿插与肢体形变。`meshWeight = 0` 时**精确**退化为 GMR。
+
+- Files: `src/lib/retarget/omniEngine.ts` (engine + pure mesh helpers),
+  `src/lib/retarget/engine.ts` (`accumulateExtraTerms` hook),
+  `src/components/EngineToggle.vue` (UI), `tests/omni.test.ts`.
+- Out of scope here (no objects/terrain in BVH input): object/scene interaction
+  meshes and the trajectory-level contact/foot-skate optimization from the
+  original paper. 输入中无物体/地形，故不含物体-场景交互网格与轨迹级接触/滑步优化。
+
+### holosoma (future, heavier) · holosoma（更重的未来方案）
+
+[holosoma](https://github.com/amazon-far/holosoma) is a trajectory-level
+**convex optimization** (`cvxpy` + `torch`), heavier than GMR's per-frame IK, so
+the in-browser story needs a decision:
 
 复用**同一套 UI**，把 [holosoma](https://github.com/amazon-far/holosoma) 作为**第二个
 重定向引擎**与 GMR 并列可选。holosoma 是轨迹级**凸优化**（`cvxpy` + `torch`），比 GMR 的
@@ -94,12 +130,13 @@ and whether we keep the pure-static deployment). 决策：**Phase 1 验收后再
 
 ### Prep work that makes Phase 2 cheap · 让 Phase 2 更省力的前置
 
-- [ ] Extract a **`RetargetEngine` interface** so GMR and holosoma are
-      interchangeable behind the store/UI (input: human frames + config;
-      output: per-frame robot state + diagnostics). Today the GMR engine is
-      called directly in `src/lib/retarget/runner.ts` / `src/stores/retarget.ts`.
-      抽象出 `RetargetEngine` 接口，让两个引擎在 store/UI 后面可互换。
-- [ ] An engine picker in the Config page (GMR / holosoma). 设置页加引擎选择器。
+- [x] Extract a **`RetargetEngine` interface** so engines are interchangeable
+      behind the store/UI (`src/lib/retarget/types.ts`). The runner selects via
+      `createEngine()` (`src/lib/retarget/runner.ts`); the store carries an
+      `engine` field (`src/stores/retarget.ts`).
+      已抽象出 `RetargetEngine` 接口，让引擎在 store/UI 后面可互换。
+- [x] An engine picker (GMR / OmniRetarget) on the Config **and** Preview pages
+      via `EngineToggle.vue`. 设置页与预览页均加入引擎选择器。
 
 ---
 
@@ -168,6 +205,8 @@ is ever opened (see Phase 2 option b), it could host such a model.
 ## Source projects · 参考项目
 
 - [GMR](https://github.com/YanjieZe/GMR) (MIT) — Phase 1 engine + robot assets.
-- [holosoma](https://github.com/amazon-far/holosoma) (Apache-2.0) — Phase 2 engine.
+- [OmniRetarget](https://omni-retarget.github.io/) — interaction-mesh idea for
+  the Phase 2 OmniRetarget engine (formulation after Ho et al., SIGGRAPH 2010).
+- [holosoma](https://github.com/amazon-far/holosoma) (Apache-2.0) — future engine.
 - [MuJoCo WASM](https://github.com/google-deepmind/mujoco/tree/main/wasm) (Apache-2.0).
 - [BVHView](https://github.com/orangeduck/BVHView) — viewer/rendering inspiration.

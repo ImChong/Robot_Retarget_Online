@@ -1,7 +1,13 @@
 import { defineStore } from 'pinia';
 import { markRaw, toRaw } from 'vue';
 import { createBlankConfig, getDefaultConfig, validateConfig } from '@/lib/retarget/defaults';
-import { DEFAULT_SOLVER_OPTIONS, type GmrIkConfig, type RetargetResult, type SolverOptions } from '@/lib/retarget/types';
+import {
+  DEFAULT_SOLVER_OPTIONS,
+  type GmrIkConfig,
+  type RetargetEngineId,
+  type RetargetResult,
+  type SolverOptions,
+} from '@/lib/retarget/types';
 import { loadRobot, type RobotModel } from '@/lib/mujoco/runtime';
 import {
   CUSTOM_ROBOT_ID,
@@ -19,6 +25,7 @@ export type RetargetStatus = 'idle' | 'loading-robot' | 'running' | 'done' | 'er
 interface RetargetState {
   robotId: string;
   customRobot: CustomRobotBundle | null;
+  engine: RetargetEngineId;
   config: GmrIkConfig;
   solver: SolverOptions;
   status: RetargetStatus;
@@ -33,6 +40,7 @@ export const useRetargetStore = defineStore('retarget', {
   state: (): RetargetState => ({
     robotId: 'unitree_g1',
     customRobot: null,
+    engine: 'gmr',
     config: getDefaultConfig('unitree_g1'),
     solver: { ...DEFAULT_SOLVER_OPTIONS },
     status: 'idle',
@@ -51,6 +59,14 @@ export const useRetargetStore = defineStore('retarget', {
         : s.robotId,
   },
   actions: {
+    setEngine(engine: RetargetEngineId) {
+      if (engine === this.engine) return;
+      this.engine = engine;
+      // Results are engine-specific; clear so the user re-runs with the new one.
+      this.result = null;
+      if (this.status === 'done' || this.status === 'error') this.status = 'idle';
+      this.errorMessage = null;
+    },
     setRobot(robotId: string) {
       if (robotId === this.robotId) return;
       if (robotId === CUSTOM_ROBOT_ID && !this.customRobot) return;
@@ -158,6 +174,7 @@ export const useRetargetStore = defineStore('retarget', {
           solver: { ...toRaw(this.solver) },
           frames: motion.lafan.frames,
           fps: motion.fps,
+          engine: this.engine,
           signal: this.abortController.signal,
           onProgress: (done, total) => {
             this.runProgress = { done, total };
@@ -181,3 +198,4 @@ export const useRetargetStore = defineStore('retarget', {
 });
 
 export { CUSTOM_ROBOT_ID };
+export type { RetargetEngineId };
