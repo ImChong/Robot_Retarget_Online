@@ -7,7 +7,7 @@
  */
 
 import * as THREE from 'three';
-import { estimateSkeletonSize, type BvhAnim } from '../bvh/parse';
+import { estimateSkeletonSize, isDecorJoint, type BvhAnim } from '../bvh/parse';
 import { blendKeypoints, frameBlendIndices } from './poseBlend';
 
 const BONE_COLOR = 0x8d99ae;
@@ -84,6 +84,7 @@ export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonVie
 
     const sphere = new THREE.Mesh(sphereGeo, jointMat);
     sphere.castShadow = true;
+    if (isDecorJoint(anim.joints[j].name)) sphere.visible = false;
     group.add(sphere);
     jointSpheres.push(sphere);
   }
@@ -105,10 +106,14 @@ export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonVie
 
   for (let j = 0; j < J; j++) {
     const parent = anim.joints[j].parent;
-    if (parent >= 0) addBone(parent, anim.joints[j].offset);
+    if (parent < 0 || isDecorJoint(anim.joints[j].name)) continue;
+    addBone(parent, anim.joints[j].offset);
   }
   for (const es of anim.endSites) {
-    if (es.parent >= 0) addBone(es.parent, es.offset);
+    if (es.parent < 0) continue;
+    const parentName = anim.joints[es.parent].name;
+    if (isDecorJoint(parentName)) continue;
+    addBone(es.parent, es.offset);
   }
 
   const qA = new THREE.Quaternion();

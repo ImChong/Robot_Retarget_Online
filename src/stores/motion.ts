@@ -2,11 +2,14 @@ import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
 import { parseBvh, estimateSkeletonSize, type BvhAnim } from '@/lib/bvh/parse';
 import { bvhToLafan1Frames, type Lafan1Motion } from '@/lib/bvh/lafan1';
+import { detectMotionKind, type MotionKind } from '@/lib/motionKind';
 
 export interface MotionState {
   fileName: string | null;
   anim: BvhAnim | null;
   lafan: Lafan1Motion | null;
+  /** Humanoid vs quadruped; set on load/clear for reliable UI reactivity. */
+  motionKind: MotionKind | null;
   /** file units -> meters */
   unitScale: number;
   skeletonSizeUnits: number;
@@ -18,6 +21,7 @@ export const useMotionStore = defineStore('motion', {
     fileName: null,
     anim: null,
     lafan: null,
+    motionKind: null,
     unitScale: 0.01,
     skeletonSizeUnits: 0,
     loadError: null,
@@ -46,6 +50,7 @@ export const useMotionStore = defineStore('motion', {
         this.unitScale = unitScale;
         this.skeletonSizeUnits = size;
         this.fileName = fileName;
+        this.motionKind = detectMotionKind(anim, fileName);
         this.loadError = null;
       } catch (err) {
         this.loadError = err instanceof Error ? err.message : String(err);
@@ -56,6 +61,7 @@ export const useMotionStore = defineStore('motion', {
       this.anim = null;
       this.lafan = null;
       this.fileName = null;
+      this.motionKind = null;
       this.loadError = null;
     },
   },

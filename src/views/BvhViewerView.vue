@@ -9,7 +9,8 @@ import { usePlayback } from '@/composables/usePlayback';
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { QUADRUPED_ENABLED } from '@/lib/features';
 import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
-import { followOrbitCamera, jointIndexByName } from '@/lib/viewport/sceneAlignment';
+import { followOrbitCamera, motionRootAnchor } from '@/lib/viewport/sceneAlignment';
+import { resolveMotionRootJoint } from '@/lib/bvh/parse';
 import FileDropZone from '@/components/FileDropZone.vue';
 import PlaybackBar from '@/components/PlaybackBar.vue';
 import JointTreePanel from '@/components/JointTreePanel.vue';
@@ -30,21 +31,22 @@ const selectedJoint = ref<number | null>(null);
 const loadErrorSnack = ref(false);
 const panelOpen = ref(false);
 const videoDialogOpen = ref(false);
+const sampleMenuOpen = ref(false);
 
-const samples = [
+const HUMANOID_SAMPLES = [
   { title: 'Walk 行走 (LAFAN1)', file: 'walk.bvh' },
   { title: 'Run 跑步 (LAFAN1)', file: 'run.bvh' },
   { title: 'Dance 舞蹈 (LAFAN1)', file: 'dance.bvh' },
   { title: 'Fall & get up 倒地起身 (LAFAN1)', file: 'fall_getup.bvh' },
   { title: 'Jumps 跳跃 (LAFAN1)', file: 'jumps.bvh' },
-  ...(QUADRUPED_ENABLED
-    ? [
-        { title: 'Dog walk 狗·行走 (Quadruped)', file: 'dog_walk.bvh' },
-        { title: 'Dog run 狗·奔跑 (Quadruped)', file: 'dog_run.bvh' },
-        { title: 'Dog idle 狗·站立 (Quadruped)', file: 'dog_idle.bvh' },
-      ]
-    : []),
-];
+] as const;
+
+const QUADRUPED_SAMPLES = [
+  { title: 'Dog walk 狗·行走 (Quadruped)', file: 'dog_walk.bvh' },
+  { title: 'Dog run 狗·奔跑 (Quadruped)', file: 'dog_run.bvh' },
+  { title: 'Dog idle 狗·站立 (Quadruped)', file: 'dog_idle.bvh' },
+] as const;
+
 const sampleLoading = ref(false);
 
 const selectedInfo = computed(() => {
@@ -79,6 +81,7 @@ function loadText(text: string, name: string) {
 }
 
 async function loadSample(file: string) {
+  sampleMenuOpen.value = false;
   sampleLoading.value = true;
   try {
     const res = await fetch(`${import.meta.env.BASE_URL}sample_motions/${file}`);
@@ -101,17 +104,14 @@ function rebuildSkeleton() {
   const sk = buildSkeletonView(motion.anim, motion.unitScale);
   sm.scene.add(sk.root);
   skeleton.value = sk;
-  try {
-    hipsIndex.value = jointIndexByName(motion.anim, 'Hips');
-  } catch {
-    hipsIndex.value = 0;
-  }
+  hipsIndex.value = resolveMotionRootJoint(motion.anim);
+  rootAnchor.copy(motionRootAnchor(motion.anim, motion.unitScale));
   playback.setMotion(motion.frameCount, motion.fps);
   playback.state.playing = true;
   applyFrame(0);
 }
 
-const hipPos = new THREE.Vector3();
+const rootAnchor = new THREE.Vector3();
 
 function applyFrame(frame: number) {
   const sk = skeleton.value;
@@ -124,9 +124,9 @@ function applyFrame(frame: number) {
   if (playing) sk.setFrameBlend(poseFrame);
   else sk.setFrame(poseFrame);
   if (!sm) return;
-  sk.getJointWorldPos(hipsIndex.value, hipPos);
-  // Snap camera to interpolated hips during playback to avoid trailing ghosting.
-  followOrbitCamera(sm, hipPos, playing ? 1 : 0.08);
+  sk.lockJointToWorld(hipsIndex.value, rootAnchor);
+  // Snap camera to the anchored root during playback to avoid trailing ghosting.
+  followOrbitCamera(sm, rootAnchor, playing ? 1 : 0.08);
   sm.setDampingEnabled(!playing);
 }
 
@@ -165,6 +165,7 @@ onUnmounted(() => {
       </v-btn>
 
       <v-menu
+        v-model="sampleMenuOpen"
         :location="mdAndUp ? 'end top' : 'bottom start'"
         :offset="mdAndUp ? 8 : 0"
         content-class="sample-menu-panel"
@@ -175,13 +176,37 @@ onUnmounted(() => {
           </v-btn>
         </template>
         <v-list density="compact" class="sample-menu-list">
-          <v-list-item v-for="s in samples" :key="s.file" :title="s.title" @click="loadSample(s.file)" />
+          <template v-if="QUADRUPED_ENABLED">
+            <v-list-subheader class="sample-group-header">{{ t('sampleHumanoid') }}</v-list-subheader>
+            <v-list-item
+              v-for="s in HUMANOID_SAMPLES"
+              :key="s.file"
+              :title="s.title"
+              @click="loadSample(s.file)"
+            />
+            <v-list-subheader class="sample-group-header">{{ t('sampleQuadruped') }}</v-list-subheader>
+            <v-list-item
+              v-for="s in QUADRUPED_SAMPLES"
+              :key="s.file"
+              :title="s.title"
+              @click="loadSample(s.file)"
+            />
+          </template>
+          <template v-else>
+            <v-list-item
+              v-for="s in HUMANOID_SAMPLES"
+              :key="s.file"
+              :title="s.title"
+              @click="loadSample(s.file)"
+            />
+          </template>
         </v-list>
       </v-menu>
 
       <v-btn variant="tonal" :prepend-icon="mdiVideoOutline" block @click="videoDialogOpen = true">
         {{ t('videoToBvh') }}
       </v-btn>
+      <p class="text-caption text-medium-emphasis text-center video-btn-hint">{{ t('videoHumanoidOnlyShort') }}</p>
 
       <v-card v-if="motion.hasMotion" variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('motionInfo') }}</v-card-title>
@@ -303,6 +328,10 @@ onUnmounted(() => {
   left: 12px;
   z-index: 4;
 }
+.video-btn-hint {
+  line-height: 1.35;
+  margin: 4px 4px 0;
+}
 </style>
 
 <style>
@@ -312,5 +341,10 @@ onUnmounted(() => {
 }
 .sample-menu-list {
   min-width: 260px;
+}
+.sample-group-header {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  min-height: 32px;
 }
 </style>

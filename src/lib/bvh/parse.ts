@@ -284,6 +284,29 @@ function rotateVec(q: Quat, v: Vec3): Vec3 {
   ];
 }
 
+/**
+ * Mocap helper / collision joints that should not be drawn as anatomy
+ * (Biped Footsteps, end-site Nubs, dog armor hulls, etc.).
+ */
+export function isDecorJoint(name: string): boolean {
+  return (
+    /Footsteps/i.test(name) ||
+    /Nub$/i.test(name) ||
+    /^Dog_.*Armor/i.test(name) ||
+    // Biped internal tail; Dog_LeftTail is the visible mesh chain.
+    /^b_Tail\d+$/i.test(name)
+  );
+}
+
+/** Preferred motion-root joint for camera / viewport anchoring. */
+export function resolveMotionRootJoint(anim: BvhAnim): number {
+  for (const name of ['Hips', 'b_Hips']) {
+    const idx = anim.joints.findIndex((j) => j.name === name);
+    if (idx >= 0) return idx;
+  }
+  return 0;
+}
+
 /** Rough skeleton height in file units (max reach from root along Y/Z up-axis guess). */
 export function estimateSkeletonSize(anim: BvhAnim): number {
   // Use first frame global positions extent.

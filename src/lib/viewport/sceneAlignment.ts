@@ -5,7 +5,7 @@
  */
 
 import * as THREE from 'three';
-import type { BvhAnim } from '../bvh/parse';
+import { bvhFk, resolveMotionRootJoint, type BvhAnim } from '../bvh/parse';
 import type { RobotModel } from '../mujoco/runtime';
 import type { RobotSceneObject } from '../mujoco/threeScene';
 import type { SceneManager } from './SceneManager';
@@ -31,6 +31,10 @@ const HUMAN_LATERAL_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['LeftUpLeg', 'RightUpLeg'],
   ['LeftArm', 'RightArm'],
   ['LeftShoulder', 'RightShoulder'],
+  // Quadruped dog mocap (Lifelike Agility / Biped-style naming).
+  ['b_LeftHand', 'b_RightHand'],
+  ['b_LeftArm', 'b_RightArm'],
+  ['b_LeftClav', 'b_RightClav'],
 ];
 
 const FORWARD_X = new THREE.Vector3(1, 0, 0);
@@ -58,6 +62,20 @@ export function jointIndexByName(anim: BvhAnim, name: string): number {
   const idx = anim.joints.findIndex((j) => j.name === name);
   if (idx < 0) throw new Error(`BVH joint "${name}" not found`);
   return idx;
+}
+
+/** World anchor (Z-up, meters) for the motion root on frame 0. */
+export function motionRootAnchor(anim: BvhAnim, unitScale: number): THREE.Vector3 {
+  const idx = resolveMotionRootJoint(anim);
+  const J = anim.joints.length;
+  const { globalPos } = bvhFk({
+    ...anim,
+    frameCount: 1,
+    localPos: anim.localPos.slice(0, J * 3),
+    localQuat: anim.localQuat.slice(0, J * 4),
+  });
+  // BVH Y-up -> Z-up: world z = bvh y.
+  return new THREE.Vector3(0, 0, globalPos[idx * 3 + 1] * unitScale);
 }
 
 /** Horizontal facing angle (radians) of a body's local +Y axis in Z-up world. */
