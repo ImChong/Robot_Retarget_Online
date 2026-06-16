@@ -531,11 +531,14 @@ onUnmounted(() => {
         <div class="sidebar-footer d-flex flex-column ga-2 pt-3 mt-auto">
           <v-btn
             v-if="!store.isBusy"
+            class="run-retarget-btn"
             color="primary"
-            size="large"
+            variant="elevated"
+            size="x-large"
             :prepend-icon="mdiPlayCircle"
             :disabled="!motion.hasMotion"
             block
+            elevation="4"
             @click="run"
           >
             {{ t('runRetarget') }}
@@ -729,5 +732,11 @@ onUnmounted(() => {
 .sidebar-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 12px;
+}
+.run-retarget-btn {
+  min-height: 52px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 </style>
