@@ -26,6 +26,7 @@ export default defineConfig({
         // on first paint.
         manualChunks(id) {
           if (id.includes('node_modules') && !id.includes('mujoco-js')) {
+            if (id.includes('plotly.js')) return 'vendor-plotly';
             if (id.includes('three')) return 'vendor-three';
             if (id.includes('vuetify')) return 'vendor-vuetify';
             return 'vendor';
