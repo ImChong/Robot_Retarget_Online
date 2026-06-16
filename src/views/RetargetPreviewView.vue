@@ -75,7 +75,6 @@ async function setupResultScene() {
   if (!sm || !entry || !result) return;
 
   const isNewDisplay = entry.id !== displayedHistoryId;
-  const playingBeforeSetup = playback.state.playing;
 
   const robot = await store.loadRobotForHistory(entry);
   if (seq !== setupSeq) return;
@@ -96,13 +95,8 @@ async function setupResultScene() {
   if (isNewDisplay) {
     playback.setMotion(result.frameCount, result.fps);
     displayedHistoryId = entry.id;
-    if (store.consumePendingAutoplay()) {
-      // Autoplay new results unless the user paused while the robot was loading.
-      if (playback.state.playing || !playingBeforeSetup) {
-        playback.state.playing = true;
-      }
-    } else if (!playingBeforeSetup) {
-      playback.state.playing = false;
+    if (store.consumePendingAutoplay(entry.id) && !playback.userPausedPlayback.value) {
+      playback.play();
     }
   }
 
@@ -195,6 +189,7 @@ onMounted(() => {
     target: [0, 0, 0.8],
   });
   sm.onTick((dt) => {
+    if (!robotScene.value) return;
     playback.tick(dt);
     applyFrame(playback.poseFrame.value);
   });

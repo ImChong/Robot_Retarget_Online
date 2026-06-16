@@ -1,4 +1,4 @@
-import { computed, reactive } from 'vue';
+import { computed, reactive, ref } from 'vue';
 
 /**
  * Frame-based playback clock. Call `tick(dt)` from the render loop; read
@@ -13,6 +13,8 @@ export function usePlayback() {
     frameCount: 0,
     fps: 30,
   });
+  /** True after the user explicitly pauses; cleared when they press play. */
+  const userPausedPlayback = ref(false);
 
   function tick(dt: number) {
     if (!state.playing || state.frameCount === 0) return;
@@ -37,12 +39,25 @@ export function usePlayback() {
     return Math.min(state.frame, state.frameCount - 1);
   });
 
+  function play() {
+    state.playing = true;
+    userPausedPlayback.value = false;
+  }
+
+  function pause() {
+    state.playing = false;
+    userPausedPlayback.value = true;
+  }
+
   return {
     state,
+    userPausedPlayback,
     tick,
     frameIndex: computed(() => Math.min(Math.floor(state.frame), Math.max(state.frameCount - 1, 0))),
     poseFrame,
-    toggle: () => (state.playing = !state.playing),
+    play,
+    pause,
+    toggle: () => (state.playing ? pause() : play()),
     seek: (f: number) => (state.frame = f),
     setMotion: (frameCount: number, fps: number) => {
       state.frameCount = frameCount;

@@ -31,7 +31,7 @@ const frameShort = computed(
 const speeds = [0.25, 0.5, 1, 1.5, 2];
 
 function step(delta: number) {
-  state.playing = false;
+  props.controller.pause();
   const f = Math.floor(state.frame) + delta;
   props.controller.seek(Math.max(0, Math.min(f, state.frameCount - 1)));
 }
