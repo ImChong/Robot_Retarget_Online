@@ -79,6 +79,13 @@ function resetActiveChartZoom() {
   else jointChartRef.value?.resetZoom();
 }
 
+function resizeActiveChart() {
+  nextTick(() => {
+    if (activeTab.value === 'error') errorChartRef.value?.resize();
+    else jointChartRef.value?.resize();
+  });
+}
+
 function updateMaxHeight() {
   const root = panelRoot.value?.closest('.main-col') as HTMLElement | null;
   if (!root) return;
@@ -102,6 +109,7 @@ function onResizeDragMove(e: PointerEvent) {
   const next = rect.bottom - e.clientY - 36;
   panelBodyH.value = Math.max(MIN_BODY_H, Math.min(maxBodyH.value, next));
   emit('resize');
+  resizeActiveChart();
 }
 
 function onResizeDragEnd(e: PointerEvent) {
@@ -121,9 +129,18 @@ onMounted(() => {
 });
 onUnmounted(() => ro?.disconnect());
 
-watch(panelBodyH, () => emit('resize'));
-watch(expanded, () => emit('resize'));
-watch(activeTab, () => nextTick(() => emit('resize')));
+watch(panelBodyH, () => {
+  emit('resize');
+  resizeActiveChart();
+});
+watch(expanded, () => {
+  emit('resize');
+  resizeActiveChart();
+});
+watch(activeTab, () => {
+  emit('resize');
+  resizeActiveChart();
+});
 </script>
 
 <template>
