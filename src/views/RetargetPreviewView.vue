@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import * as THREE from 'three';
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
 import { mdiPlayCircle, mdiStopCircle, mdiDownload, mdiTune } from '@mdi/js';
 import { useDisplay } from 'vuetify';
@@ -74,6 +75,23 @@ async function setupResultScene() {
   playback.setMotion(result.frameCount, result.fps);
   playback.state.playing = true;
   applyFrame(0);
+  frameSmallRobot(scene.root);
+}
+
+/** Pull the camera in for small robots (e.g. quadrupeds) so they aren't a speck. */
+function frameSmallRobot(root: THREE.Object3D) {
+  const sm = sceneManager.value;
+  if (!sm) return;
+  const box = new THREE.Box3().setFromObject(root);
+  if (box.isEmpty()) return;
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  if (size.z >= 0.9) return; // humanoids keep their default framing
+  const d = Math.max(size.x, size.y, size.z) * 2.2;
+  sm.setView(
+    [center.x + d * 0.55, center.y - d * 0.85, center.z + d * 0.5],
+    [center.x, center.y, center.z],
+  );
 }
 
 let blendedQpos = new Float64Array(0);
@@ -100,8 +118,14 @@ function applyFrame(f: number) {
     const tx = qpos[0];
     const ty = qpos[1];
     const smooth = playing ? 1 : 0.08;
-    sm.controls.target.x += (tx - sm.controls.target.x) * smooth;
-    sm.controls.target.y += (ty - sm.controls.target.y) * smooth;
+    const dx = (tx - sm.controls.target.x) * smooth;
+    const dy = (ty - sm.controls.target.y) * smooth;
+    sm.controls.target.x += dx;
+    sm.controls.target.y += dy;
+    // Rigidly pan the camera with the target so a translating robot (e.g. a
+    // walking quadruped) stays framed, preserving the current orbit/zoom.
+    sm.camera.position.x += dx;
+    sm.camera.position.y += dy;
     sm.setDampingEnabled(!playing);
   }
 }

@@ -128,6 +128,7 @@ async function ensureRobotScene() {
       );
     }
     refreshLines();
+    frameSmallScene();
     stripState.value = 'success';
     loadingText.value =
       loadTotal > 0 ? `${t('robotLoadComplete')} (${loadTotal}/${loadTotal})` : t('robotLoadComplete');
@@ -135,6 +136,24 @@ async function ensureRobotScene() {
   } catch (err) {
     showLoadingStrip('error', err instanceof Error ? err.message : String(err));
   }
+}
+
+/** Pull the camera in for small robots (quadrupeds) so robot + source skeleton fill the view. */
+function frameSmallScene() {
+  const sm = sceneManager.value;
+  const robotRoot = robotScene.value?.root;
+  if (!sm || !robotRoot) return;
+  const box = new THREE.Box3().setFromObject(robotRoot);
+  if (skeleton.value?.root) box.expandByObject(skeleton.value.root);
+  if (box.isEmpty()) return;
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  if (size.z >= 0.9) return; // humanoids keep their default framing
+  const d = Math.max(size.x, size.y, size.z) * 1.8;
+  sm.setView(
+    [center.x + d * 0.5, center.y - d * 0.95, center.z + d * 0.55],
+    [center.x, center.y, center.z],
+  );
 }
 
 function rebuildSkeleton() {

@@ -12,6 +12,8 @@ import bvh_lafan1_to_n1 from './configs/bvh_lafan1_to_n1.json';
 import bvh_to_talos from './configs/bvh_to_talos.json';
 import bvh_lafan1_to_toddy from './configs/bvh_lafan1_to_toddy.json';
 import bvh_lafan1_to_unitree_g1 from './configs/bvh_lafan1_to_unitree_g1.json';
+import bvh_quadruped_to_unitree_go2 from './configs/bvh_quadruped_to_unitree_go2.json';
+import bvh_quadruped_to_unitree_a1 from './configs/bvh_quadruped_to_unitree_a1.json';
 import type { GmrIkConfig, IkMatchEntry } from './types';
 
 export const DEFAULT_CONFIGS: Record<string, GmrIkConfig> = {
@@ -22,6 +24,9 @@ export const DEFAULT_CONFIGS: Record<string, GmrIkConfig> = {
   stanford_toddy: bvh_lafan1_to_toddy as unknown as GmrIkConfig,
   unitree_g1: bvh_lafan1_to_unitree_g1 as unknown as GmrIkConfig,
   unitree_g1_with_hands: bvh_lafan1_to_unitree_g1 as unknown as GmrIkConfig,
+  // Quadrupeds (BVH dog mocap → robot; keypoint IK on root + 4 feet).
+  unitree_go2: bvh_quadruped_to_unitree_go2 as unknown as GmrIkConfig,
+  unitree_a1: bvh_quadruped_to_unitree_a1 as unknown as GmrIkConfig,
 };
 
 export function getDefaultConfig(robotId: string): GmrIkConfig {

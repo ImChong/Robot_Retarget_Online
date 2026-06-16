@@ -96,6 +96,44 @@ The legacy procedural generator (`scripts/gen_sample_bvh.py`) is kept for
 reference only. For the full dataset, download LAFAN1 and drop any `.bvh` into
 the app.
 
+## Quadruped retargeting · 四足机器人重定向
+
+Beyond humanoids, the same keypoint differential-IK engine retargets **animal
+mocap onto quadruped robots**. This follows the most mature open-source
+quadruped retargeting work — Peng et al.'s
+[**motion_imitation**](https://github.com/erwincoumans/motion_imitation)
+("Learning Agile Robotic Locomotion Skills by Imitating Animals", RSS 2020):
+pick a small set of source keypoints on the animal (root + four feet) and the
+corresponding target keypoints on the robot, then solve IK. GMR's two-stage
+solver already does exactly this, so quadruped support is a config + asset
+drop-in rather than a new algorithm. Related references surveyed:
+[Tencent Robotics X "Lifelike Agility and Play"](https://github.com/Tencent-RoboticsX/lifelike-agility-and-play)
+(Nature MI 2024, real Labrador BVH) and
+[pan-motion-retargeting](https://github.com/hlcdyy/pan-motion-retargeting) (TVCG 2023).
+
+复用同一套关键点微分 IK 引擎，将**动物动捕重定向到四足机器人**。方法对齐当前最成熟的开源四足
+重定向工作（motion_imitation，"模仿动物"）：在动物身上选取少量关键点（躯干 + 4 只脚）与机器人
+对应点，求解 IK。GMR 两阶段求解器本就如此，因此四足支持只需新增配置与资产。
+
+| | |
+| --- | --- |
+| **Source motion** | Real **Labrador retriever** mocap (`.bvh`) from Tencent's *Lifelike Agility* dataset (MIT), trimmed/downsampled to 30 fps: `dog_walk`, `dog_run`, `dog_idle`. 61-joint quadruped skeleton — flows through the same BVH loader (generic FK; human foot augmentation auto-skips). |
+| **Robots** | **Unitree Go2** and **Unitree A1** (12 DoF), real MJCF + meshes from [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) (Unitree BSD-3). A `*_mocap.xml` variant adds four massless `*_foot` keypoint bodies at the foot tips (no added DoF). Canonical URDFs are also included under `public/robots/<id>/urdf/` as reference. |
+| **Mapping** | `bvh_quadruped_to_unitree_{go2,a1}.json`: `base/trunk ← b_Hips` (orientation + position) and `FL/FR/RL/RR_foot ← b_{Left,Right}Hand / b_{Left,Right}Toe` (position). A constant trunk-frame offset (clip-independent) and a 0.5 body scale fit the Labrador onto the smaller robots. |
+
+**Try it:** in *BVH Viewer* pick a **Dog …(Quadruped)** sample, then in *Retarget
+Config* choose **Unitree Go2/A1**. Validated headless: across walk/run/idle the
+robot stands at ≈0.28 m with the four feet tracked to **~1–2 cm** and the trunk
+within ~10° of the dog's (faithful pitch). Reproduce:
+
+```bash
+# trimmed dog clips from a local checkout of the Lifelike-Agility raw_mocap_data
+python3 scripts/prepare_dog_samples.py --raw /path/to/raw_mocap_data
+# regenerate the foot-keypoint robot variants from a Menagerie checkout
+python3 scripts/add_quadruped_foot_sites.py go2.xml go2_mocap.xml 0.213
+npx vitest run tests/quadruped.test.ts
+```
+
 ## Deploy
 
 Pushes to `main` build and deploy via GitHub Actions
@@ -109,6 +147,7 @@ Full plan of record in **[`ROADMAP.md`](ROADMAP.md)**. Headlines:
 - [x] Phase 1 — GMR online (BVH/LAFAN1 → Unitree G1, Booster T1), parity-validated
 - [x] Phase 2 — pluggable engines: **OmniRetarget** (in-browser interaction-mesh) selectable alongside GMR
 - [x] Video → BVH input (experimental, in-browser MediaPipe pose capture)
+- [x] **Quadruped retargeting** — dog mocap (BVH) → Unitree Go2 / A1 via keypoint IK ([motion_imitation](https://github.com/erwincoumans/motion_imitation)-style)
 - [ ] More GMR robots (assets are drop-in: `public/robots/` + manifest entry)
 - [ ] [holosoma](https://github.com/amazon-far/holosoma) as a third, trajectory-level engine (heavier; backend TBD)
 - [ ] SMPL-X / AMASS input (user-supplied body model; deferred for licensing)
@@ -118,6 +157,16 @@ Full plan of record in **[`ROADMAP.md`](ROADMAP.md)**. Headlines:
 - [GMR](https://github.com/YanjieZe/GMR) (MIT) — retargeting algorithm,
   ik_configs and robot model assets (`public/robots/`, original sources:
   Unitree, Booster Robotics).
+- [motion_imitation](https://github.com/erwincoumans/motion_imitation)
+  (Apache-2.0) — "Learning Agile Robotic Locomotion Skills by Imitating Animals";
+  the root + four-feet keypoint-IK scheme adopted for quadruped retargeting.
+- [Lifelike Agility and Play](https://github.com/Tencent-RoboticsX/lifelike-agility-and-play)
+  (Tencent Robotics X, MIT) — source of the bundled Labrador retriever dog mocap
+  (`public/sample_motions/dog_*.bvh`, trimmed/downsampled).
+- [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) —
+  Unitree **Go2** / **A1** MJCF and meshes (Unitree BSD-3, see each robot's
+  `LICENSE`); canonical URDFs from
+  [unitree_ros](https://github.com/unitreerobotics/unitree_ros).
 - [OmniRetarget](https://omni-retarget.github.io/) — interaction-mesh /
   interaction-preserving retargeting idea adapted for the in-browser
   OmniRetarget engine. The interaction-mesh / Laplacian formulation follows Ho,

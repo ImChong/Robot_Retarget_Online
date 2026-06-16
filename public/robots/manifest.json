@@ -353,5 +353,49 @@
       "assets/v2/knee_lo_res.stl",
       "talos.xml"
     ]
+  },
+  {
+    "id": "unitree_go2",
+    "label": "Unitree Go2 (Quadruped, 12 DoF)",
+    "xml": "go2_mocap.xml",
+    "baseBody": "base",
+    "camDistance": 1.6,
+    "configKey": "bvh_quadruped",
+    "files": [
+      "go2_mocap.xml",
+      "assets/base_0.obj",
+      "assets/base_1.obj",
+      "assets/base_2.obj",
+      "assets/base_3.obj",
+      "assets/base_4.obj",
+      "assets/calf_0.obj",
+      "assets/calf_1.obj",
+      "assets/calf_mirror_0.obj",
+      "assets/calf_mirror_1.obj",
+      "assets/foot.obj",
+      "assets/hip_0.obj",
+      "assets/hip_1.obj",
+      "assets/thigh_0.obj",
+      "assets/thigh_1.obj",
+      "assets/thigh_mirror_0.obj",
+      "assets/thigh_mirror_1.obj"
+    ]
+  },
+  {
+    "id": "unitree_a1",
+    "label": "Unitree A1 (Quadruped, 12 DoF)",
+    "xml": "a1_mocap.xml",
+    "baseBody": "trunk",
+    "camDistance": 1.6,
+    "configKey": "bvh_quadruped",
+    "files": [
+      "a1_mocap.xml",
+      "assets/calf.obj",
+      "assets/hip.obj",
+      "assets/thigh.obj",
+      "assets/thigh_mirror.obj",
+      "assets/trunk.obj",
+      "assets/trunk_A1.png"
+    ]
   }
 ]
