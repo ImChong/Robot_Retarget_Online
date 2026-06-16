@@ -123,6 +123,13 @@ export class SceneManager {
     this.controls.enableDamping = enabled;
   }
 
+  /** Reposition the camera and orbit target (e.g. to frame a small robot). */
+  setView(cameraPos: [number, number, number], target: [number, number, number]) {
+    this.camera.position.set(cameraPos[0], cameraPos[1], cameraPos[2]);
+    this.controls.target.set(target[0], target[1], target[2]);
+    this.controls.update();
+  }
+
   start() {
     if (this.running) return;
     this.running = true;
