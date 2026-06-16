@@ -243,7 +243,7 @@ onUnmounted(() => {
           {{ t('exportJson') }}
         </v-btn>
       </template>
-      <div v-else class="text-caption text-disabled mt-2">
+      <div v-else class="text-caption text-disabled text-center mt-2">
         {{ t('notRun') }}
       </div>
     </MobileSidePanel>
