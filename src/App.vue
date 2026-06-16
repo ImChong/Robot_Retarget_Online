@@ -5,6 +5,7 @@ import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useAppTheme } from '@/composables/useAppTheme';
 import { mdiTranslate, mdiGithub, mdiWeatherSunny, mdiWeatherNight, mdiCoffee } from '@mdi/js';
+import SponsorDialog from '@/components/SponsorDialog.vue';
 
 const { t, toggleLocale, localeLabel, locale } = useI18n();
 const { isDark, toggleAppTheme } = useAppTheme();
@@ -25,9 +26,7 @@ const currentTab = computed({
   },
 });
 
-// Sponsor popup — QR lives in public/ so it's served under the deploy base path.
 const sponsorOpen = ref(false);
-const sponsorQrSrc = `${import.meta.env.BASE_URL}sponsor/wechat-pay.png`;
 
 // re-render tab labels on locale change
 void locale.value;
@@ -111,26 +110,7 @@ void locale.value;
       </router-view>
     </v-main>
 
-    <v-dialog
-      v-model="sponsorOpen"
-      max-width="340"
-      scrim="rgba(0, 0, 0, 0.55)"
-      :opacity="1"
-      class="sponsor-dialog"
-    >
-      <v-card rounded="xl" class="sponsor-card">
-        <v-card-item class="text-center pt-5 pb-1">
-          <div class="text-h6 font-weight-bold">{{ t('sponsorTitle') }}</div>
-          <div class="text-medium-emphasis text-body-2 mt-1">{{ t('sponsorHint') }}</div>
-        </v-card-item>
-        <v-card-text class="d-flex justify-center pb-2">
-          <img :src="sponsorQrSrc" :alt="t('sponsorImgAlt')" class="sponsor-qr" />
-        </v-card-text>
-        <v-card-actions class="justify-center pb-4">
-          <v-btn variant="tonal" @click="sponsorOpen = false">{{ t('close') }}</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <SponsorDialog v-model="sponsorOpen" />
   </v-app>
 </template>
 
@@ -276,22 +256,4 @@ void locale.value;
   color: #e2566a;
 }
 
-.sponsor-dialog {
-  --v-overlay-opacity: 1;
-}
-
-.sponsor-dialog :deep(.v-overlay__scrim) {
-  background: rgba(0, 0, 0, 0.55) !important;
-  opacity: 1 !important;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-
-.sponsor-qr {
-  display: block;
-  width: 100%;
-  max-width: 260px;
-  height: auto;
-  border-radius: 12px;
-}
 </style>
