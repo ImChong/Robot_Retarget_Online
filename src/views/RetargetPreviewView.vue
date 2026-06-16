@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import * as THREE from 'three';
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
-import { mdiPlayCircle, mdiStopCircle, mdiDownload, mdiTune } from '@mdi/js';
+import { mdiDownload, mdiTune } from '@mdi/js';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
@@ -14,7 +14,6 @@ import { usePlayback } from '@/composables/usePlayback';
 import PlaybackBar from '@/components/PlaybackBar.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import MetricsPanel from '@/components/MetricsPanel.vue';
-import EngineToggle from '@/components/EngineToggle.vue';
 import { blendQpos } from '@/lib/viewport/poseBlend';
 import { exportCsv, exportJson, exportNpz, downloadBlob } from '@/lib/export/motion';
 
@@ -34,10 +33,6 @@ const followCamera = ref(true);
 const panelOpen = ref(false);
 const currentFrame = computed(() => playback.frameIndex.value);
 
-const progressPct = computed(() =>
-  store.runProgress.total > 0 ? (100 * store.runProgress.done) / store.runProgress.total : 0,
-);
-
 const stats = computed(() => {
   const r = store.result;
   if (!r) return null;
@@ -47,11 +42,6 @@ const stats = computed(() => {
     frames: r.frameCount,
   };
 });
-
-async function run() {
-  await store.run();
-  if (store.status === 'done') await setupResultScene();
-}
 
 async function setupResultScene() {
   const sm = sceneManager.value;
@@ -143,6 +133,12 @@ function onExport(kind: 'npz' | 'csv' | 'json') {
 watch(showGhost, (v) => {
   if (ghost.value) ghost.value.root.visible = v;
 });
+watch(
+  () => store.result,
+  (result) => {
+    if (result) setupResultScene();
+  },
+);
 watch(mdAndUp, () => sceneManager.value?.resize());
 watch(panelOpen, () => nextTick(() => sceneManager.value?.resize()));
 
@@ -181,39 +177,6 @@ onUnmounted(() => {
     <MobileSidePanel v-model="panelOpen">
       <div v-if="!motion.hasMotion" class="text-caption text-warning text-center">{{ t('noMotionHint') }}</div>
 
-      <EngineToggle :disabled="store.isBusy" />
-
-      <v-btn
-        v-if="!store.isBusy"
-        color="primary"
-        size="large"
-        :prepend-icon="mdiPlayCircle"
-        :disabled="!motion.hasMotion"
-        block
-        @click="run"
-      >
-        {{ t('runRetarget') }}
-      </v-btn>
-      <v-btn v-else color="error" variant="tonal" :prepend-icon="mdiStopCircle" block @click="store.cancel()">
-        {{ t('cancel') }}
-      </v-btn>
-
-      <div v-if="store.status === 'loading-robot'" class="text-caption">
-        {{ t('loadingRobot') }} {{ store.robotLoadProgress.done }}/{{ store.robotLoadProgress.total }}
-      </div>
-
-      <template v-if="store.status === 'running'">
-        <v-progress-linear :model-value="progressPct" color="primary" height="18" rounded>
-          <span class="text-caption">
-            {{ t('retargeting') }} {{ store.runProgress.done }}/{{ store.runProgress.total }}
-          </span>
-        </v-progress-linear>
-      </template>
-
-      <v-alert v-if="store.status === 'error'" type="error" density="compact" variant="tonal">
-        {{ store.errorMessage }}
-      </v-alert>
-
       <v-card v-if="stats" variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('statsTitle') }}</v-card-title>
         <v-card-text class="text-body-2">
@@ -243,7 +206,7 @@ onUnmounted(() => {
           {{ t('exportJson') }}
         </v-btn>
       </template>
-      <div v-else-if="store.status !== 'running'" class="text-caption text-disabled mt-2">
+      <div v-else class="text-caption text-disabled mt-2">
         {{ t('notRun') }}
       </div>
     </MobileSidePanel>
