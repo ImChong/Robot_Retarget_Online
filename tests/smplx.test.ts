@@ -9,7 +9,11 @@ import {
   type SmplxFrameParams,
 } from '../src/lib/smplx/model';
 import { restJoints, forwardKinematics, smplxToHumanFrames } from '../src/lib/smplx/fk';
+import { smplxToBvh } from '../src/lib/smplx/smplxToBvh';
 import { loadSmplxMotion } from '../src/lib/smplx';
+import { parseBvh, estimateSkeletonSize } from '../src/lib/bvh/parse';
+import { bvhToLafan1Frames } from '../src/lib/bvh/lafan1';
+import { getDefaultConfig } from '../src/lib/retarget/defaults';
 
 const close = (a: number, b: number, eps = 1e-9) => Math.abs(a - b) < eps;
 const vClose = (a: ArrayLike<number | bigint>, b: number[], eps = 1e-9) => {
@@ -221,6 +225,61 @@ describe('smplx: end-to-end loadSmplxMotion', () => {
     expect(frame.has('pelvis')).toBe(true);
     expect(frame.get('pelvis')!.quat.length).toBe(4);
     vClose(frame.get('left_hip')!.pos, [0, 0, 1]);
+  });
+});
+
+describe('smplx → BVH round-trip', () => {
+  // 3-joint branch model: pelvis with two children (both leaves).
+  function branchModel(): SmplxBodyModel {
+    const vTemplate = Float64Array.from([0, 0.9, 0, 0.1, 0.8, 0, -0.1, 0.8, 0]);
+    const jRegressor = Float64Array.from([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+    return {
+      numVerts: 3, numJoints: 3, numShape: 1,
+      vTemplate, shapeDirs: new Float64Array(9),
+      jRegressor, parents: Int32Array.from([-1, 0, 0]),
+    };
+  }
+
+  it('the emitted BVH retargets to the same keypoints as the direct path', () => {
+    const model = branchModel();
+    const body = (z1: number) => { const b = new Float64Array(63); b[2] = z1; return b; };
+    const motion = {
+      betas: new Float64Array([0]),
+      fps: 30,
+      frames: [
+        { rootOrient: [0, 0, 0.3] as [number, number, number], bodyPose: body(0.5), trans: [0.2, 0.1, -0.3] as [number, number, number] },
+        { rootOrient: [0.1, 0, 0] as [number, number, number], bodyPose: body(-0.4), trans: [0, 0, 0] as [number, number, number] },
+      ],
+    };
+
+    const direct = smplxToHumanFrames(model, motion);
+    const { bvh } = smplxToBvh(model, motion);
+    const anim = parseBvh(bvh);
+    const size = estimateSkeletonSize(anim);
+    const viaBvh = bvhToLafan1Frames(anim, size > 10 ? 0.01 : 1.0);
+
+    expect(anim.joints.map((j) => j.name)).toEqual(['pelvis', 'left_hip', 'right_hip']);
+    for (let f = 0; f < motion.frames.length; f++) {
+      for (const name of ['pelvis', 'left_hip', 'right_hip']) {
+        const a = direct.frames[f].get(name)!.pos;
+        const b = viaBvh.frames[f].get(name)!.pos;
+        vClose(a, [b[0], b[1], b[2]], 1e-4);
+      }
+    }
+  });
+});
+
+describe('smplx: default configs registered for SMPL-X robots', () => {
+  it('resolves a config for each registered SMPL-X robot', () => {
+    for (const id of [
+      'unitree_h1', 'unitree_h1_2', 'booster_t1', 'kuavo_s45', 'hightorque_hi',
+      'berkeley_humanoid_lite', 'booster_k1', 'pnd_adam_lite', 'tienkung', 'fourier_gr3',
+    ]) {
+      const cfg = getDefaultConfig(id);
+      expect(cfg.human_root_name).toBe('pelvis'); // SMPL-X root convention
+      // Some robots (bhl, adam) are valid single-stage configs (use_ik_match_table2=false).
+      expect(Object.keys(cfg.ik_match_table1).length).toBeGreaterThan(0);
+    }
   });
 });
 

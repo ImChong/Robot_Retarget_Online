@@ -108,6 +108,8 @@ const robotItems = computed((): RobotSelectItem[] => {
   const kind = motion.motionKind;
   const items: RobotSelectItem[] = manifest.value
     .filter((m) => QUADRUPED_ENABLED || m.configKey !== 'bvh_quadruped')
+    // SMPL-X robots only surface for SMPL-X motion (keeps the BVH dropdown clean).
+    .filter((m) => m.configKey !== 'smplx' || kind === 'smplx')
     .map((m) => ({
       title: m.label,
       value: m.id,
@@ -120,7 +122,7 @@ const robotItems = computed((): RobotSelectItem[] => {
       title: `${store.customRobot.label} (${t('customRobot')})`,
       value: CUSTOM_ROBOT_ID,
       isCustom: true,
-      props: { disabled: kind === 'quadruped' },
+      props: { disabled: kind === 'quadruped' || kind === 'smplx' },
     });
   }
   return items;

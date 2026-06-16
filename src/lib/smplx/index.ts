@@ -26,9 +26,11 @@ export {
   type SmplxHumanMotion,
   type PosedJoints,
 } from './fk';
+export { smplxToBvh, type SmplxToBvhResult } from './smplxToBvh';
 
 import { parseSmplxModel, parseAmassMotion } from './model';
 import { smplxToHumanFrames, type SmplxHumanMotion } from './fk';
+import { smplxToBvh, type SmplxToBvhResult } from './smplxToBvh';
 
 /**
  * One-shot: parse a SMPL-X model `.npz` + AMASS motion `.npz` and produce GMR
@@ -38,4 +40,15 @@ export function loadSmplxMotion(modelNpz: Uint8Array, motionNpz: Uint8Array): Sm
   const model = parseSmplxModel(modelNpz);
   const motion = parseAmassMotion(motionNpz);
   return smplxToHumanFrames(model, motion);
+}
+
+/**
+ * One-shot: parse a SMPL-X model `.npz` + AMASS motion `.npz` into LAFAN1-style
+ * BVH text, ready for `useMotionStore().loadSmplx(...)` / `loadBvhText(...)` so
+ * it flows through the existing viewer + retargeting pipeline.
+ */
+export function smplxNpzToBvh(modelNpz: Uint8Array, motionNpz: Uint8Array): SmplxToBvhResult {
+  const model = parseSmplxModel(modelNpz);
+  const motion = parseAmassMotion(motionNpz);
+  return smplxToBvh(model, motion);
 }
