@@ -531,15 +531,11 @@ onUnmounted(() => {
         <div class="sidebar-footer d-flex flex-column ga-2 pt-3 mt-auto">
           <v-btn
             v-if="!store.isBusy"
-            class="run-retarget-btn"
             color="primary"
-            variant="elevated"
             size="large"
-            rounded="lg"
             :prepend-icon="mdiPlayCircle"
             :disabled="!motion.hasMotion"
             block
-            elevation="6"
             @click="run"
           >
             {{ t('runRetarget') }}
@@ -733,17 +729,5 @@ onUnmounted(() => {
 .sidebar-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 12px;
-}
-.run-retarget-btn {
-  min-height: 56px;
-  padding-top: 14px;
-  padding-bottom: 14px;
-  box-shadow: 0 4px 18px rgba(79, 195, 247, 0.35);
-}
-.run-retarget-btn:not(:disabled):hover {
-  box-shadow: 0 6px 22px rgba(79, 195, 247, 0.48);
-}
-.run-retarget-btn :deep(.v-btn__prepend .v-icon) {
-  font-size: 1.5rem;
 }
 </style>
