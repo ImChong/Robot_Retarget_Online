@@ -242,6 +242,7 @@ export const useRetargetStore = defineStore('retarget', {
           robotId: this.robotId,
           robotLabel,
           engine: this.engine,
+          createdAt: Date.now(),
           result: markRaw(result),
         };
         this.resultHistory.unshift(entry);

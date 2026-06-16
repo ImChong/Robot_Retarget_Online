@@ -6,7 +6,11 @@ import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore } from '@/stores/retarget';
-import type { RetargetHistoryEntry } from '@/lib/retarget/types';
+import {
+  formatRetargetExportBasename,
+  formatRetargetHistoryLabel,
+  formatRetargetTimestamp,
+} from '@/lib/retarget/historyLabel';
 import type { RobotModel } from '@/lib/mujoco/runtime';
 import { buildRobotScene, type RobotSceneObject } from '@/lib/mujoco/threeScene';
 import { SceneManager } from '@/lib/viewport/SceneManager';
@@ -51,10 +55,9 @@ const historyItems = computed(() =>
   })),
 );
 
-function formatHistoryLabel(entry: RetargetHistoryEntry): string {
-  const bvh = entry.bvhName.replace(/\.bvh$/i, '');
+function formatHistoryLabel(entry: (typeof store.resultHistory)[number]): string {
   const engine = entry.engine === 'omniretarget' ? t('engineOmni') : t('engineGmr');
-  return `${bvh} · ${entry.robotLabel} · ${engine}`;
+  return formatRetargetHistoryLabel(entry, engine);
 }
 
 function onHistorySelect(id: unknown) {
@@ -143,8 +146,7 @@ function onExport(kind: 'npz' | 'csv' | 'json') {
   const entry = store.activeHistoryEntry;
   const result = entry?.result;
   if (!entry || !result) return;
-  const base = entry.bvhName.replace(/\.bvh$/i, '');
-  const name = `${base}_${result.robotId}_${result.engine}`;
+  const name = formatRetargetExportBasename(entry);
   if (kind === 'npz') downloadBlob(exportNpz(result), `${name}.npz`);
   else if (kind === 'csv') downloadBlob(exportCsv(result), `${name}.csv`);
   else downloadBlob(exportJson(result), `${name}.json`);
@@ -211,6 +213,10 @@ onUnmounted(() => {
         <v-card-title class="text-subtitle-2">{{ t('statsTitle') }}</v-card-title>
         <v-card-text class="text-body-2">
           <div class="info-line"><span>{{ t('fileName') }}</span><b>{{ store.activeHistoryEntry?.bvhName }}</b></div>
+          <div v-if="store.activeHistoryEntry" class="info-line">
+            <span>{{ t('retargetTime') }}</span>
+            <b>{{ formatRetargetTimestamp(store.activeHistoryEntry.createdAt) }}</b>
+          </div>
           <div class="info-line"><span>{{ t('robot') }}</span><b>{{ store.activeHistoryEntry?.robotLabel }}</b></div>
           <div class="info-line">
             <span>{{ t('engine') }}</span>
