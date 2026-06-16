@@ -77,13 +77,13 @@ function buildFigure() {
   };
 }
 
-const { isZoomed, resetZoom, draw } = usePlotlyChart(chartEl, buildFigure, toRef(props, 'frame'));
+const { isZoomed, resetZoom, draw, resize } = usePlotlyChart(chartEl, buildFigure, toRef(props, 'frame'));
 
 watch(series, () => {
   void draw();
 });
 
-defineExpose({ resetZoom, isZoomed });
+defineExpose({ resetZoom, isZoomed, resize });
 </script>
 
 <template>
