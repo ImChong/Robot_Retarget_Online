@@ -102,6 +102,8 @@ export interface RetargetHistoryEntry {
   /** URDF / model file label shown in the history dropdown. */
   robotLabel: string;
   engine: RetargetEngineId;
+  /** Wall-clock time when the retarget run finished (ms since epoch). */
+  createdAt: number;
   result: RetargetResult;
 }
 
