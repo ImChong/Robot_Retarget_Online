@@ -121,10 +121,37 @@ drop-in rather than a new algorithm. Related references surveyed:
 | **Robots** | **Unitree Go2** and **Unitree A1** (12 DoF), real MJCF + meshes from [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) (Unitree BSD-3). A `*_mocap.xml` variant adds four massless `*_foot` keypoint bodies at the foot tips (no added DoF). Canonical URDFs are also included under `public/robots/<id>/urdf/` as reference. |
 | **Mapping** | `bvh_quadruped_to_unitree_{go2,a1}.json`: `base/trunk ← b_Hips` (orientation + position) and `FL/FR/RL/RR_foot ← b_{Left,Right}Hand / b_{Left,Right}Toe` (position). A constant trunk-frame offset (clip-independent) and a 0.5 body scale fit the Labrador onto the smaller robots. |
 
-**Try it:** in *BVH Viewer* pick a **Dog …(Quadruped)** sample, then in *Retarget
-Config* choose **Unitree Go2/A1**. Validated headless: across walk/run/idle the
-robot stands at ≈0.28 m with the four feet tracked to **~1–2 cm** and the trunk
-within ~10° of the dog's (faithful pitch). Reproduce:
+### Hidden preview · 暂时隐藏（URL 开关）
+
+The quadruped workflow is **hidden in the public UI by default** (Go2 / A1 in the
+robot dropdown and the **Dog … (Quadruped)** sample clips). The MJCF assets,
+dog BVH samples, and retargeting configs still ship in the build — only the UI
+entry points are gated (`src/lib/features.ts`).
+
+四足重定向流程在公开站点上**默认隐藏**（机器人下拉中的 Go2 / A1，以及示例动作里的狗动捕
+条目）。相关资产与引擎代码仍随构建发布，只是 UI 入口被关掉。
+
+**Reveal it** by visiting the site once with a `quadruped` query parameter (the
+choice is remembered in `localStorage` for that origin; use `?quadruped=0` to
+hide again):
+
+**启用方式**：在任意页面 URL 后加上 `quadruped` 查询参数并打开一次（会写入
+`localStorage` 记住；用 `?quadruped=0` 可再次关闭）：
+
+| | URL |
+| --- | --- |
+| **Production 线上** | <https://imchong.github.io/Robot_Retarget_Online/?quadruped=1> |
+| **Local dev 本地** | <http://localhost:3000/?quadruped=1> |
+| **Hash-router form** (also works) | `…/Robot_Retarget_Online/#/bvh?quadruped=1` |
+
+After enabling, reload if needed, then in *BVH Viewer* pick a **Dog …
+(Quadruped)** sample and in *Retarget Config* choose **Unitree Go2/A1**.
+启用后若菜单未出现可刷新页面；在 *BVH Viewer* 加载 **Dog … (Quadruped)** 示例，
+再在 *Retarget Config* 选择 **Unitree Go2/A1**。
+
+Validated headless: across walk/run/idle the robot stands at ≈0.28 m with the
+four feet tracked to **~1–2 cm** and the trunk within ~10° of the dog's
+(faithful pitch). Reproduce:
 
 ```bash
 # trimmed dog clips from a local checkout of the Lifelike-Agility raw_mocap_data
