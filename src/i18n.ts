@@ -81,13 +81,13 @@ const messages: Record<string, { zh: string; en: string }> = {
   engine: { zh: '重定向引擎', en: 'Retarget engine' },
   engineGmr: { zh: 'GMR', en: 'GMR' },
   engineOmni: { zh: 'OmniRetarget', en: 'OmniRetarget' },
-  engineGmrDesc: {
-    zh: 'GMR：逐关键点的两阶段微分 IK（与原版 GMR 数值对齐）。',
-    en: 'GMR: per-keypoint two-stage differential IK (numerically aligned with upstream GMR).',
+  engineGmrDescSuffix: {
+    zh: '：逐关键点的两阶段微分 IK（与原版 GMR 数值对齐）。',
+    en: ': per-keypoint two-stage differential IK (numerically aligned with upstream GMR).',
   },
-  engineOmniDesc: {
-    zh: 'OmniRetarget：在 GMR 之上增加交互网格（拉普拉斯）约束，保持关键点之间的相对结构，减少自穿插与肢体形变。',
-    en: 'OmniRetarget: adds an interaction-mesh (Laplacian) term on top of GMR to preserve the relative structure between keypoints, reducing self-penetration and limb distortion.',
+  engineOmniDescSuffix: {
+    zh: '：在 GMR 之上增加交互网格（拉普拉斯）约束，保持关键点之间的相对结构，减少自穿插与肢体形变。',
+    en: ': adds an interaction-mesh (Laplacian) term on top of GMR to preserve the relative structure between keypoints, reducing self-penetration and limb distortion.',
   },
   omniParams: { zh: 'OmniRetarget 参数', en: 'OmniRetarget Parameters' },
   meshWeight: { zh: '交互网格权重', en: 'Interaction-mesh weight' },

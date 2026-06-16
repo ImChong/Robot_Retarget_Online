@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { useI18n } from '@/i18n';
 import { useRetargetStore, type RetargetEngineId } from '@/stores/retarget';
 
@@ -8,9 +7,8 @@ defineProps<{ disabled?: boolean }>();
 const { t } = useI18n();
 const store = useRetargetStore();
 
-const desc = computed(() =>
-  store.engine === 'omniretarget' ? t('engineOmniDesc') : t('engineGmrDesc'),
-);
+const GMR_URL = 'https://github.com/YanjieZe/GMR';
+const OMNI_URL = 'https://omni-retarget.github.io/';
 
 function onSelect(value: unknown) {
   if (value === 'gmr' || value === 'omniretarget') {
@@ -36,7 +34,26 @@ function onSelect(value: unknown) {
       <v-btn value="gmr" size="small" class="flex-grow-1">{{ t('engineGmr') }}</v-btn>
       <v-btn value="omniretarget" size="small" class="flex-grow-1">{{ t('engineOmni') }}</v-btn>
     </v-btn-toggle>
-    <div class="text-caption text-medium-emphasis mt-1 engine-desc">{{ desc }}</div>
+    <div class="text-caption text-medium-emphasis mt-1 engine-desc">
+      <template v-if="store.engine === 'omniretarget'">
+        <a
+          class="engine-desc-link"
+          :href="OMNI_URL"
+          target="_blank"
+          rel="noopener noreferrer"
+          :title="t('engineOmni')"
+        >{{ t('engineOmni') }}</a>{{ t('engineOmniDescSuffix') }}
+      </template>
+      <template v-else>
+        <a
+          class="engine-desc-link"
+          :href="GMR_URL"
+          target="_blank"
+          rel="noopener noreferrer"
+          :title="t('engineGmr')"
+        >{{ t('engineGmr') }}</a>{{ t('engineGmrDescSuffix') }}
+      </template>
+    </div>
   </div>
 </template>
 
@@ -46,5 +63,15 @@ function onSelect(value: unknown) {
 }
 .engine-desc {
   line-height: 1.35;
+}
+
+.engine-desc-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.engine-desc-link:hover {
+  text-decoration: underline;
+  color: rgb(var(--v-theme-primary));
 }
 </style>
