@@ -179,7 +179,7 @@ Full plan of record in **[`ROADMAP.md`](ROADMAP.md)**. Headlines:
 - [x] **Quadruped retargeting** — dog mocap (BVH) → Unitree Go2 / A1 via keypoint IK ([motion_imitation](https://github.com/erwincoumans/motion_imitation)-style)
 - [ ] More GMR robots (assets are drop-in: `public/robots/` + manifest entry)
 - [ ] [holosoma](https://github.com/amazon-far/holosoma) as a third, trajectory-level engine (heavier; backend TBD)
-- [ ] SMPL-X / AMASS input (user-supplied body model; deferred for licensing)
+- [x] **SMPL-X / AMASS input** (user-supplied body model `.npz`, in-browser) — unlocks 10 more GMR robots (H1, H1-2, Kuavo, …); GMR parity pending
 
 ## Credits & licenses
 

@@ -29,6 +29,11 @@ describe('motionKind', () => {
     expect(motionMatchesRobot('humanoid', 'bvh_quadruped')).toBe(false);
     expect(motionMatchesRobot('quadruped', 'bvh_quadruped')).toBe(true);
     expect(motionMatchesRobot('quadruped', 'bvh_lafan1')).toBe(false);
+    // SMPL-X robots match only SMPL-X motion, and never a BVH/quadruped motion.
+    expect(motionMatchesRobot('smplx', 'smplx')).toBe(true);
+    expect(motionMatchesRobot('smplx', 'bvh_lafan1')).toBe(false);
+    expect(motionMatchesRobot('humanoid', 'smplx')).toBe(false);
+    expect(motionMatchesRobot('quadruped', 'smplx')).toBe(false);
   });
 
   it('greys out the other family once a motion is loaded', () => {

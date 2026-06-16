@@ -174,7 +174,10 @@ export function alignSkeletonToRobot(
   const pelvisId = robot.bodyIds.get(pelvisName);
   if (pelvisId === undefined) return;
 
-  const hipsIdx = jointIndexByName(anim, humanRootName);
+  // Tolerate a config/motion root-name mismatch (e.g. a stale `Hips` while the
+  // robot is still syncing to a SMPL-X clip whose root is `pelvis`).
+  const named = anim.joints.findIndex((j) => j.name === humanRootName);
+  const hipsIdx = named >= 0 ? named : resolveMotionRootJoint(anim);
 
   robotScene.root.updateMatrixWorld(true);
   pelvisWorldPose(robotScene, pelvisId, tmpPos, tmpQuat);

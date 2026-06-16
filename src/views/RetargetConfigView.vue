@@ -25,7 +25,6 @@ import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonVie
 import {
   alignRobotRoot,
   alignSkeletonToRobot,
-  jointIndexByName,
   VIEWPORT_ANCHOR,
 } from '@/lib/viewport/sceneAlignment';
 import MappingTable from '@/components/MappingTable.vue';
@@ -108,6 +107,8 @@ const robotItems = computed((): RobotSelectItem[] => {
   const kind = motion.motionKind;
   const items: RobotSelectItem[] = manifest.value
     .filter((m) => QUADRUPED_ENABLED || m.configKey !== 'bvh_quadruped')
+    // SMPL-X robots only surface for SMPL-X motion (keeps the BVH dropdown clean).
+    .filter((m) => m.configKey !== 'smplx' || kind === 'smplx')
     .map((m) => ({
       title: m.label,
       value: m.id,
@@ -120,7 +121,7 @@ const robotItems = computed((): RobotSelectItem[] => {
       title: `${store.customRobot.label} (${t('customRobot')})`,
       value: CUSTOM_ROBOT_ID,
       isCustom: true,
-      props: { disabled: kind === 'quadruped' },
+      props: { disabled: kind === 'quadruped' || kind === 'smplx' },
     });
   }
   return items;
@@ -229,7 +230,10 @@ function rebuildSkeleton() {
       VIEWPORT_ANCHOR,
     );
   } else {
-    sk.lockJointToWorld(jointIndexByName(motion.anim, store.config.human_root_name), VIEWPORT_ANCHOR);
+    // Fall back to the root joint (index 0) if the config root name is briefly
+    // out of sync with the loaded motion (e.g. SMPL-X `pelvis` vs a stale `Hips`).
+    const named = motion.anim.joints.findIndex((j) => j.name === store.config.human_root_name);
+    sk.lockJointToWorld(named >= 0 ? named : 0, VIEWPORT_ANCHOR);
   }
   refreshLines();
 }

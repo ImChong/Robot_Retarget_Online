@@ -1,12 +1,25 @@
 import type { BvhAnim } from './bvh/parse';
 
-/** Humanoid (LAFAN1 / BlazePose) vs quadruped (dog mocap) motion families. */
-export type MotionKind = 'humanoid' | 'quadruped';
+/**
+ * Motion source families. `humanoid` = LAFAN1 BVH / BlazePose; `quadruped` = dog
+ * mocap; `smplx` = SMPL-X / AMASS (keyed by SMPL-X joint names). The retarget
+ * configs are convention-specific, so a robot only matches its own family.
+ */
+export type MotionKind = 'humanoid' | 'quadruped' | 'smplx';
 
 export function isQuadrupedConfigKey(configKey: string): boolean {
   return configKey === 'bvh_quadruped';
 }
 
+export function isSmplxConfigKey(configKey: string): boolean {
+  return configKey === 'smplx';
+}
+
+/**
+ * Classify a *BVH* motion. SMPL-X is not detected here — it never arrives as a
+ * dropped `.bvh`; the SMPL-X loader (`useMotionStore().loadSmplx`) sets the
+ * `smplx` kind explicitly after converting the uploaded `.npz` files.
+ */
 export function detectMotionKind(anim: BvhAnim, fileName?: string | null): MotionKind {
   if (fileName && /^dog_/i.test(fileName)) return 'quadruped';
   const names = new Set(anim.joints.map((j) => j.name));
@@ -16,11 +29,15 @@ export function detectMotionKind(anim: BvhAnim, fileName?: string | null): Motio
 }
 
 export function motionMatchesRobot(kind: MotionKind, configKey: string): boolean {
-  return isQuadrupedConfigKey(configKey) === (kind === 'quadruped');
+  if (isQuadrupedConfigKey(configKey)) return kind === 'quadruped';
+  if (isSmplxConfigKey(configKey)) return kind === 'smplx';
+  return kind === 'humanoid'; // bvh_lafan1 / bvh
 }
 
 export function defaultRobotIdForKind(kind: MotionKind): string {
-  return kind === 'quadruped' ? 'unitree_go2' : 'unitree_g1';
+  if (kind === 'quadruped') return 'unitree_go2';
+  if (kind === 'smplx') return 'unitree_h1';
+  return 'unitree_g1';
 }
 
 /** Whether a sample / menu entry should be greyed out for the active motion. */

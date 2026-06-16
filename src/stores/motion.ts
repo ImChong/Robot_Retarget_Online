@@ -3,6 +3,7 @@ import { markRaw } from 'vue';
 import { parseBvh, estimateSkeletonSize, type BvhAnim } from '@/lib/bvh/parse';
 import { bvhToLafan1Frames, type Lafan1Motion } from '@/lib/bvh/lafan1';
 import { detectMotionKind, type MotionKind } from '@/lib/motionKind';
+import { smplxNpzToBvh } from '@/lib/smplx';
 
 export interface MotionState {
   fileName: string | null;
@@ -52,6 +53,22 @@ export const useMotionStore = defineStore('motion', {
         this.fileName = fileName;
         this.motionKind = detectMotionKind(anim, fileName);
         this.loadError = null;
+      } catch (err) {
+        this.loadError = err instanceof Error ? err.message : String(err);
+        throw err;
+      }
+    },
+    /**
+     * Load SMPL-X model + AMASS motion `.npz` buffers (kept in memory, never
+     * persisted). Converts to a LAFAN1-style BVH so the viewer + retargeting
+     * pipeline are reused unchanged, then forces the `smplx` motion kind so the
+     * robot dropdown surfaces the SMPL-X robots.
+     */
+    loadSmplx(modelNpz: Uint8Array, motionNpz: Uint8Array, fileName: string) {
+      try {
+        const { bvh } = smplxNpzToBvh(modelNpz, motionNpz);
+        this.loadBvhText(bvh, fileName);
+        this.motionKind = 'smplx';
       } catch (err) {
         this.loadError = err instanceof Error ? err.message : String(err);
         throw err;

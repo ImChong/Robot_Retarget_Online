@@ -74,6 +74,39 @@ const messages: Record<string, { zh: string; en: string }> = {
     en: 'Unsupported file type — choose an mp4 / webm / mov video',
   },
 
+  // SMPL-X / AMASS input (user-supplied body model, in-browser)
+  smplxImport: { zh: 'SMPL-X / AMASS', en: 'SMPL-X / AMASS' },
+  smplxTitle: { zh: '导入 SMPL-X / AMASS 动作', en: 'Import SMPL-X / AMASS Motion' },
+  smplxHint: {
+    zh: '在浏览器内把 SMPL-X 形状 + AMASS 动作（.npz）转换为关键点，复用既有预览与重定向链路，可重定向到 H1、Kuavo 等 SMPL-X 机器人。',
+    en: 'Converts a SMPL-X body shape + AMASS motion (.npz) into keypoints in your browser, reusing the existing preview + retargeting path — retargets to the SMPL-X robots (H1, Kuavo, …).',
+  },
+  smplxModelLabel: { zh: 'SMPL-X 模型 (.npz)', en: 'SMPL-X body model (.npz)' },
+  smplxMotionLabel: { zh: 'AMASS 动作 (.npz)', en: 'AMASS motion (.npz)' },
+  smplxModelDropHint: {
+    zh: '需自备 SMPL-X 模型（如 SMPLX_NEUTRAL.npz）',
+    en: 'Bring your own SMPL-X model (e.g. SMPLX_NEUTRAL.npz)',
+  },
+  smplxMotionDropHint: {
+    zh: 'AMASS 序列 .npz（含 poses / trans / betas）',
+    en: 'An AMASS sequence .npz (poses / trans / betas)',
+  },
+  smplxSelectFile: { zh: '选择 .npz', en: 'Select .npz' },
+  smplxChangeFile: { zh: '更换', en: 'Change' },
+  smplxLoad: { zh: '载入动作', en: 'Load motion' },
+  smplxLicenseNote: {
+    zh: 'SMPL-X 模型受许可证限制、不随应用分发，需自行从官网下载。',
+    en: 'SMPL-X body models are license-restricted and not bundled — download your own from the official site.',
+  },
+  smplxPrivacyNote: {
+    zh: '模型与动作均在本地浏览器中处理，不会上传到任何服务器。',
+    en: 'The model and motion are processed locally in your browser and never uploaded.',
+  },
+  smplxInvalidFormat: {
+    zh: '不支持的文件类型，请选择 .npz 文件',
+    en: 'Unsupported file type — choose a .npz file',
+  },
+
   robot: { zh: '机器人', en: 'Robot' },
   loadingRobot: { zh: '正在加载机器人模型…', en: 'Loading robot model…' },
   robotLoadComplete: { zh: '机器人模型加载完成', en: 'Robot model loaded' },
