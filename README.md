@@ -131,12 +131,14 @@ entry points are gated (`src/lib/features.ts`).
 四足重定向流程在公开站点上**默认隐藏**（机器人下拉中的 Go2 / A1，以及示例动作里的狗动捕
 条目）。相关资产与引擎代码仍随构建发布，只是 UI 入口被关掉。
 
-**Reveal it** by visiting the site once with a `quadruped` query parameter (the
-choice is remembered in `localStorage` for that origin; use `?quadruped=0` to
-hide again):
+**Reveal it** by opening the site with a `quadruped` query parameter. The flag is
+read from the URL on each page load only (not persisted — a prior test visit
+with `?quadruped=1` will not keep the menu visible on later visits without the
+parameter):
 
-**启用方式**：在任意页面 URL 后加上 `quadruped` 查询参数并打开一次（会写入
-`localStorage` 记住；用 `?quadruped=0` 可再次关闭）：
+**启用方式**：在 URL 中带上 `quadruped` 查询参数后打开页面。每次加载只读 URL
+（不写入 `localStorage`；之前用过 `?quadruped=1` 测试，之后不带参数打开也不会
+一直显示四足入口）：
 
 | | URL |
 | --- | --- |
