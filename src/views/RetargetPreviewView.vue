@@ -37,6 +37,9 @@ const showGhost = ref(true);
 const followCamera = ref(true);
 const panelOpen = ref(false);
 const currentFrame = computed(() => playback.frameIndex.value);
+const isViewActive = ref(false);
+let setupSeq = 0;
+let displayedHistoryId: string | null = null;
 
 const stats = computed(() => {
   const r = store.result;
@@ -65,12 +68,18 @@ function onHistorySelect(id: unknown) {
 }
 
 async function setupResultScene() {
+  const seq = ++setupSeq;
   const sm = sceneManager.value;
   const entry = store.activeHistoryEntry;
   const result = entry?.result;
   if (!sm || !entry || !result) return;
 
+  const isNewDisplay = entry.id !== displayedHistoryId;
+  const playingBeforeSetup = playback.state.playing;
+
   const robot = await store.loadRobotForHistory(entry);
+  if (seq !== setupSeq) return;
+
   robotModel.value = robot;
 
   robotScene.value?.dispose();
@@ -84,9 +93,20 @@ async function setupResultScene() {
   sm.scene.add(cloud.root);
   ghost.value = cloud;
 
-  playback.setMotion(result.frameCount, result.fps);
-  playback.state.playing = true;
-  applyFrame(0);
+  if (isNewDisplay) {
+    playback.setMotion(result.frameCount, result.fps);
+    displayedHistoryId = entry.id;
+    if (store.consumePendingAutoplay()) {
+      // Autoplay new results unless the user paused while the robot was loading.
+      if (playback.state.playing || !playingBeforeSetup) {
+        playback.state.playing = true;
+      }
+    } else if (!playingBeforeSetup) {
+      playback.state.playing = false;
+    }
+  }
+
+  applyFrame(playback.poseFrame.value);
   frameSmallRobot(scene.root);
 }
 
@@ -158,7 +178,7 @@ watch(showGhost, (v) => {
 watch(
   () => store.activeHistoryId,
   (id) => {
-    if (id) setupResultScene();
+    if (id && isViewActive.value) void setupResultScene();
   },
 );
 watch(mdAndUp, () => sceneManager.value?.resize());
@@ -169,6 +189,7 @@ function onMetricsResize() {
 }
 
 onMounted(() => {
+  isViewActive.value = true;
   const sm = new SceneManager(viewportEl.value!, {
     cameraPos: [2.6, -2.6, 1.7],
     target: [0, 0, 0.8],
@@ -179,14 +200,21 @@ onMounted(() => {
   });
   sm.start();
   sceneManager.value = sm;
-  if (store.result) setupResultScene();
+  if (store.activeHistoryId) void setupResultScene();
 });
 
 onActivated(() => {
+  isViewActive.value = true;
   sceneManager.value?.start();
-  if (store.result && !robotScene.value) setupResultScene();
+  if (store.activeHistoryId && (store.activeHistoryId !== displayedHistoryId || !robotScene.value)) {
+    void setupResultScene();
+  }
 });
-onDeactivated(() => sceneManager.value?.stop());
+onDeactivated(() => {
+  isViewActive.value = false;
+  setupSeq++;
+  sceneManager.value?.stop();
+});
 onUnmounted(() => {
   ghost.value?.dispose();
   robotScene.value?.dispose();

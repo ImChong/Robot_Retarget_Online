@@ -35,6 +35,10 @@ function step(delta: number) {
   const f = Math.floor(state.frame) + delta;
   props.controller.seek(Math.max(0, Math.min(f, state.frameCount - 1)));
 }
+
+function togglePlayback() {
+  props.controller.toggle();
+}
 </script>
 
 <template>
@@ -49,7 +53,7 @@ function step(delta: number) {
         color="primary"
         size="small"
         variant="tonal"
-        @click="controller.toggle()"
+        @click="togglePlayback"
       />
       <v-btn :icon="mdiSkipNext" size="small" variant="text" @click="step(1)" />
 

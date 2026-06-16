@@ -39,6 +39,8 @@ interface RetargetState {
   runProgress: { done: number; total: number };
   resultHistory: RetargetHistoryEntry[];
   activeHistoryId: string | null;
+  /** Set when a new retarget result should autoplay once preview loads it. */
+  pendingPreviewAutoplay: boolean;
   errorMessage: string | null;
   abortController: AbortController | null;
 }
@@ -55,6 +57,7 @@ export const useRetargetStore = defineStore('retarget', {
     runProgress: { done: 0, total: 1 },
     resultHistory: [],
     activeHistoryId: null,
+    pendingPreviewAutoplay: false,
     errorMessage: null,
     abortController: null,
   }),
@@ -182,6 +185,11 @@ export const useRetargetStore = defineStore('retarget', {
     selectHistory(id: string) {
       if (this.resultHistory.some((e) => e.id === id)) this.activeHistoryId = id;
     },
+    consumePendingAutoplay(): boolean {
+      if (!this.pendingPreviewAutoplay) return false;
+      this.pendingPreviewAutoplay = false;
+      return true;
+    },
     async resolveRobotLabel(robotId?: string): Promise<string> {
       const id = robotId ?? this.robotId;
       if (id === CUSTOM_ROBOT_ID) {
@@ -247,6 +255,7 @@ export const useRetargetStore = defineStore('retarget', {
         };
         this.resultHistory.unshift(entry);
         this.activeHistoryId = entry.id;
+        this.pendingPreviewAutoplay = true;
         this.status = 'done';
         this.errorMessage = null;
       } catch (err) {
