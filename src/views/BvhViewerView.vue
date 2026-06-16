@@ -9,7 +9,7 @@ import { usePlayback } from '@/composables/usePlayback';
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { QUADRUPED_ENABLED } from '@/lib/features';
 import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
-import { followOrbitCamera, motionRootAnchor } from '@/lib/viewport/sceneAlignment';
+import { followOrbitCamera } from '@/lib/viewport/sceneAlignment';
 import { resolveMotionRootJoint } from '@/lib/bvh/parse';
 import FileDropZone from '@/components/FileDropZone.vue';
 import PlaybackBar from '@/components/PlaybackBar.vue';
@@ -105,13 +105,12 @@ function rebuildSkeleton() {
   sm.scene.add(sk.root);
   skeleton.value = sk;
   hipsIndex.value = resolveMotionRootJoint(motion.anim);
-  rootAnchor.copy(motionRootAnchor(motion.anim, motion.unitScale));
   playback.setMotion(motion.frameCount, motion.fps);
   playback.state.playing = true;
   applyFrame(0);
 }
 
-const rootAnchor = new THREE.Vector3();
+const rootTrack = new THREE.Vector3();
 
 function applyFrame(frame: number) {
   const sk = skeleton.value;
@@ -124,9 +123,8 @@ function applyFrame(frame: number) {
   if (playing) sk.setFrameBlend(poseFrame);
   else sk.setFrame(poseFrame);
   if (!sm) return;
-  sk.lockJointToWorld(hipsIndex.value, rootAnchor);
-  // Snap camera to the anchored root during playback to avoid trailing ghosting.
-  followOrbitCamera(sm, rootAnchor, playing ? 1 : 0.08);
+  sk.getJointWorldPos(hipsIndex.value, rootTrack);
+  followOrbitCamera(sm, rootTrack, playing ? 1 : 0.08);
   sm.setDampingEnabled(!playing);
 }
 
