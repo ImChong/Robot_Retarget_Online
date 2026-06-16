@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
 import { parseBvh, estimateSkeletonSize, type BvhAnim } from '@/lib/bvh/parse';
 import { bvhToLafan1Frames, type Lafan1Motion } from '@/lib/bvh/lafan1';
+import { detectMotionKind, type MotionKind } from '@/lib/motionKind';
 
 export interface MotionState {
   fileName: string | null;
@@ -32,6 +33,8 @@ export const useMotionStore = defineStore('motion', {
     jointNames: (s) => s.anim?.joints.map((j) => j.name) ?? [],
     /** estimated standing height in meters */
     estHeightMeters: (s) => s.skeletonSizeUnits * s.unitScale,
+    motionKind: (s): MotionKind | null =>
+      s.anim ? detectMotionKind(s.anim, s.fileName) : null,
   },
   actions: {
     loadBvhText(text: string, fileName: string) {

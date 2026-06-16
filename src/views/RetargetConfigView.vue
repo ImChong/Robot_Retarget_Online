@@ -8,6 +8,7 @@ import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore, CUSTOM_ROBOT_ID } from '@/stores/retarget';
 import { getRobotManifest, type RobotManifestEntry, type RobotModel } from '@/lib/mujoco/runtime';
 import { QUADRUPED_ENABLED } from '@/lib/features';
+import { motionMatchesRobot } from '@/lib/motionKind';
 import { buildRobotScene, type RobotSceneObject } from '@/lib/mujoco/threeScene';
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
@@ -76,21 +77,46 @@ const urdfDialogOpen = ref(false);
 const activeTab = ref('stage1');
 const panelOpen = ref(false);
 
-type RobotSelectItem = { title: string; value: string; isCustom?: boolean };
+type RobotSelectItem = {
+  title: string;
+  value: string;
+  props?: { disabled?: boolean };
+  isCustom?: boolean;
+};
 
 const robotItems = computed((): RobotSelectItem[] => {
+  const kind = motion.motionKind;
   const items: RobotSelectItem[] = manifest.value
     .filter((m) => QUADRUPED_ENABLED || m.configKey !== 'bvh_quadruped')
-    .map((m) => ({ title: m.label, value: m.id }));
+    .map((m) => ({
+      title: m.label,
+      value: m.id,
+      props: {
+        disabled: kind !== null && !motionMatchesRobot(kind, m.configKey),
+      },
+    }));
   if (store.customRobot) {
     items.unshift({
       title: `${store.customRobot.label} (${t('customRobot')})`,
       value: CUSTOM_ROBOT_ID,
       isCustom: true,
+      props: { disabled: kind === 'quadruped' },
     });
   }
   return items;
 });
+
+function onRobotSelected(robotId: string) {
+  const item = robotItems.value.find((i) => i.value === robotId);
+  if (item?.props?.disabled) return;
+  store.setRobot(robotId);
+}
+
+async function syncRobotToMotion() {
+  if (store.syncRobotToMotion(manifest.value)) {
+    await ensureRobotScene();
+  }
+}
 
 const robotBodies = computed(() => robotModel.value?.bodyNames ?? []);
 
@@ -280,6 +306,9 @@ function onRemoveCustomRobot() {
   }
 }
 
+watch(() => motion.motionKind, () => {
+  void syncRobotToMotion();
+});
 watch(() => store.robotId, ensureRobotScene);
 watch(
   () => store.robotLoadProgress,
@@ -335,6 +364,7 @@ onMounted(async () => {
   sm.start();
   sceneManager.value = sm;
   rebuildSkeleton();
+  store.syncRobotToMotion(manifest.value);
   await ensureRobotScene();
 });
 
@@ -360,13 +390,16 @@ onUnmounted(() => {
       <v-select
         :model-value="store.robotId"
         :items="robotItems"
+        item-title="title"
+        item-value="value"
+        item-props="props"
         :label="t('robot')"
         density="compact"
         hide-details
-        @update:model-value="(v: string) => store.setRobot(v)"
+        @update:model-value="onRobotSelected"
       >
         <template #item="{ item, props: itemProps }">
-          <v-list-item v-bind="itemProps" :title="item.title">
+          <v-list-item v-bind="itemProps" :title="item.title" :disabled="item.props?.disabled">
             <template v-if="item.raw.isCustom" #append>
               <v-btn
                 :icon="mdiDelete"
@@ -383,7 +416,13 @@ onUnmounted(() => {
         </template>
       </v-select>
 
-      <v-btn variant="tonal" color="secondary" :prepend-icon="mdiRobotOutline" @click="urdfDialogOpen = true">
+      <v-btn
+        variant="tonal"
+        color="secondary"
+        :prepend-icon="mdiRobotOutline"
+        :disabled="motion.motionKind === 'quadruped'"
+        @click="urdfDialogOpen = true"
+      >
         {{ t('importUrdf') }}
       </v-btn>
 

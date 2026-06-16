@@ -18,6 +18,11 @@ import {
 } from '@/lib/mujoco/customRobot';
 import { runRetarget } from '@/lib/retarget/runner';
 import { findMissingBodies } from '@/lib/bvh/lafan1';
+import {
+  defaultRobotIdForKind,
+  motionMatchesRobot,
+} from '@/lib/motionKind';
+import type { RobotManifestEntry } from '@/lib/mujoco/runtime';
 import { useMotionStore } from './motion';
 
 export type RetargetStatus = 'idle' | 'loading-robot' | 'running' | 'done' | 'error';
@@ -79,6 +84,30 @@ export const useRetargetStore = defineStore('retarget', {
       this.result = null;
       this.status = 'idle';
       this.errorMessage = null;
+    },
+    /** Pick a built-in robot compatible with the loaded motion (humanoid vs quadruped). */
+    syncRobotToMotion(manifest: RobotManifestEntry[]) {
+      const motion = useMotionStore();
+      const kind = motion.motionKind;
+      if (!kind) return false;
+
+      if (this.robotId === CUSTOM_ROBOT_ID) {
+        if (kind === 'quadruped') {
+          this.setRobot(defaultRobotIdForKind(kind));
+          return true;
+        }
+        return false;
+      }
+
+      const entry = manifest.find((m) => m.id === this.robotId);
+      if (entry && motionMatchesRobot(kind, entry.configKey)) return false;
+
+      const fallback =
+        manifest.find((m) => motionMatchesRobot(kind, m.configKey)) ??
+        manifest.find((m) => m.id === defaultRobotIdForKind(kind));
+      if (!fallback || fallback.id === this.robotId) return false;
+      this.setRobot(fallback.id);
+      return true;
     },
     async importCustomRobot(file: File) {
       const bundle = await parseCustomRobotImport(file);

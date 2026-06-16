@@ -8,6 +8,7 @@ import { useMotionStore } from '@/stores/motion';
 import { usePlayback } from '@/composables/usePlayback';
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { QUADRUPED_ENABLED } from '@/lib/features';
+import { isMotionKindDisabled, type MotionKind } from '@/lib/motionKind';
 import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
 import { followOrbitCamera, motionRootAnchor } from '@/lib/viewport/sceneAlignment';
 import { resolveMotionRootJoint } from '@/lib/bvh/parse';
@@ -32,21 +33,27 @@ const loadErrorSnack = ref(false);
 const panelOpen = ref(false);
 const videoDialogOpen = ref(false);
 
-const samples = [
-  { title: 'Walk 行走 (LAFAN1)', file: 'walk.bvh' },
-  { title: 'Run 跑步 (LAFAN1)', file: 'run.bvh' },
-  { title: 'Dance 舞蹈 (LAFAN1)', file: 'dance.bvh' },
-  { title: 'Fall & get up 倒地起身 (LAFAN1)', file: 'fall_getup.bvh' },
-  { title: 'Jumps 跳跃 (LAFAN1)', file: 'jumps.bvh' },
+const samples: { title: string; file: string; kind: MotionKind }[] = [
+  { title: 'Walk 行走 (LAFAN1)', file: 'walk.bvh', kind: 'humanoid' },
+  { title: 'Run 跑步 (LAFAN1)', file: 'run.bvh', kind: 'humanoid' },
+  { title: 'Dance 舞蹈 (LAFAN1)', file: 'dance.bvh', kind: 'humanoid' },
+  { title: 'Fall & get up 倒地起身 (LAFAN1)', file: 'fall_getup.bvh', kind: 'humanoid' },
+  { title: 'Jumps 跳跃 (LAFAN1)', file: 'jumps.bvh', kind: 'humanoid' },
   ...(QUADRUPED_ENABLED
     ? [
-        { title: 'Dog walk 狗·行走 (Quadruped)', file: 'dog_walk.bvh' },
-        { title: 'Dog run 狗·奔跑 (Quadruped)', file: 'dog_run.bvh' },
-        { title: 'Dog idle 狗·站立 (Quadruped)', file: 'dog_idle.bvh' },
+        { title: 'Dog walk 狗·行走 (Quadruped)', file: 'dog_walk.bvh', kind: 'quadruped' as const },
+        { title: 'Dog run 狗·奔跑 (Quadruped)', file: 'dog_run.bvh', kind: 'quadruped' as const },
+        { title: 'Dog idle 狗·站立 (Quadruped)', file: 'dog_idle.bvh', kind: 'quadruped' as const },
       ]
     : []),
 ];
 const sampleLoading = ref(false);
+
+function isSampleDisabled(kind: MotionKind): boolean {
+  return isMotionKindDisabled(motion.motionKind, kind);
+}
+
+const videoToBvhDisabled = computed(() => motion.motionKind === 'quadruped');
 
 const selectedInfo = computed(() => {
   if (selectedJoint.value === null || !motion.anim) return null;
@@ -173,11 +180,23 @@ onUnmounted(() => {
           </v-btn>
         </template>
         <v-list density="compact" class="sample-menu-list">
-          <v-list-item v-for="s in samples" :key="s.file" :title="s.title" @click="loadSample(s.file)" />
+          <v-list-item
+            v-for="s in samples"
+            :key="s.file"
+            :title="s.title"
+            :disabled="isSampleDisabled(s.kind)"
+            @click="!isSampleDisabled(s.kind) && loadSample(s.file)"
+          />
         </v-list>
       </v-menu>
 
-      <v-btn variant="tonal" :prepend-icon="mdiVideoOutline" block @click="videoDialogOpen = true">
+      <v-btn
+        variant="tonal"
+        :prepend-icon="mdiVideoOutline"
+        block
+        :disabled="videoToBvhDisabled"
+        @click="videoDialogOpen = true"
+      >
         {{ t('videoToBvh') }}
       </v-btn>
 
