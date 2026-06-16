@@ -534,11 +534,12 @@ onUnmounted(() => {
             class="run-retarget-btn"
             color="primary"
             variant="elevated"
-            size="x-large"
+            size="large"
+            rounded="lg"
             :prepend-icon="mdiPlayCircle"
             :disabled="!motion.hasMotion"
             block
-            elevation="4"
+            elevation="6"
             @click="run"
           >
             {{ t('runRetarget') }}
@@ -734,9 +735,15 @@ onUnmounted(() => {
   padding-top: 12px;
 }
 .run-retarget-btn {
-  min-height: 52px;
-  font-size: 1.05rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  min-height: 56px;
+  padding-top: 14px;
+  padding-bottom: 14px;
+  box-shadow: 0 4px 18px rgba(79, 195, 247, 0.35);
+}
+.run-retarget-btn:not(:disabled):hover {
+  box-shadow: 0 6px 22px rgba(79, 195, 247, 0.48);
+}
+.run-retarget-btn :deep(.v-btn__prepend .v-icon) {
+  font-size: 1.5rem;
 }
 </style>
