@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
 import * as THREE from 'three';
-import { mdiFolderOpen, mdiRun, mdiTune, mdiVideoOutline } from '@mdi/js';
+import { mdiCubeOutline, mdiFolderOpen, mdiRun, mdiTune, mdiVideoOutline } from '@mdi/js';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
@@ -16,6 +16,7 @@ import PlaybackBar from '@/components/PlaybackBar.vue';
 import JointTreePanel from '@/components/JointTreePanel.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import VideoToBvhDialog from '@/components/VideoToBvhDialog.vue';
+import SmplxImportDialog from '@/components/SmplxImportDialog.vue';
 
 const { t } = useI18n();
 const { mdAndUp } = useDisplay();
@@ -31,6 +32,7 @@ const selectedJoint = ref<number | null>(null);
 const loadErrorSnack = ref(false);
 const panelOpen = ref(false);
 const videoDialogOpen = ref(false);
+const smplxDialogOpen = ref(false);
 const sampleMenuOpen = ref(false);
 
 const HUMANOID_SAMPLES = [
@@ -75,6 +77,14 @@ function onFileChosen(e: Event) {
 function loadText(text: string, name: string) {
   try {
     motion.loadBvhText(text, name);
+  } catch {
+    loadErrorSnack.value = true;
+  }
+}
+
+function onSmplxLoaded(model: Uint8Array, motionNpz: Uint8Array, name: string) {
+  try {
+    motion.loadSmplx(model, motionNpz, name);
   } catch {
     loadErrorSnack.value = true;
   }
@@ -205,6 +215,10 @@ onUnmounted(() => {
         {{ t('videoToBvh') }}
       </v-btn>
 
+      <v-btn variant="tonal" :prepend-icon="mdiCubeOutline" block @click="smplxDialogOpen = true">
+        {{ t('smplxImport') }}
+      </v-btn>
+
       <v-card v-if="motion.hasMotion" variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('motionInfo') }}</v-card-title>
         <v-card-text class="text-body-2">
@@ -262,6 +276,7 @@ onUnmounted(() => {
     />
 
     <VideoToBvhDialog v-model="videoDialogOpen" @generated="loadText" />
+    <SmplxImportDialog v-model="smplxDialogOpen" @loaded="onSmplxLoaded" />
 
     <v-snackbar v-model="loadErrorSnack" color="error" timeout="5000">
       {{ motion.loadError ?? 'Failed to load BVH' }}

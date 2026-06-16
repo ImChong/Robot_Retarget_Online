@@ -25,7 +25,6 @@ import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonVie
 import {
   alignRobotRoot,
   alignSkeletonToRobot,
-  jointIndexByName,
   VIEWPORT_ANCHOR,
 } from '@/lib/viewport/sceneAlignment';
 import MappingTable from '@/components/MappingTable.vue';
@@ -231,7 +230,10 @@ function rebuildSkeleton() {
       VIEWPORT_ANCHOR,
     );
   } else {
-    sk.lockJointToWorld(jointIndexByName(motion.anim, store.config.human_root_name), VIEWPORT_ANCHOR);
+    // Fall back to the root joint (index 0) if the config root name is briefly
+    // out of sync with the loaded motion (e.g. SMPL-X `pelvis` vs a stale `Hips`).
+    const named = motion.anim.joints.findIndex((j) => j.name === store.config.human_root_name);
+    sk.lockJointToWorld(named >= 0 ? named : 0, VIEWPORT_ANCHOR);
   }
   refreshLines();
 }
