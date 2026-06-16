@@ -206,6 +206,7 @@ onUnmounted(() => {
       <v-btn variant="tonal" :prepend-icon="mdiVideoOutline" block @click="videoDialogOpen = true">
         {{ t('videoToBvh') }}
       </v-btn>
+      <p class="text-caption text-medium-emphasis text-center video-btn-hint">{{ t('videoHumanoidOnlyShort') }}</p>
 
       <v-card v-if="motion.hasMotion" variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('motionInfo') }}</v-card-title>
@@ -326,6 +327,10 @@ onUnmounted(() => {
   top: 12px;
   left: 12px;
   z-index: 4;
+}
+.video-btn-hint {
+  line-height: 1.35;
+  margin: 4px 4px 0;
 }
 </style>
 

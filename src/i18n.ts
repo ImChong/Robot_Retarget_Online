@@ -40,6 +40,14 @@ const messages: Record<string, { zh: string; en: string }> = {
     zh: '在浏览器内用 MediaPipe 姿态估计从单人视频提取动作，生成 LAFAN1 兼容的 BVH，可直接预览与重定向。',
     en: 'Extracts motion from a single-person video using in-browser MediaPipe pose estimation and produces a LAFAN1-compatible BVH ready for preview and retargeting.',
   },
+  videoHumanoidOnly: {
+    zh: '当前仅支持从单人视频生成双足人形动作（LAFAN1 骨架），不支持四足动物。',
+    en: 'Humanoid (LAFAN1) motion only — single-person video; quadruped / animal skeletons are not supported.',
+  },
+  videoHumanoidOnlyShort: {
+    zh: '仅双足人形；不支持四足',
+    en: 'Humanoid only — not quadruped',
+  },
   selectVideo: { zh: '选择视频', en: 'Select video' },
   videoDropTitle: { zh: '拖拽视频到此处', en: 'Drop a video here' },
   videoDropHint: {

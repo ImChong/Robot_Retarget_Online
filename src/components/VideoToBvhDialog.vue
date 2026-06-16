@@ -122,6 +122,9 @@ function cancel() {
 
       <v-card-text class="pb-2">
         <p class="text-body-2 text-medium-emphasis mb-3">{{ t('videoToBvhHint') }}</p>
+        <v-alert type="info" density="compact" variant="tonal" class="mb-3 text-body-2">
+          {{ t('videoHumanoidOnly') }}
+        </v-alert>
 
         <!-- Drop / pick zone -->
         <div
