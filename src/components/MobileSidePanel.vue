@@ -22,7 +22,7 @@ watch(mdAndUp, (up) => {
     width="320"
     class="side-drawer"
   >
-    <div class="pa-3 d-flex flex-column ga-3">
+    <div class="pa-3 d-flex flex-column ga-3 side-drawer-inner">
       <slot />
     </div>
   </v-navigation-drawer>
@@ -33,6 +33,8 @@ watch(mdAndUp, (up) => {
   width: 300px;
   min-width: 300px;
   flex-shrink: 0;
+  height: 100%;
+  min-height: 0;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   overflow-y: auto;
 }
@@ -43,5 +45,8 @@ watch(mdAndUp, (up) => {
 }
 .side-drawer :deep(.v-navigation-drawer__content) {
   overflow-y: auto;
+}
+.side-drawer-inner {
+  min-height: 100%;
 }
 </style>

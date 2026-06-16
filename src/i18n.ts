@@ -146,6 +146,7 @@ const messages: Record<string, { zh: string; en: string }> = {
   solveTime: { zh: '求解耗时', en: 'Solve time' },
   procSpeed: { zh: '处理速度', en: 'Speed' },
   statsTitle: { zh: '统计', en: 'Stats' },
+  historyRetarget: { zh: '历史重定向', en: 'Retarget history' },
   notRun: { zh: '尚未运行重定向', en: 'Retargeting has not been run yet' },
   missingJoints: {
     zh: 'BVH 缺少所需关节（需要 LAFAN1 命名）',

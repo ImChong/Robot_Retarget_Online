@@ -93,6 +93,18 @@ export interface RetargetResult {
   elapsedMs: number;
 }
 
+/** One completed retarget run kept in the in-memory session history (lost on refresh). */
+export interface RetargetHistoryEntry {
+  id: string;
+  /** Source BVH file name at run time. */
+  bvhName: string;
+  robotId: string;
+  /** URDF / model file label shown in the history dropdown. */
+  robotLabel: string;
+  engine: RetargetEngineId;
+  result: RetargetResult;
+}
+
 /**
  * Common contract every retargeting engine implements so GMR and OmniRetarget
  * are interchangeable behind the runner / store / UI (the `RetargetEngine`

@@ -5,10 +5,11 @@ import {
   DEFAULT_SOLVER_OPTIONS,
   type GmrIkConfig,
   type RetargetEngineId,
+  type RetargetHistoryEntry,
   type RetargetResult,
   type SolverOptions,
 } from '@/lib/retarget/types';
-import { loadRobot, type RobotModel } from '@/lib/mujoco/runtime';
+import { getRobotManifest, loadRobot, type RobotModel } from '@/lib/mujoco/runtime';
 import {
   CUSTOM_ROBOT_ID,
   clearCustomRobotCache,
@@ -36,7 +37,8 @@ interface RetargetState {
   status: RetargetStatus;
   robotLoadProgress: { done: number; total: number };
   runProgress: { done: number; total: number };
-  result: RetargetResult | null;
+  resultHistory: RetargetHistoryEntry[];
+  activeHistoryId: string | null;
   errorMessage: string | null;
   abortController: AbortController | null;
 }
@@ -51,7 +53,8 @@ export const useRetargetStore = defineStore('retarget', {
     status: 'idle',
     robotLoadProgress: { done: 0, total: 1 },
     runProgress: { done: 0, total: 1 },
-    result: null,
+    resultHistory: [],
+    activeHistoryId: null,
     errorMessage: null,
     abortController: null,
   }),
@@ -62,13 +65,20 @@ export const useRetargetStore = defineStore('retarget', {
       s.robotId === CUSTOM_ROBOT_ID && s.customRobot
         ? `${s.customRobot.label} (custom)`
         : s.robotId,
+    result: (s): RetargetResult | null => {
+      if (!s.activeHistoryId) return null;
+      return s.resultHistory.find((e) => e.id === s.activeHistoryId)?.result ?? null;
+    },
+    activeHistoryEntry: (s): RetargetHistoryEntry | null => {
+      if (!s.activeHistoryId) return null;
+      return s.resultHistory.find((e) => e.id === s.activeHistoryId) ?? null;
+    },
+    hasHistory: (s) => s.resultHistory.length > 0,
   },
   actions: {
     setEngine(engine: RetargetEngineId) {
       if (engine === this.engine) return;
       this.engine = engine;
-      // Results are engine-specific; clear so the user re-runs with the new one.
-      this.result = null;
       if (this.status === 'done' || this.status === 'error') this.status = 'idle';
       this.errorMessage = null;
     },
@@ -81,7 +91,6 @@ export const useRetargetStore = defineStore('retarget', {
       } else {
         this.config = getDefaultConfig(robotId);
       }
-      this.result = null;
       this.status = 'idle';
       this.errorMessage = null;
     },
@@ -114,7 +123,6 @@ export const useRetargetStore = defineStore('retarget', {
       clearCustomRobotCache();
       this.customRobot = bundle;
       this.robotId = CUSTOM_ROBOT_ID;
-      this.result = null;
       this.status = 'idle';
       this.errorMessage = null;
 
@@ -130,7 +138,6 @@ export const useRetargetStore = defineStore('retarget', {
         this.robotId = fallbackRobotId;
         this.config = getDefaultConfig(fallbackRobotId);
       }
-      this.result = null;
       this.status = 'idle';
       this.errorMessage = null;
       return wasSelected;
@@ -172,6 +179,25 @@ export const useRetargetStore = defineStore('retarget', {
     cancel() {
       this.abortController?.abort();
     },
+    selectHistory(id: string) {
+      if (this.resultHistory.some((e) => e.id === id)) this.activeHistoryId = id;
+    },
+    async resolveRobotLabel(robotId?: string): Promise<string> {
+      const id = robotId ?? this.robotId;
+      if (id === CUSTOM_ROBOT_ID) {
+        return this.customRobot?.label ?? CUSTOM_ROBOT_ID;
+      }
+      const manifest = await getRobotManifest().catch(() => []);
+      const entry = manifest.find((m) => m.id === id);
+      return entry?.xml ?? id;
+    },
+    async loadRobotForHistory(entry: RetargetHistoryEntry): Promise<RobotModel> {
+      if (entry.robotId === CUSTOM_ROBOT_ID) {
+        if (!this.customRobot) throw new Error('Custom robot no longer available');
+        return loadCustomRobot(this.customRobot);
+      }
+      return loadRobot(entry.robotId);
+    },
     async run() {
       const motion = useMotionStore();
       if (!motion.lafan) {
@@ -209,7 +235,17 @@ export const useRetargetStore = defineStore('retarget', {
             this.runProgress = { done, total };
           },
         });
-        this.result = markRaw(result);
+        const robotLabel = await this.resolveRobotLabel();
+        const entry: RetargetHistoryEntry = {
+          id: crypto.randomUUID(),
+          bvhName: motion.fileName ?? 'motion.bvh',
+          robotId: this.robotId,
+          robotLabel,
+          engine: this.engine,
+          result: markRaw(result),
+        };
+        this.resultHistory.unshift(entry);
+        this.activeHistoryId = entry.id;
         this.status = 'done';
         this.errorMessage = null;
       } catch (err) {
@@ -227,4 +263,4 @@ export const useRetargetStore = defineStore('retarget', {
 });
 
 export { CUSTOM_ROBOT_ID };
-export type { RetargetEngineId };
+export type { RetargetEngineId, RetargetHistoryEntry };

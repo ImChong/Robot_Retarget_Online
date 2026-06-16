@@ -1,7 +1,17 @@
 <script setup lang="ts">
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
 import * as THREE from 'three';
-import { mdiDownload, mdiUpload, mdiBackupRestore, mdiTune, mdiRobotOutline, mdiDelete } from '@mdi/js';
+import {
+  mdiDownload,
+  mdiUpload,
+  mdiBackupRestore,
+  mdiTune,
+  mdiRobotOutline,
+  mdiDelete,
+  mdiPlayCircle,
+  mdiStopCircle,
+} from '@mdi/js';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
@@ -26,8 +36,18 @@ import { downloadBlob } from '@/lib/export/motion';
 
 const { t } = useI18n();
 const { mdAndUp } = useDisplay();
+const router = useRouter();
 const motion = useMotionStore();
 const store = useRetargetStore();
+
+const progressPct = computed(() =>
+  store.runProgress.total > 0 ? (100 * store.runProgress.done) / store.runProgress.total : 0,
+);
+
+async function run() {
+  await store.run();
+  if (store.status === 'done') await router.push({ name: 'preview' });
+}
 
 const viewportEl = ref<HTMLElement | null>(null);
 const sceneManager = shallowRef<SceneManager | null>(null);
@@ -385,9 +405,11 @@ onUnmounted(() => {
     <CustomUrdfImportDialog v-model="urdfDialogOpen" @imported="onCustomUrdfImported" />
 
     <MobileSidePanel v-model="panelOpen">
-      <div v-if="!motion.hasMotion" class="text-caption text-warning text-center">{{ t('noMotionHint') }}</div>
+      <div class="sidebar-inner d-flex flex-column">
+        <div class="sidebar-body d-flex flex-column ga-3">
+          <div v-if="!motion.hasMotion" class="text-caption text-warning text-center">{{ t('noMotionHint') }}</div>
 
-      <v-select
+          <v-select
         :model-value="store.robotId"
         :items="robotItems"
         item-title="title"
@@ -426,9 +448,9 @@ onUnmounted(() => {
         {{ t('importUrdf') }}
       </v-btn>
 
-      <EngineToggle />
+          <EngineToggle :disabled="store.isBusy" />
 
-      <v-card variant="tonal" density="compact">
+          <v-card variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('globalParams') }}</v-card-title>
         <v-card-text class="d-flex flex-column ga-2">
           <v-text-field
@@ -502,8 +524,43 @@ onUnmounted(() => {
 
       <div class="text-caption text-medium-emphasis">{{ t('configHint') }}</div>
 
-      <v-switch v-model="showHuman" :label="t('showHuman')" color="primary" density="compact" hide-details />
-      <v-switch v-model="showLines" :label="t('showLines')" color="primary" density="compact" hide-details />
+          <v-switch v-model="showHuman" :label="t('showHuman')" color="primary" density="compact" hide-details />
+          <v-switch v-model="showLines" :label="t('showLines')" color="primary" density="compact" hide-details />
+        </div>
+
+        <div class="sidebar-footer d-flex flex-column ga-2 pt-3 mt-auto">
+          <v-btn
+            v-if="!store.isBusy"
+            color="primary"
+            size="large"
+            :prepend-icon="mdiPlayCircle"
+            :disabled="!motion.hasMotion"
+            block
+            @click="run"
+          >
+            {{ t('runRetarget') }}
+          </v-btn>
+          <v-btn v-else color="error" variant="tonal" :prepend-icon="mdiStopCircle" block @click="store.cancel()">
+            {{ t('cancel') }}
+          </v-btn>
+
+          <div v-if="store.status === 'loading-robot'" class="text-caption">
+            {{ t('loadingRobot') }} {{ store.robotLoadProgress.done }}/{{ store.robotLoadProgress.total }}
+          </div>
+
+          <template v-if="store.status === 'running'">
+            <v-progress-linear :model-value="progressPct" color="primary" height="18" rounded>
+              <span class="text-caption">
+                {{ t('retargeting') }} {{ store.runProgress.done }}/{{ store.runProgress.total }}
+              </span>
+            </v-progress-linear>
+          </template>
+
+          <v-alert v-if="store.status === 'error'" type="error" density="compact" variant="tonal">
+            {{ store.errorMessage }}
+          </v-alert>
+        </div>
+      </div>
     </MobileSidePanel>
 
     <div class="main-col d-flex flex-column flex-grow-1">
@@ -665,5 +722,12 @@ onUnmounted(() => {
   top: 12px;
   left: 12px;
   z-index: 4;
+}
+.sidebar-inner {
+  min-height: 100%;
+}
+.sidebar-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 12px;
 }
 </style>

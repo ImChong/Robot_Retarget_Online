@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import * as THREE from 'three';
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
-import { mdiPlayCircle, mdiStopCircle, mdiDownload, mdiTune } from '@mdi/js';
+import { mdiDownload, mdiTune } from '@mdi/js';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore } from '@/stores/retarget';
+import type { RetargetHistoryEntry } from '@/lib/retarget/types';
 import type { RobotModel } from '@/lib/mujoco/runtime';
 import { buildRobotScene, type RobotSceneObject } from '@/lib/mujoco/threeScene';
 import { SceneManager } from '@/lib/viewport/SceneManager';
@@ -14,7 +15,6 @@ import { usePlayback } from '@/composables/usePlayback';
 import PlaybackBar from '@/components/PlaybackBar.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import MetricsPanel from '@/components/MetricsPanel.vue';
-import EngineToggle from '@/components/EngineToggle.vue';
 import { blendQpos } from '@/lib/viewport/poseBlend';
 import { exportCsv, exportJson, exportNpz, downloadBlob } from '@/lib/export/motion';
 
@@ -34,10 +34,6 @@ const followCamera = ref(true);
 const panelOpen = ref(false);
 const currentFrame = computed(() => playback.frameIndex.value);
 
-const progressPct = computed(() =>
-  store.runProgress.total > 0 ? (100 * store.runProgress.done) / store.runProgress.total : 0,
-);
-
 const stats = computed(() => {
   const r = store.result;
   if (!r) return null;
@@ -48,17 +44,30 @@ const stats = computed(() => {
   };
 });
 
-async function run() {
-  await store.run();
-  if (store.status === 'done') await setupResultScene();
+const historyItems = computed(() =>
+  store.resultHistory.map((entry) => ({
+    title: formatHistoryLabel(entry),
+    value: entry.id,
+  })),
+);
+
+function formatHistoryLabel(entry: RetargetHistoryEntry): string {
+  const bvh = entry.bvhName.replace(/\.bvh$/i, '');
+  const engine = entry.engine === 'omniretarget' ? t('engineOmni') : t('engineGmr');
+  return `${bvh} · ${entry.robotLabel} · ${engine}`;
+}
+
+function onHistorySelect(id: unknown) {
+  if (typeof id === 'string') store.selectHistory(id);
 }
 
 async function setupResultScene() {
   const sm = sceneManager.value;
-  const result = store.result;
-  if (!sm || !result) return;
+  const entry = store.activeHistoryEntry;
+  const result = entry?.result;
+  if (!sm || !entry || !result) return;
 
-  const robot = await store.ensureRobot();
+  const robot = await store.loadRobotForHistory(entry);
   robotModel.value = robot;
 
   robotScene.value?.dispose();
@@ -131,9 +140,10 @@ function applyFrame(f: number) {
 }
 
 function onExport(kind: 'npz' | 'csv' | 'json') {
-  const result = store.result;
-  if (!result) return;
-  const base = (motion.fileName ?? 'motion').replace(/\.bvh$/i, '');
+  const entry = store.activeHistoryEntry;
+  const result = entry?.result;
+  if (!entry || !result) return;
+  const base = entry.bvhName.replace(/\.bvh$/i, '');
   const name = `${base}_${result.robotId}_${result.engine}`;
   if (kind === 'npz') downloadBlob(exportNpz(result), `${name}.npz`);
   else if (kind === 'csv') downloadBlob(exportCsv(result), `${name}.csv`);
@@ -143,6 +153,12 @@ function onExport(kind: 'npz' | 'csv' | 'json') {
 watch(showGhost, (v) => {
   if (ghost.value) ghost.value.root.visible = v;
 });
+watch(
+  () => store.activeHistoryId,
+  (id) => {
+    if (id) setupResultScene();
+  },
+);
 watch(mdAndUp, () => sceneManager.value?.resize());
 watch(panelOpen, () => nextTick(() => sceneManager.value?.resize()));
 
@@ -179,45 +195,23 @@ onUnmounted(() => {
 <template>
   <div class="page-root d-flex">
     <MobileSidePanel v-model="panelOpen">
+      <v-select
+        v-if="store.hasHistory"
+        :model-value="store.activeHistoryId"
+        :items="historyItems"
+        :label="t('historyRetarget')"
+        density="compact"
+        hide-details
+        @update:model-value="onHistorySelect"
+      />
+
       <div v-if="!motion.hasMotion" class="text-caption text-warning text-center">{{ t('noMotionHint') }}</div>
-
-      <EngineToggle :disabled="store.isBusy" />
-
-      <v-btn
-        v-if="!store.isBusy"
-        color="primary"
-        size="large"
-        :prepend-icon="mdiPlayCircle"
-        :disabled="!motion.hasMotion"
-        block
-        @click="run"
-      >
-        {{ t('runRetarget') }}
-      </v-btn>
-      <v-btn v-else color="error" variant="tonal" :prepend-icon="mdiStopCircle" block @click="store.cancel()">
-        {{ t('cancel') }}
-      </v-btn>
-
-      <div v-if="store.status === 'loading-robot'" class="text-caption">
-        {{ t('loadingRobot') }} {{ store.robotLoadProgress.done }}/{{ store.robotLoadProgress.total }}
-      </div>
-
-      <template v-if="store.status === 'running'">
-        <v-progress-linear :model-value="progressPct" color="primary" height="18" rounded>
-          <span class="text-caption">
-            {{ t('retargeting') }} {{ store.runProgress.done }}/{{ store.runProgress.total }}
-          </span>
-        </v-progress-linear>
-      </template>
-
-      <v-alert v-if="store.status === 'error'" type="error" density="compact" variant="tonal">
-        {{ store.errorMessage }}
-      </v-alert>
 
       <v-card v-if="stats" variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('statsTitle') }}</v-card-title>
         <v-card-text class="text-body-2">
-          <div class="info-line"><span>{{ t('robot') }}</span><b>{{ store.result?.robotId }}</b></div>
+          <div class="info-line"><span>{{ t('fileName') }}</span><b>{{ store.activeHistoryEntry?.bvhName }}</b></div>
+          <div class="info-line"><span>{{ t('robot') }}</span><b>{{ store.activeHistoryEntry?.robotLabel }}</b></div>
           <div class="info-line">
             <span>{{ t('engine') }}</span>
             <b>{{ store.result?.engine === 'omniretarget' ? t('engineOmni') : t('engineGmr') }}</b>
@@ -243,7 +237,7 @@ onUnmounted(() => {
           {{ t('exportJson') }}
         </v-btn>
       </template>
-      <div v-else-if="store.status !== 'running'" class="text-caption text-disabled mt-2">
+      <div v-else class="text-caption text-disabled mt-2">
         {{ t('notRun') }}
       </div>
     </MobileSidePanel>
