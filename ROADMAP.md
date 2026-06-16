@@ -60,12 +60,13 @@ clips (walk / run / dance / fall & get-up / jumps), per-robot regression tests.
 Robots shipped today / 当前已支持机器人 (BVH/LAFAN1, selectable in UI): `unitree_g1`,
 `unitree_g1_with_hands`, `booster_t1_29dof`, `stanford_toddy`, `fourier_n1`,
 `engineai_pm01`, `pal_talos` (+ quadrupeds `unitree_go2` / `unitree_a1` behind the
-`?quadruped=1` URL flag). A further ~11 GMR robots (`unitree_h1`, `unitree_h1_2`,
-`kuavo_s45`, `hightorque_hi`, `galaxea_r1pro`, `berkeley_humanoid_lite`,
-`booster_k1`, `pnd_adam_lite`, `tienkung`, `fourier_gr3`, `booster_t1`) ship their
-MJCF assets + a `smplx_to_*` ik_config but are `selectable: false`
-(`public/robots/assets_index.json`) — they come alive with the SMPL-X input track
-below (they have no `bvh_lafan1` config).
+`?quadruped=1` URL flag). A further 10 GMR robots (`unitree_h1`, `unitree_h1_2`,
+`kuavo_s45`, `hightorque_hi`, `berkeley_humanoid_lite`, `booster_k1`,
+`pnd_adam_lite`, `tienkung`, `fourier_gr3`, `booster_t1`) have no `bvh_lafan1`
+config — they are keyed to SMPL-X joint names and surface via the **SMPL-X input
+track** below (registered in `manifest.json` + `defaults.ts`, shown only for
+SMPL-X motion). `galaxea_r1pro` stays out: its `smplx_to_r1pro` config references
+bodies absent from the bundled MJCF.
 
 ### Near-term, still Phase 1 · 近期（仍属 Phase 1）
 
@@ -148,11 +149,13 @@ and whether we keep the pure-static deployment). 决策：**Phase 1 验收后再
 
 ---
 
-## Input formats: SMPL-X / AMASS · 输入格式：SMPL-X / AMASS  🚧 In progress / 进行中
+## Input formats: SMPL-X / AMASS · 输入格式：SMPL-X / AMASS  ✅ Shipped (parity pending) / 已交付（待对齐）
 
-GMR already supports SMPL-X (AMASS, OMOMO). Picked up as an **independent track**
-(it unlocks the ~11 staged robots above + the AMASS dataset in one shot). The
-algorithmic core is landed and tested; UI/store wiring remains. Because:
+GMR already supports SMPL-X (AMASS, OMOMO). Shipped as an **independent track**
+(it unlocks 10 of the staged robots above + the AMASS dataset in one shot):
+upload a SMPL-X model `.npz` + AMASS motion `.npz` in the BVH Viewer, the clip
+flows through the existing viewer → retarget path, and the SMPL-X robots surface
+in the dropdown. The only remaining item is a GMR parity check. Notes:
 
 GMR 本身已支持 SMPL-X（AMASS、OMOMO）。作为**独立分支**后置，因为：
 
@@ -175,14 +178,16 @@ Scope / 范围:
 - [x] **End-to-end integration** proven in Node: synthetic SMPL-X → existing
       `runRetarget` → real Unitree **H1** via the bundled `smplx_to_h1.json`
       (`tests/smplxRetarget.test.ts`). 已验证可跑通到真实机器人 H1。
-- [ ] **UI/store wiring** (needs the mandatory screenshot verification in
-      `AGENTS.md`): a SMPL-X/AMASS upload entry (model `.npz` + motion `.npz`, kept
-      in-memory, never bundled — handles the license restriction) that feeds
-      `loadSmplxMotion` into the same viewer → retarget path; advertise each
-      robot's supported source convention(s) and filter the robot dropdown by the
-      loaded motion's source so the ~11 `smplx`-config robots become selectable
-      *only* for SMPL-X input (flip `selectable`, register in `manifest.json` +
-      `defaults.ts`). 待接 UI/store（需按 AGENTS.md 做截图验证）。
+- [x] **UI/store wiring** (screenshot-verified per `AGENTS.md`): `SmplxImportDialog`
+      (model `.npz` + motion `.npz`, kept in-memory, never bundled — handles the
+      license restriction) feeds `motion.loadSmplx` → `smplxToBvh` → the same viewer
+      → retarget path. A third `smplx` motion kind (`motionKind.ts`) filters the
+      robot dropdown so the SMPL-X robots surface *only* for SMPL-X input
+      (`RetargetConfigView.vue`).
+- [x] **10 GMR SMPL-X robots registered** (`manifest.json` + `defaults.ts`): h1,
+      h1_2, t1, kuavo, hi, bhl, k1, adam, tienkung, gr3 — each verified to load +
+      retarget (`tests/smplxRetarget.test.ts`). `galaxea_r1pro` excluded (its config
+      body names don't match the bundled MJCF).
 - [ ] Parity vs Python GMR's SMPL-X path on a real body model (skipped-by-default,
       like the BVH parity test) to pin the Y-up→Z-up convention. 与 GMR SMPL-X 路径对齐。
 - [ ] BVH (Nokov / Xsens / FBX-export) dialect support as opportunistic adds.
