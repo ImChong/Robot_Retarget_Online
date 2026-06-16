@@ -7,6 +7,7 @@ import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
 import { usePlayback } from '@/composables/usePlayback';
 import { SceneManager } from '@/lib/viewport/SceneManager';
+import { QUADRUPED_ENABLED } from '@/lib/features';
 import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
 import { followOrbitCamera, jointIndexByName } from '@/lib/viewport/sceneAlignment';
 import FileDropZone from '@/components/FileDropZone.vue';
@@ -36,9 +37,13 @@ const samples = [
   { title: 'Dance 舞蹈 (LAFAN1)', file: 'dance.bvh' },
   { title: 'Fall & get up 倒地起身 (LAFAN1)', file: 'fall_getup.bvh' },
   { title: 'Jumps 跳跃 (LAFAN1)', file: 'jumps.bvh' },
-  { title: 'Dog walk 狗·行走 (Quadruped)', file: 'dog_walk.bvh' },
-  { title: 'Dog run 狗·奔跑 (Quadruped)', file: 'dog_run.bvh' },
-  { title: 'Dog idle 狗·站立 (Quadruped)', file: 'dog_idle.bvh' },
+  ...(QUADRUPED_ENABLED
+    ? [
+        { title: 'Dog walk 狗·行走 (Quadruped)', file: 'dog_walk.bvh' },
+        { title: 'Dog run 狗·奔跑 (Quadruped)', file: 'dog_run.bvh' },
+        { title: 'Dog idle 狗·站立 (Quadruped)', file: 'dog_idle.bvh' },
+      ]
+    : []),
 ];
 const sampleLoading = ref(false);
 
