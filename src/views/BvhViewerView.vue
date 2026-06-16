@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
-import { storeToRefs } from 'pinia';
 import * as THREE from 'three';
 import { mdiFolderOpen, mdiRun, mdiTune, mdiVideoOutline } from '@mdi/js';
 import { useDisplay } from 'vuetify';
@@ -9,7 +8,6 @@ import { useMotionStore } from '@/stores/motion';
 import { usePlayback } from '@/composables/usePlayback';
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { QUADRUPED_ENABLED } from '@/lib/features';
-import { isMotionKindDisabled, type MotionKind } from '@/lib/motionKind';
 import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
 import { followOrbitCamera, motionRootAnchor } from '@/lib/viewport/sceneAlignment';
 import { resolveMotionRootJoint } from '@/lib/bvh/parse';
@@ -22,7 +20,6 @@ import VideoToBvhDialog from '@/components/VideoToBvhDialog.vue';
 const { t } = useI18n();
 const { mdAndUp } = useDisplay();
 const motion = useMotionStore();
-const { motionKind } = storeToRefs(motion);
 const playback = usePlayback();
 
 const viewportEl = ref<HTMLElement | null>(null);
@@ -36,40 +33,21 @@ const panelOpen = ref(false);
 const videoDialogOpen = ref(false);
 const sampleMenuOpen = ref(false);
 
-const HUMANOID_SAMPLES: { title: string; file: string; kind: MotionKind }[] = [
-  { title: 'Walk 行走 (LAFAN1)', file: 'walk.bvh', kind: 'humanoid' },
-  { title: 'Run 跑步 (LAFAN1)', file: 'run.bvh', kind: 'humanoid' },
-  { title: 'Dance 舞蹈 (LAFAN1)', file: 'dance.bvh', kind: 'humanoid' },
-  { title: 'Fall & get up 倒地起身 (LAFAN1)', file: 'fall_getup.bvh', kind: 'humanoid' },
-  { title: 'Jumps 跳跃 (LAFAN1)', file: 'jumps.bvh', kind: 'humanoid' },
-];
+const HUMANOID_SAMPLES = [
+  { title: 'Walk 行走 (LAFAN1)', file: 'walk.bvh' },
+  { title: 'Run 跑步 (LAFAN1)', file: 'run.bvh' },
+  { title: 'Dance 舞蹈 (LAFAN1)', file: 'dance.bvh' },
+  { title: 'Fall & get up 倒地起身 (LAFAN1)', file: 'fall_getup.bvh' },
+  { title: 'Jumps 跳跃 (LAFAN1)', file: 'jumps.bvh' },
+] as const;
 
-const QUADRUPED_SAMPLES: { title: string; file: string; kind: MotionKind }[] = [
-  { title: 'Dog walk 狗·行走 (Quadruped)', file: 'dog_walk.bvh', kind: 'quadruped' },
-  { title: 'Dog run 狗·奔跑 (Quadruped)', file: 'dog_run.bvh', kind: 'quadruped' },
-  { title: 'Dog idle 狗·站立 (Quadruped)', file: 'dog_idle.bvh', kind: 'quadruped' },
-];
-
-type SampleEntry = { title: string; file: string; kind: MotionKind; disabled: boolean };
-
-const sampleMenuItems = computed((): SampleEntry[] => {
-  const active = motionKind.value;
-  const all = [
-    ...HUMANOID_SAMPLES,
-    ...(QUADRUPED_ENABLED ? QUADRUPED_SAMPLES : []),
-  ];
-  return all.map((s) => ({
-    ...s,
-    disabled: isMotionKindDisabled(active, s.kind),
-  }));
-});
-
-/** Force v-menu list to remount when the active motion family changes. */
-const sampleMenuKey = computed(() => motionKind.value ?? 'none');
+const QUADRUPED_SAMPLES = [
+  { title: 'Dog walk 狗·行走 (Quadruped)', file: 'dog_walk.bvh' },
+  { title: 'Dog run 狗·奔跑 (Quadruped)', file: 'dog_run.bvh' },
+  { title: 'Dog idle 狗·站立 (Quadruped)', file: 'dog_idle.bvh' },
+] as const;
 
 const sampleLoading = ref(false);
-
-const videoToBvhDisabled = computed(() => motionKind.value === 'quadruped');
 
 const selectedInfo = computed(() => {
   if (selectedJoint.value === null || !motion.anim) return null;
@@ -103,8 +81,6 @@ function loadText(text: string, name: string) {
 }
 
 async function loadSample(file: string) {
-  const entry = sampleMenuItems.value.find((s) => s.file === file);
-  if (entry?.disabled) return;
   sampleMenuOpen.value = false;
   sampleLoading.value = true;
   try {
@@ -199,47 +175,35 @@ onUnmounted(() => {
             {{ t('loadSample') }}
           </v-btn>
         </template>
-        <v-list :key="sampleMenuKey" density="compact" class="sample-menu-list">
+        <v-list density="compact" class="sample-menu-list">
           <template v-if="QUADRUPED_ENABLED">
             <v-list-subheader class="sample-group-header">{{ t('sampleHumanoid') }}</v-list-subheader>
             <v-list-item
-              v-for="s in sampleMenuItems.filter((x) => x.kind === 'humanoid')"
+              v-for="s in HUMANOID_SAMPLES"
               :key="s.file"
               :title="s.title"
-              :disabled="s.disabled"
-              :class="{ 'sample-item--blocked': s.disabled }"
               @click="loadSample(s.file)"
             />
             <v-list-subheader class="sample-group-header">{{ t('sampleQuadruped') }}</v-list-subheader>
             <v-list-item
-              v-for="s in sampleMenuItems.filter((x) => x.kind === 'quadruped')"
+              v-for="s in QUADRUPED_SAMPLES"
               :key="s.file"
               :title="s.title"
-              :disabled="s.disabled"
-              :class="{ 'sample-item--blocked': s.disabled }"
               @click="loadSample(s.file)"
             />
           </template>
           <template v-else>
             <v-list-item
-              v-for="s in sampleMenuItems"
+              v-for="s in HUMANOID_SAMPLES"
               :key="s.file"
               :title="s.title"
-              :disabled="s.disabled"
-              :class="{ 'sample-item--blocked': s.disabled }"
               @click="loadSample(s.file)"
             />
           </template>
         </v-list>
       </v-menu>
 
-      <v-btn
-        variant="tonal"
-        :prepend-icon="mdiVideoOutline"
-        block
-        :disabled="videoToBvhDisabled"
-        @click="videoDialogOpen = true"
-      >
+      <v-btn variant="tonal" :prepend-icon="mdiVideoOutline" block @click="videoDialogOpen = true">
         {{ t('videoToBvh') }}
       </v-btn>
 
@@ -377,9 +341,5 @@ onUnmounted(() => {
   font-size: 0.75rem;
   line-height: 1.2;
   min-height: 32px;
-}
-.sample-menu-list .sample-item--blocked {
-  opacity: 0.38;
-  pointer-events: none;
 }
 </style>
