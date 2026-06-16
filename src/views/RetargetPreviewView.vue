@@ -75,6 +75,7 @@ async function setupResultScene() {
   if (!sm || !entry || !result) return;
 
   const isNewDisplay = entry.id !== displayedHistoryId;
+  const pausedAtSetupStart = playback.userPausedPlayback.value;
 
   const robot = await store.loadRobotForHistory(entry);
   if (seq !== setupSeq) return;
@@ -95,7 +96,11 @@ async function setupResultScene() {
   if (isNewDisplay) {
     playback.setMotion(result.frameCount, result.fps);
     displayedHistoryId = entry.id;
-    if (store.consumePendingAutoplay(entry.id) && !playback.userPausedPlayback.value) {
+    store.consumePendingAutoplay(entry.id);
+    // Autoplay new results and history switches; only skip if the user paused
+    // while this scene was loading (not a pause carried over from before).
+    const pausedDuringSetup = playback.userPausedPlayback.value && !pausedAtSetupStart;
+    if (!pausedDuringSetup) {
       playback.play();
     }
   }
