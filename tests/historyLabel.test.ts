@@ -60,7 +60,7 @@ describe('historyLabel', () => {
     expect(label).toContain('walk');
     expect(label).toContain('g1.xml');
     expect(label).toContain('GMR');
-    expect(label).toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    expect(label).toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
   });
 
   it('includes timestamp in export basenames', () => {

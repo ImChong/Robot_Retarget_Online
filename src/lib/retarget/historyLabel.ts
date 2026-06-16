@@ -19,7 +19,7 @@ export function formatRetargetFilenameStamp(ms: number): string {
 export function formatRetargetHistoryLabel(entry: RetargetHistoryEntry, engineLabel: string): string {
   const bvh = entry.bvhName.replace(/\.bvh$/i, '');
   const stamp = formatRetargetTimestamp(entry.createdAt);
-  return `${bvh} · ${entry.robotLabel} · ${engineLabel} · ${stamp}`;
+  return `${bvh} · ${stamp} · ${entry.robotLabel} · ${engineLabel}`;
 }
 
 export function formatRetargetExportBasename(entry: RetargetHistoryEntry): string {
