@@ -7,6 +7,7 @@ import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore, CUSTOM_ROBOT_ID } from '@/stores/retarget';
 import { getRobotManifest, type RobotManifestEntry, type RobotModel } from '@/lib/mujoco/runtime';
+import { QUADRUPED_ENABLED } from '@/lib/features';
 import { buildRobotScene, type RobotSceneObject } from '@/lib/mujoco/threeScene';
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
@@ -78,7 +79,9 @@ const panelOpen = ref(false);
 type RobotSelectItem = { title: string; value: string; isCustom?: boolean };
 
 const robotItems = computed((): RobotSelectItem[] => {
-  const items: RobotSelectItem[] = manifest.value.map((m) => ({ title: m.label, value: m.id }));
+  const items: RobotSelectItem[] = manifest.value
+    .filter((m) => QUADRUPED_ENABLED || m.configKey !== 'bvh_quadruped')
+    .map((m) => ({ title: m.label, value: m.id }));
   if (store.customRobot) {
     items.unshift({
       title: `${store.customRobot.label} (${t('customRobot')})`,
