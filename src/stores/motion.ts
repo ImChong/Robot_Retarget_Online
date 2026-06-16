@@ -8,6 +8,8 @@ export interface MotionState {
   fileName: string | null;
   anim: BvhAnim | null;
   lafan: Lafan1Motion | null;
+  /** Humanoid vs quadruped; set on load/clear for reliable UI reactivity. */
+  motionKind: MotionKind | null;
   /** file units -> meters */
   unitScale: number;
   skeletonSizeUnits: number;
@@ -19,6 +21,7 @@ export const useMotionStore = defineStore('motion', {
     fileName: null,
     anim: null,
     lafan: null,
+    motionKind: null,
     unitScale: 0.01,
     skeletonSizeUnits: 0,
     loadError: null,
@@ -33,8 +36,6 @@ export const useMotionStore = defineStore('motion', {
     jointNames: (s) => s.anim?.joints.map((j) => j.name) ?? [],
     /** estimated standing height in meters */
     estHeightMeters: (s) => s.skeletonSizeUnits * s.unitScale,
-    motionKind: (s): MotionKind | null =>
-      s.anim ? detectMotionKind(s.anim, s.fileName) : null,
   },
   actions: {
     loadBvhText(text: string, fileName: string) {
@@ -49,6 +50,7 @@ export const useMotionStore = defineStore('motion', {
         this.unitScale = unitScale;
         this.skeletonSizeUnits = size;
         this.fileName = fileName;
+        this.motionKind = detectMotionKind(anim, fileName);
         this.loadError = null;
       } catch (err) {
         this.loadError = err instanceof Error ? err.message : String(err);
@@ -59,6 +61,7 @@ export const useMotionStore = defineStore('motion', {
       this.anim = null;
       this.lafan = null;
       this.fileName = null;
+      this.motionKind = null;
       this.loadError = null;
     },
   },

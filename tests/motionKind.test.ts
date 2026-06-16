@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { setActivePinia, createPinia } from 'pinia';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseBvh } from '../src/lib/bvh/parse';
@@ -7,8 +8,13 @@ import {
   isMotionKindDisabled,
   motionMatchesRobot,
 } from '../src/lib/motionKind';
+import { useMotionStore } from '../src/stores/motion';
 
 const ROOT = join(import.meta.dirname, '..');
+
+beforeEach(() => {
+  setActivePinia(createPinia());
+});
 
 describe('motionKind', () => {
   it('classifies LAFAN1 and dog samples', () => {
@@ -30,5 +36,14 @@ describe('motionKind', () => {
     expect(isMotionKindDisabled('quadruped', 'humanoid')).toBe(true);
     expect(isMotionKindDisabled('quadruped', 'quadruped')).toBe(false);
     expect(isMotionKindDisabled('humanoid', 'quadruped')).toBe(true);
+  });
+
+  it('stores motionKind on load', () => {
+    const motion = useMotionStore();
+    const text = readFileSync(join(ROOT, 'public/sample_motions/dog_walk.bvh'), 'utf-8');
+    motion.loadBvhText(text, 'dog_walk.bvh');
+    expect(motion.motionKind).toBe('quadruped');
+    motion.clear();
+    expect(motion.motionKind).toBeNull();
   });
 });
