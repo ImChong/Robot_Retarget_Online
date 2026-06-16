@@ -6,6 +6,7 @@ import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore } from '@/stores/retarget';
+import type { RetargetHistoryEntry } from '@/lib/retarget/types';
 import type { RobotModel } from '@/lib/mujoco/runtime';
 import { buildRobotScene, type RobotSceneObject } from '@/lib/mujoco/threeScene';
 import { SceneManager } from '@/lib/viewport/SceneManager';
@@ -43,12 +44,30 @@ const stats = computed(() => {
   };
 });
 
+const historyItems = computed(() =>
+  store.resultHistory.map((entry) => ({
+    title: formatHistoryLabel(entry),
+    value: entry.id,
+  })),
+);
+
+function formatHistoryLabel(entry: RetargetHistoryEntry): string {
+  const bvh = entry.bvhName.replace(/\.bvh$/i, '');
+  const engine = entry.engine === 'omniretarget' ? t('engineOmni') : t('engineGmr');
+  return `${bvh} · ${entry.robotLabel} · ${engine}`;
+}
+
+function onHistorySelect(id: unknown) {
+  if (typeof id === 'string') store.selectHistory(id);
+}
+
 async function setupResultScene() {
   const sm = sceneManager.value;
-  const result = store.result;
-  if (!sm || !result) return;
+  const entry = store.activeHistoryEntry;
+  const result = entry?.result;
+  if (!sm || !entry || !result) return;
 
-  const robot = await store.ensureRobot();
+  const robot = await store.loadRobotForHistory(entry);
   robotModel.value = robot;
 
   robotScene.value?.dispose();
@@ -121,9 +140,10 @@ function applyFrame(f: number) {
 }
 
 function onExport(kind: 'npz' | 'csv' | 'json') {
-  const result = store.result;
-  if (!result) return;
-  const base = (motion.fileName ?? 'motion').replace(/\.bvh$/i, '');
+  const entry = store.activeHistoryEntry;
+  const result = entry?.result;
+  if (!entry || !result) return;
+  const base = entry.bvhName.replace(/\.bvh$/i, '');
   const name = `${base}_${result.robotId}_${result.engine}`;
   if (kind === 'npz') downloadBlob(exportNpz(result), `${name}.npz`);
   else if (kind === 'csv') downloadBlob(exportCsv(result), `${name}.csv`);
@@ -134,9 +154,9 @@ watch(showGhost, (v) => {
   if (ghost.value) ghost.value.root.visible = v;
 });
 watch(
-  () => store.result,
-  (result) => {
-    if (result) setupResultScene();
+  () => store.activeHistoryId,
+  (id) => {
+    if (id) setupResultScene();
   },
 );
 watch(mdAndUp, () => sceneManager.value?.resize());
@@ -175,12 +195,23 @@ onUnmounted(() => {
 <template>
   <div class="page-root d-flex">
     <MobileSidePanel v-model="panelOpen">
+      <v-select
+        v-if="store.hasHistory"
+        :model-value="store.activeHistoryId"
+        :items="historyItems"
+        :label="t('historyRetarget')"
+        density="compact"
+        hide-details
+        @update:model-value="onHistorySelect"
+      />
+
       <div v-if="!motion.hasMotion" class="text-caption text-warning text-center">{{ t('noMotionHint') }}</div>
 
       <v-card v-if="stats" variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('statsTitle') }}</v-card-title>
         <v-card-text class="text-body-2">
-          <div class="info-line"><span>{{ t('robot') }}</span><b>{{ store.result?.robotId }}</b></div>
+          <div class="info-line"><span>{{ t('fileName') }}</span><b>{{ store.activeHistoryEntry?.bvhName }}</b></div>
+          <div class="info-line"><span>{{ t('robot') }}</span><b>{{ store.activeHistoryEntry?.robotLabel }}</b></div>
           <div class="info-line">
             <span>{{ t('engine') }}</span>
             <b>{{ store.result?.engine === 'omniretarget' ? t('engineOmni') : t('engineGmr') }}</b>
