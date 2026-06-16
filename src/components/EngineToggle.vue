@@ -8,7 +8,7 @@ const { t } = useI18n();
 const store = useRetargetStore();
 
 const GMR_URL = 'https://github.com/YanjieZe/GMR';
-const OMNI_URL = 'https://omni-retarget.github.io/';
+const OMNI_URL = 'https://omniretarget.github.io/';
 
 function onSelect(value: unknown) {
   if (value === 'gmr' || value === 'omniretarget') {
