@@ -195,6 +195,8 @@ const messages: Record<string, { zh: string; en: string }> = {
   jointVelocityChart: { zh: '关节速度', en: 'Joint velocity' },
   selectJoints: { zh: '选择关节', en: 'Select joints' },
   selectJointsHint: { zh: '请在上方选择要显示的关节', en: 'Select joints above to display curves' },
+  selectKeypoints: { zh: '选择关键点', en: 'Select keypoints' },
+  selectKeypointsHint: { zh: '请在上方选择要显示的关键点或总误差', en: 'Select keypoints or total error above to display curves' },
   collapseMetrics: { zh: '收起数据面板', en: 'Collapse metrics panel' },
   expandMetrics: { zh: '展开数据面板', en: 'Expand metrics panel' },
   dragResizeMetrics: { zh: '上拉调整数据面板高度', en: 'Drag up to resize metrics panel' },
