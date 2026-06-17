@@ -110,6 +110,8 @@ function togglePlayback() {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding: 4px 8px 6px;
   flex-shrink: 0;
+  position: relative;
+  z-index: 3;
 }
 .playback-bar--light {
   background: rgba(255, 255, 255, 0.94);

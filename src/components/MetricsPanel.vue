@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
 import { mdiChevronDown, mdiChevronUp, mdiMagnifyRemoveOutline, mdiDragHorizontalVariant } from '@mdi/js';
 import { useI18n } from '@/i18n';
 import type { RetargetResult } from '@/lib/retarget/types';
@@ -29,7 +29,9 @@ const MIN_BODY_H = 168;
 const panelBodyH = ref(MIN_BODY_H);
 const dragging = ref(false);
 const panelRoot = ref<HTMLElement | null>(null);
+const resizeHandleEl = ref<HTMLElement | null>(null);
 const maxBodyH = ref(MIN_BODY_H * 3);
+let capturedPointerId: number | null = null;
 
 const JOINT_PREFS = [
   'left_knee',
@@ -93,11 +95,50 @@ function updateMaxHeight() {
   if (panelBodyH.value > maxBodyH.value) panelBodyH.value = maxBodyH.value;
 }
 
+function detachWindowPointerListeners() {
+  window.removeEventListener('pointerup', onWindowPointerEnd);
+  window.removeEventListener('pointercancel', onWindowPointerEnd);
+  window.removeEventListener('blur', onWindowPointerEnd);
+}
+
+function releaseCapturedPointer() {
+  const handle = resizeHandleEl.value;
+  if (!handle || capturedPointerId === null) return;
+  try {
+    if (handle.hasPointerCapture(capturedPointerId)) {
+      handle.releasePointerCapture(capturedPointerId);
+    }
+  } catch {
+    /* already released */
+  }
+  capturedPointerId = null;
+}
+
+function endResizeDrag() {
+  if (!dragging.value) return;
+  dragging.value = false;
+  releaseCapturedPointer();
+  detachWindowPointerListeners();
+}
+
+function onWindowPointerEnd() {
+  endResizeDrag();
+}
+
+function attachWindowPointerListeners() {
+  window.addEventListener('pointerup', onWindowPointerEnd);
+  window.addEventListener('pointercancel', onWindowPointerEnd);
+  window.addEventListener('blur', onWindowPointerEnd);
+}
+
 function onResizeDragStart(e: PointerEvent) {
   if (!expanded.value) return;
   dragging.value = true;
+  capturedPointerId = e.pointerId;
+  resizeHandleEl.value = e.currentTarget as HTMLElement;
   updateMaxHeight();
-  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  resizeHandleEl.value.setPointerCapture(e.pointerId);
+  attachWindowPointerListeners();
   e.preventDefault();
 }
 
@@ -112,10 +153,8 @@ function onResizeDragMove(e: PointerEvent) {
   resizeActiveChart();
 }
 
-function onResizeDragEnd(e: PointerEvent) {
-  if (!dragging.value) return;
-  dragging.value = false;
-  (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+function onResizeDragEnd() {
+  endResizeDrag();
 }
 
 let ro: ResizeObserver | null = null;
@@ -127,7 +166,13 @@ onMounted(() => {
     ro.observe(root);
   }
 });
-onUnmounted(() => ro?.disconnect());
+onDeactivated(() => {
+  endResizeDrag();
+});
+onUnmounted(() => {
+  endResizeDrag();
+  ro?.disconnect();
+});
 
 watch(panelBodyH, () => {
   emit('resize');
@@ -147,12 +192,14 @@ watch(activeTab, () => {
   <div ref="panelRoot" class="metrics-panel" :class="{ dragging }">
     <div
       v-if="expanded"
+      ref="resizeHandleEl"
       class="resize-handle d-flex align-center justify-center"
       :title="t('dragResizeMetrics')"
       @pointerdown="onResizeDragStart"
       @pointermove="onResizeDragMove"
       @pointerup="onResizeDragEnd"
       @pointercancel="onResizeDragEnd"
+      @lostpointercapture="onResizeDragEnd"
     >
       <v-icon :icon="mdiDragHorizontalVariant" size="small" class="resize-icon" />
     </div>
@@ -211,31 +258,27 @@ watch(activeTab, () => {
           <v-btn value="rad" size="small">{{ t('unitRad') }}</v-btn>
         </v-btn-toggle>
       </div>
-      <v-window v-model="activeTab" class="chart-window mt-1">
-        <v-window-item value="error">
-          <ErrorChart ref="errorChartRef" :result="result" :frame="frame" />
-        </v-window-item>
-        <v-window-item value="position">
-          <JointSeriesChart
-            ref="jointChartRef"
-            :result="result"
-            :joints="selectedJoints"
-            mode="position"
-            :unit="angleUnit"
-            :frame="frame"
-          />
-        </v-window-item>
-        <v-window-item value="velocity">
-          <JointSeriesChart
-            ref="jointChartRef"
-            :result="result"
-            :joints="selectedJoints"
-            mode="velocity"
-            :unit="angleUnit"
-            :frame="frame"
-          />
-        </v-window-item>
-      </v-window>
+      <div class="chart-window mt-1">
+        <ErrorChart v-if="activeTab === 'error'" ref="errorChartRef" :result="result" :frame="frame" />
+        <JointSeriesChart
+          v-else-if="activeTab === 'position'"
+          ref="jointChartRef"
+          :result="result"
+          :joints="selectedJoints"
+          mode="position"
+          :unit="angleUnit"
+          :frame="frame"
+        />
+        <JointSeriesChart
+          v-else
+          ref="jointChartRef"
+          :result="result"
+          :joints="selectedJoints"
+          mode="velocity"
+          :unit="angleUnit"
+          :frame="frame"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -246,6 +289,7 @@ watch(activeTab, () => {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(0, 0, 0, 0.12);
   position: relative;
+  z-index: 1;
 }
 .metrics-panel.dragging {
   user-select: none;
@@ -305,22 +349,15 @@ watch(activeTab, () => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
+  isolation: isolate;
 }
-.chart-window :deep(.v-window) {
-  flex: 1 1 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+.chart-window :deep(.chart-root),
+.chart-window :deep(.chart),
+.chart-window :deep(.js-plotly-plot) {
+  max-height: 100%;
 }
-.chart-window :deep(.v-window__container) {
-  flex: 1 1 0;
-  min-height: 0;
-  height: auto;
-}
-.chart-window :deep(.v-window-item) {
-  flex: 1 1 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+.chart-window :deep(.plot-container) {
+  overflow: hidden;
 }
 </style>

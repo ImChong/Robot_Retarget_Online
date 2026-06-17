@@ -308,6 +308,7 @@ onUnmounted(() => {
 .viewport {
   min-height: 0;
   position: relative;
+  overflow: hidden;
 }
 .info-line {
   display: flex;

@@ -37,6 +37,8 @@ watch(mdAndUp, (up) => {
   min-height: 0;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   overflow-y: auto;
+  position: relative;
+  z-index: 2;
 }
 /* Vuetify inputs default to flex: 1 1 auto and stretch in column sidebars. */
 .side-panel :deep(.v-input),
