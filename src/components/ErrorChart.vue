@@ -5,8 +5,15 @@ import type { RetargetResult } from '@/lib/retarget/types';
 import { usePlotlyChart } from '@/composables/usePlotlyChart';
 import type { Data } from 'plotly.js';
 
+/** Aggregate mean error across all keypoints (per frame). */
+export const ERROR_SERIES_MEAN = '__mean__';
+/** Aggregate max error across all keypoints (per frame). */
+export const ERROR_SERIES_MAX = '__max__';
+
 const props = defineProps<{
   result: RetargetResult;
+  /** Selected series: aggregate sentinels and/or taskNames from result.taskNames. */
+  series: string[];
   /** current playback frame to draw a cursor at */
   frame?: number;
 }>();
@@ -14,7 +21,11 @@ const props = defineProps<{
 const { t } = useI18n();
 const chartEl = ref<HTMLElement | null>(null);
 
-const series = computed(() => {
+const COLORS = ['#81c784', '#ffb74d', '#ba68c8', '#4dd0e1', '#a1887f', '#90a4ae'];
+const MEAN_COLOR = '#4fc3f7';
+const MAX_COLOR = '#ef5350';
+
+const aggregates = computed(() => {
   const { posErrors, frameCount, taskNames } = props.result;
   const nT = taskNames.length;
   const mean = new Float32Array(frameCount);
@@ -33,41 +44,55 @@ const series = computed(() => {
   return { mean, max, frameCount };
 });
 
-const stats = computed(() => {
-  const m = series.value.mean;
-  let sum = 0;
-  for (const v of m) sum += v;
-  let mxAll = 0;
-  for (const v of series.value.max) if (v > mxAll) mxAll = v;
-  return { mean: m.length ? sum / m.length : 0, maxAll: mxAll };
+const plottedSeries = computed(() => {
+  const { posErrors, frameCount, taskNames } = props.result;
+  const nT = taskNames.length;
+  const { mean, max } = aggregates.value;
+  const out: { id: string; label: string; values: Float32Array; color: string }[] = [];
+  let colorIdx = 0;
+
+  for (const id of props.series) {
+    if (id === ERROR_SERIES_MEAN) {
+      out.push({ id, label: t('meanError'), values: mean, color: MEAN_COLOR });
+      continue;
+    }
+    if (id === ERROR_SERIES_MAX) {
+      out.push({ id, label: t('maxError'), values: max, color: MAX_COLOR });
+      continue;
+    }
+    const taskIdx = taskNames.indexOf(id);
+    if (taskIdx < 0) continue;
+    const values = new Float32Array(frameCount);
+    for (let f = 0; f < frameCount; f++) {
+      values[f] = posErrors[f * nT + taskIdx];
+    }
+    out.push({
+      id,
+      label: shortName(id),
+      values,
+      color: COLORS[colorIdx++ % COLORS.length],
+    });
+  }
+  return { items: out, frameCount };
 });
 
+function shortName(name: string): string {
+  return name.replace(/_link$/, '').replace(/^left_/, 'L_').replace(/^right_/, 'R_');
+}
+
 function buildFigure() {
-  const { mean, max, frameCount } = series.value;
+  const { items, frameCount } = plottedSeries.value;
   const x = Array.from({ length: frameCount }, (_, i) => i);
-  const meanY = Array.from(mean, (v) => v * 100);
-  const maxY = Array.from(max, (v) => v * 100);
-  const data: Data[] = [
-    {
-      x,
-      y: maxY,
-      type: 'scatter',
-      mode: 'lines',
-      name: t('maxError'),
-      line: { color: '#ef5350', width: 1 },
-      opacity: 0.75,
-      hovertemplate: `${t('frame')} %{x}<br>${t('maxError')}: %{y:.2f} cm<extra></extra>`,
-    },
-    {
-      x,
-      y: meanY,
-      type: 'scatter',
-      mode: 'lines',
-      name: t('meanError'),
-      line: { color: '#4fc3f7', width: 1.4 },
-      hovertemplate: `${t('frame')} %{x}<br>${t('meanError')}: %{y:.2f} cm<extra></extra>`,
-    },
-  ];
+  const data: Data[] = items.map((s) => ({
+    x,
+    y: Array.from(s.values, (v) => v * 100),
+    type: 'scatter',
+    mode: 'lines',
+    name: s.label,
+    line: { color: s.color, width: s.id === ERROR_SERIES_MEAN ? 1.4 : 1.3 },
+    opacity: s.id === ERROR_SERIES_MAX ? 0.75 : 1,
+    hovertemplate: `${t('frame')} %{x}<br>${s.label}: %{y:.2f} cm<extra></extra>`,
+  }));
   return {
     data,
     layout: {
@@ -79,7 +104,7 @@ function buildFigure() {
 
 const { isZoomed, resetZoom, draw, resize } = usePlotlyChart(chartEl, buildFigure, toRef(props, 'frame'));
 
-watch(series, () => {
+watch([plottedSeries, () => props.series], () => {
   void draw();
 });
 
@@ -88,10 +113,13 @@ defineExpose({ resetZoom, isZoomed, resize });
 
 <template>
   <div class="chart-root">
-    <div class="d-flex align-center ga-4 mb-1 text-caption chart-toolbar">
-      <span><span class="legend mean" /> {{ t('meanError') }}: {{ (stats.mean * 100).toFixed(2) }} cm</span>
-      <span><span class="legend max" /> {{ t('maxError') }}: {{ (stats.maxAll * 100).toFixed(2) }} cm</span>
+    <div v-if="plottedSeries.items.length" class="d-flex flex-wrap align-center ga-3 mb-1 text-caption chart-toolbar">
+      <span v-for="s in plottedSeries.items" :key="s.id">
+        <span class="legend" :style="{ background: s.color }" />
+        {{ s.label }}
+      </span>
     </div>
+    <div v-if="!plottedSeries.items.length" class="text-caption text-disabled mb-1">{{ t('selectKeypointsHint') }}</div>
     <div ref="chartEl" class="chart" />
   </div>
 </template>
@@ -120,11 +148,5 @@ defineExpose({ resetZoom, isZoomed, resize });
   height: 3px;
   vertical-align: middle;
   margin-right: 4px;
-}
-.legend.mean {
-  background: #4fc3f7;
-}
-.legend.max {
-  background: #ef5350;
 }
 </style>

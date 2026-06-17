@@ -3,7 +3,7 @@ import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted,
 import { mdiChevronDown, mdiChevronUp, mdiMagnifyRemoveOutline, mdiDragHorizontalVariant } from '@mdi/js';
 import { useI18n } from '@/i18n';
 import type { RetargetResult } from '@/lib/retarget/types';
-import ErrorChart from '@/components/ErrorChart.vue';
+import ErrorChart, { ERROR_SERIES_MAX, ERROR_SERIES_MEAN } from '@/components/ErrorChart.vue';
 import JointSeriesChart from '@/components/JointSeriesChart.vue';
 
 const props = defineProps<{
@@ -20,6 +20,7 @@ const { t } = useI18n();
 const activeTab = ref<'error' | 'position' | 'velocity'>('error');
 const expanded = ref(true);
 const selectedJoints = ref<string[]>([]);
+const selectedErrorSeries = ref<string[]>([]);
 const angleUnit = ref<'deg' | 'rad'>('deg');
 
 const errorChartRef = ref<InstanceType<typeof ErrorChart> | null>(null);
@@ -55,10 +56,22 @@ function defaultJoints(names: string[]): string[] {
   return found;
 }
 
+function defaultErrorSeries(_taskNames: string[]): string[] {
+  return [ERROR_SERIES_MEAN, ERROR_SERIES_MAX];
+}
+
 watch(
   () => props.result.dofNames,
   (names) => {
     selectedJoints.value = defaultJoints(names);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.result.taskNames,
+  (names) => {
+    selectedErrorSeries.value = defaultErrorSeries(names);
   },
   { immediate: true },
 );
@@ -70,7 +83,17 @@ const jointItems = computed(() =>
   })),
 );
 
+const errorSeriesItems = computed(() => [
+  { title: t('meanError'), value: ERROR_SERIES_MEAN },
+  { title: t('maxError'), value: ERROR_SERIES_MAX },
+  ...props.result.taskNames.map((name) => ({
+    title: name.replace(/_link$/, ''),
+    value: name,
+  })),
+]);
+
 const showJointPicker = computed(() => activeTab.value !== 'error' && expanded.value);
+const showErrorPicker = computed(() => activeTab.value === 'error' && expanded.value);
 const showUnitToggle = computed(() => activeTab.value !== 'error' && expanded.value);
 
 const activeChartZoomed = computed(() => {
@@ -252,7 +275,21 @@ watch(activeTab, () => {
           multiple
           chips
           closable-chips
-          class="joint-select flex-grow-1"
+          class="series-select flex-grow-1"
+          :menu-props="{ maxHeight: 280 }"
+        />
+        <v-select
+          v-if="showErrorPicker"
+          v-model="selectedErrorSeries"
+          :items="errorSeriesItems"
+          :label="t('selectKeypoints')"
+          density="compact"
+          variant="outlined"
+          hide-details
+          multiple
+          chips
+          closable-chips
+          class="series-select flex-grow-1"
           :menu-props="{ maxHeight: 280 }"
         />
         <v-btn-toggle
@@ -269,7 +306,13 @@ watch(activeTab, () => {
         </v-btn-toggle>
       </div>
       <div class="chart-window mt-1">
-        <ErrorChart v-if="activeTab === 'error'" ref="errorChartRef" :result="result" :frame="frame" />
+        <ErrorChart
+          v-if="activeTab === 'error'"
+          ref="errorChartRef"
+          :result="result"
+          :series="selectedErrorSeries"
+          :frame="frame"
+        />
         <JointSeriesChart
           v-else-if="activeTab === 'position'"
           ref="jointChartRef"
@@ -342,11 +385,11 @@ watch(activeTab, () => {
 .metrics-controls {
   flex-shrink: 0;
 }
-.joint-select {
+.series-select {
   min-width: 0;
   max-width: 100%;
 }
-.joint-select :deep(.v-field__input) {
+.series-select :deep(.v-field__input) {
   flex-wrap: wrap;
   gap: 4px;
 }
