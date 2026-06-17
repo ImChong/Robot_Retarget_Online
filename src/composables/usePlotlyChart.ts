@@ -1,6 +1,7 @@
 import { onMounted, onUnmounted, ref, shallowRef, watch, type Ref } from 'vue';
 import type { Config, Data, Layout, PlotlyHTMLElement } from 'plotly.js';
 import { buildDarkLayout, frameCursorShape } from '@/lib/plotlyTheme';
+import { isCoarsePointerDevice } from '@/lib/plotlyTouch';
 
 type PlotlyModule = typeof import('plotly.js-dist-min');
 
@@ -11,11 +12,16 @@ function loadPlotly(): Promise<PlotlyModule> {
   return plotlyLoad;
 }
 
-const BASE_CONFIG: Partial<Config> = {
-  responsive: true,
-  displayModeBar: false,
-  scrollZoom: true,
-};
+function buildPlotConfig(): Partial<Config> {
+  const touch = isCoarsePointerDevice();
+  return {
+    responsive: true,
+    displayModeBar: false,
+    scrollZoom: !touch,
+    // Touch: disable double-tap zoom so Plotly does not keep a full-viewport drag layer active.
+    doubleClick: touch ? false : 'reset+autosize',
+  };
+}
 
 export function usePlotlyChart(
   elRef: Ref<HTMLElement | null>,
@@ -26,6 +32,7 @@ export function usePlotlyChart(
   const plotly = shallowRef<PlotlyModule['default'] | null>(null);
   const plotEl = shallowRef<PlotlyHTMLElement | null>(null);
   let ro: ResizeObserver | null = null;
+  let lastCursorFrame = Number.NaN;
 
   function onRelayout(ev: Record<string, unknown>) {
     if (ev['xaxis.autorange'] === true || ev['yaxis.autorange'] === true) {
@@ -43,11 +50,16 @@ export function usePlotlyChart(
     const mod = await loadPlotly();
     plotly.value = mod.default;
     const { data, layout } = buildFigure();
-    const merged = buildDarkLayout(layout);
+    const touch = isCoarsePointerDevice();
+    const merged = buildDarkLayout({
+      ...layout,
+      dragmode: touch ? false : (layout?.dragmode ?? 'zoom'),
+    });
+    const config = buildPlotConfig();
     if (plotEl.value === el && (el as PlotlyHTMLElement).data) {
-      await mod.default.react(el, data, merged, BASE_CONFIG);
+      await mod.default.react(el, data, merged, config);
     } else {
-      await mod.default.newPlot(el, data, merged, BASE_CONFIG);
+      await mod.default.newPlot(el, data, merged, config);
       plotEl.value = el as PlotlyHTMLElement;
       (el as PlotlyHTMLElement).on('plotly_relayout', onRelayout as Parameters<PlotlyHTMLElement['on']>[1]);
       (el as PlotlyHTMLElement).on('plotly_doubleclick', () => {
@@ -59,6 +71,8 @@ export function usePlotlyChart(
 
   async function syncCursor() {
     const frame = frameRef?.value;
+    if (frame === lastCursorFrame) return;
+    lastCursorFrame = frame ?? Number.NaN;
     const el = elRef.value;
     const P = plotly.value;
     if (!el || !P) return;
