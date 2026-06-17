@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { mdiPlay, mdiPause, mdiSkipPrevious, mdiSkipNext, mdiRestart } from '@mdi/js';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
@@ -39,6 +39,41 @@ function step(delta: number) {
 function togglePlayback() {
   props.controller.toggle();
 }
+
+function shouldIgnorePlaybackKeys(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return true;
+  if (
+    target.closest(
+      'input, textarea, select, [contenteditable="true"], [role="textbox"], [role="combobox"], [role="option"]',
+    )
+  ) {
+    return true;
+  }
+  return !!document.querySelector('.v-overlay--active');
+}
+
+function onKeyDown(e: KeyboardEvent) {
+  if (shouldIgnorePlaybackKeys(e.target)) return;
+  if (state.frameCount <= 0) return;
+
+  if (e.code === 'Space') {
+    e.preventDefault();
+    togglePlayback();
+    return;
+  }
+  if (e.code === 'ArrowLeft') {
+    e.preventDefault();
+    step(-1);
+    return;
+  }
+  if (e.code === 'ArrowRight') {
+    e.preventDefault();
+    step(1);
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onKeyDown));
+onUnmounted(() => window.removeEventListener('keydown', onKeyDown));
 </script>
 
 <template>
@@ -47,15 +82,22 @@ function togglePlayback() {
     :class="{ 'playback-bar--compact': smAndDown, 'playback-bar--light': !isDark }"
   >
     <div class="playback-row playback-row--transport d-flex align-center ga-1">
-      <v-btn :icon="mdiSkipPrevious" size="small" variant="text" @click="step(-1)" />
+      <v-btn
+        :icon="mdiSkipPrevious"
+        size="small"
+        variant="text"
+        :title="t('prevFrame')"
+        @click="step(-1)"
+      />
       <v-btn
         :icon="state.playing ? mdiPause : mdiPlay"
         color="primary"
         size="small"
         variant="tonal"
+        :title="state.playing ? t('pause') : t('play')"
         @click="togglePlayback"
       />
-      <v-btn :icon="mdiSkipNext" size="small" variant="text" @click="step(1)" />
+      <v-btn :icon="mdiSkipNext" size="small" variant="text" :title="t('nextFrame')" @click="step(1)" />
 
       <v-slider
         v-model="sliderValue"
