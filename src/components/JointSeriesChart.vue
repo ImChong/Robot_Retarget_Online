@@ -107,12 +107,6 @@ defineExpose({ resetZoom, isZoomed, resize });
 
 <template>
   <div class="chart-root">
-    <div v-if="series.items.length" class="d-flex flex-wrap align-center ga-3 mb-1 text-caption chart-toolbar">
-      <span v-for="(s, i) in series.items" :key="s.name">
-        <span class="legend" :style="{ background: COLORS[i % COLORS.length] }" />
-        {{ shortName(s.name) }}
-      </span>
-    </div>
     <div v-if="!series.items.length" class="text-caption text-disabled mb-1">{{ t('selectJointsHint') }}</div>
     <div ref="chartEl" class="chart" />
   </div>
@@ -131,16 +125,5 @@ defineExpose({ resetZoom, isZoomed, resize });
   min-height: 120px;
   border-radius: 6px;
   overflow: hidden;
-}
-.chart-toolbar {
-  flex-shrink: 0;
-  min-height: 20px;
-}
-.legend {
-  display: inline-block;
-  width: 14px;
-  height: 3px;
-  vertical-align: middle;
-  margin-right: 4px;
 }
 </style>

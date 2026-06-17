@@ -33,15 +33,6 @@ const series = computed(() => {
   return { mean, max, frameCount };
 });
 
-const stats = computed(() => {
-  const m = series.value.mean;
-  let sum = 0;
-  for (const v of m) sum += v;
-  let mxAll = 0;
-  for (const v of series.value.max) if (v > mxAll) mxAll = v;
-  return { mean: m.length ? sum / m.length : 0, maxAll: mxAll };
-});
-
 function buildFigure() {
   const { mean, max, frameCount } = series.value;
   const x = Array.from({ length: frameCount }, (_, i) => i);
@@ -88,10 +79,6 @@ defineExpose({ resetZoom, isZoomed, resize });
 
 <template>
   <div class="chart-root">
-    <div class="d-flex align-center ga-4 mb-1 text-caption chart-toolbar">
-      <span><span class="legend mean" /> {{ t('meanError') }}: {{ (stats.mean * 100).toFixed(2) }} cm</span>
-      <span><span class="legend max" /> {{ t('maxError') }}: {{ (stats.maxAll * 100).toFixed(2) }} cm</span>
-    </div>
     <div ref="chartEl" class="chart" />
   </div>
 </template>
@@ -109,22 +96,5 @@ defineExpose({ resetZoom, isZoomed, resize });
   min-height: 120px;
   border-radius: 6px;
   overflow: hidden;
-}
-.chart-toolbar {
-  flex-shrink: 0;
-  min-height: 20px;
-}
-.legend {
-  display: inline-block;
-  width: 14px;
-  height: 3px;
-  vertical-align: middle;
-  margin-right: 4px;
-}
-.legend.mean {
-  background: #4fc3f7;
-}
-.legend.max {
-  background: #ef5350;
 }
 </style>
