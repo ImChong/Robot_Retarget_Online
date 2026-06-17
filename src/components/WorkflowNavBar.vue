@@ -3,23 +3,12 @@ import { mdiChevronLeft, mdiChevronRight, mdiPlayCircle, mdiStopCircle } from '@
 import { useI18n } from '@/i18n';
 import { useWorkflowNav } from '@/composables/useWorkflowNav';
 
-defineProps<{
-  /** `bar` = desktop strip; `inline` = compact row above playback bar on mobile */
-  variant?: 'bar' | 'inline';
-}>();
-
 const { t } = useI18n();
 const { step, canGoConfig, isBusy, goToConfig, goToBvh, runRetarget, cancelRetarget } = useWorkflowNav();
 </script>
 
 <template>
-  <div
-    class="workflow-nav"
-    :class="{
-      'workflow-nav--bar': variant === 'bar',
-      'workflow-nav--inline': variant === 'inline',
-    }"
-  >
+  <div class="workflow-nav">
     <template v-if="step === 'bvh'">
       <v-tooltip :text="canGoConfig ? t('workflowNextHint') : t('workflowNextDisabledHint')" location="bottom">
         <template #activator="{ props: tipProps }">
@@ -83,24 +72,25 @@ const { step, canGoConfig, isBusy, goToConfig, goToBvh, runRetarget, cancelRetar
 
 <style scoped>
 .workflow-nav {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  flex-shrink: 0;
-}
-
-.workflow-nav--bar {
-  width: 100%;
-}
-
-.workflow-nav--inline {
-  padding: 8px 12px;
-  border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  background: rgb(var(--v-theme-surface));
+  padding: 4px 6px;
+  border-radius: 10px;
+  pointer-events: none;
+  background: rgba(var(--v-theme-surface), 0.78);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.28);
 }
 
 .workflow-nav__activator {
   display: inline-flex;
+  pointer-events: auto;
 }
 </style>

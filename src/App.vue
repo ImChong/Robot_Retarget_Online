@@ -4,12 +4,10 @@ import { useRoute, useRouter } from 'vue-router';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useAppTheme } from '@/composables/useAppTheme';
-import { useWorkflowNav } from '@/composables/useWorkflowNav';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore } from '@/stores/retarget';
 import { mdiTranslate, mdiGithub, mdiWeatherSunny, mdiWeatherNight, mdiCoffee } from '@mdi/js';
 import SponsorDialog from '@/components/SponsorDialog.vue';
-import WorkflowNavBar from '@/components/WorkflowNavBar.vue';
 
 const { t, toggleLocale, localeLabel, locale } = useI18n();
 const { isDark, toggleAppTheme } = useAppTheme();
@@ -18,7 +16,6 @@ const route = useRoute();
 const router = useRouter();
 const motion = useMotionStore();
 const retarget = useRetargetStore();
-const { showNav } = useWorkflowNav();
 
 const tabs = computed(() => [
   { value: 'bvh', label: t('navBvh'), step: 1, disabled: false, disabledHint: '' },
@@ -137,18 +134,11 @@ void locale.value;
     </v-bottom-navigation>
 
     <v-main class="app-main">
-      <div class="app-main-inner">
-        <div v-if="mdAndUp && showNav" class="workflow-strip">
-          <WorkflowNavBar variant="bar" />
-        </div>
-        <div class="app-main-content">
-          <router-view v-slot="{ Component }">
-            <keep-alive>
-              <component :is="Component" />
-            </keep-alive>
-          </router-view>
-        </div>
-      </div>
+      <router-view v-slot="{ Component }">
+        <keep-alive>
+          <component :is="Component" />
+        </keep-alive>
+      </router-view>
     </v-main>
 
     <SponsorDialog v-model="sponsorOpen" />
@@ -183,26 +173,6 @@ void locale.value;
 .app-main {
   height: calc(100dvh - var(--app-bar-height) - var(--app-bottom-nav-height));
   overflow: hidden;
-}
-
-.app-main-inner {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-
-.app-main-content {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.workflow-strip {
-  flex-shrink: 0;
-  padding: 6px 16px;
-  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  background: rgb(var(--v-theme-surface));
 }
 
 .app-bar :deep(.v-toolbar__content) {

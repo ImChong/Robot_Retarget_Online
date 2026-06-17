@@ -569,7 +569,10 @@ onUnmounted(() => {
     </MobileSidePanel>
 
     <div class="main-col d-flex flex-column flex-grow-1">
-      <div ref="viewportEl" class="viewport" />
+      <div class="viewport-wrap">
+        <div ref="viewportEl" class="viewport" />
+        <WorkflowNavBar />
+      </div>
       <Transition name="loading-strip-slide" @after-leave="onLoadingStripAfterLeave">
         <div
           v-if="stripVisible && loadingText"
@@ -583,8 +586,6 @@ onUnmounted(() => {
           {{ loadingText }}
         </div>
       </Transition>
-
-      <WorkflowNavBar v-if="!mdAndUp" variant="inline" />
 
       <div class="tables-panel">
         <v-tabs v-model="activeTab" density="compact" color="primary" show-arrows>
@@ -657,13 +658,17 @@ onUnmounted(() => {
   min-width: 0;
   min-height: 0;
 }
-.viewport {
+.viewport-wrap {
   flex: 1 1 55%;
   min-height: 0;
   position: relative;
 }
+.viewport {
+  position: absolute;
+  inset: 0;
+}
 @media (max-width: 959.98px) {
-  .viewport {
+  .viewport-wrap {
     flex: 0 0 38vh;
     min-height: 220px;
   }
