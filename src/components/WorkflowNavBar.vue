@@ -47,44 +47,46 @@ const progressPct = computed(() =>
     </template>
 
     <template v-else-if="step === 'config'">
-      <v-tooltip :text="t('workflowPrevHint')" location="bottom">
-        <template #activator="{ props: tipProps }">
-          <span v-bind="tipProps" class="workflow-nav__activator">
-            <v-btn variant="tonal" size="small" :prepend-icon="mdiChevronLeft" @click="goToBvh">
-              {{ t('workflowPrev') }}
-            </v-btn>
-          </span>
-        </template>
-      </v-tooltip>
+      <div class="workflow-nav__config-group">
+        <div class="workflow-nav__actions">
+          <v-tooltip :text="t('workflowPrevHint')" location="bottom">
+            <template #activator="{ props: tipProps }">
+              <span v-bind="tipProps" class="workflow-nav__activator">
+                <v-btn variant="tonal" size="small" :prepend-icon="mdiChevronLeft" @click="goToBvh">
+                  {{ t('workflowPrev') }}
+                </v-btn>
+              </span>
+            </template>
+          </v-tooltip>
 
-      <div class="workflow-nav__run-group">
-        <v-tooltip :text="canGoConfig ? t('runRetarget') : t('noMotionHint')" location="bottom">
-          <template #activator="{ props: tipProps }">
-            <span v-bind="tipProps" class="workflow-nav__activator">
-              <v-btn
-                v-if="!isRetargetRunning"
-                color="primary"
-                variant="flat"
-                size="small"
-                :prepend-icon="mdiPlayCircle"
-                :disabled="!canGoConfig || isLoadingRobot"
-                @click="runRetarget"
-              >
-                {{ t('runRetarget') }}
-              </v-btn>
-              <v-btn
-                v-else
-                color="error"
-                variant="tonal"
-                size="small"
-                :prepend-icon="mdiStopCircle"
-                @click="cancelRetarget"
-              >
-                {{ t('cancel') }}
-              </v-btn>
-            </span>
-          </template>
-        </v-tooltip>
+          <v-tooltip :text="canGoConfig ? t('runRetarget') : t('noMotionHint')" location="bottom">
+            <template #activator="{ props: tipProps }">
+              <span v-bind="tipProps" class="workflow-nav__activator">
+                <v-btn
+                  v-if="!isRetargetRunning"
+                  color="primary"
+                  variant="flat"
+                  size="small"
+                  :prepend-icon="mdiPlayCircle"
+                  :disabled="!canGoConfig || isLoadingRobot"
+                  @click="runRetarget"
+                >
+                  {{ t('runRetarget') }}
+                </v-btn>
+                <v-btn
+                  v-else
+                  color="error"
+                  variant="tonal"
+                  size="small"
+                  :prepend-icon="mdiStopCircle"
+                  @click="cancelRetarget"
+                >
+                  {{ t('cancel') }}
+                </v-btn>
+              </span>
+            </template>
+          </v-tooltip>
+        </div>
 
         <v-progress-linear
           v-if="isRetargetRunning"
@@ -155,13 +157,18 @@ const progressPct = computed(() =>
   pointer-events: auto;
 }
 
-.workflow-nav__run-group {
+.workflow-nav__config-group {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
-  min-width: 148px;
   pointer-events: auto;
+}
+
+.workflow-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .workflow-nav__progress {
