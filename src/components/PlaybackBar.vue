@@ -5,6 +5,7 @@ import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useAppTheme } from '@/composables/useAppTheme';
 import type { PlaybackController } from '@/composables/usePlayback';
+import { isPlaybackKeyCode, shouldIgnorePlaybackKeys } from '@/lib/playbackKeys';
 
 const props = defineProps<{ controller: PlaybackController }>();
 const { t } = useI18n();
@@ -40,40 +41,31 @@ function togglePlayback() {
   props.controller.toggle();
 }
 
-function shouldIgnorePlaybackKeys(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return true;
-  if (
-    target.closest(
-      'input, textarea, select, [contenteditable="true"], [role="textbox"], [role="combobox"], [role="option"]',
-    )
-  ) {
-    return true;
-  }
-  return !!document.querySelector('.v-overlay--active');
-}
-
 function onKeyDown(e: KeyboardEvent) {
   if (shouldIgnorePlaybackKeys(e.target)) return;
   if (state.frameCount <= 0) return;
+  if (!isPlaybackKeyCode(e.code)) return;
+
+  // Capture phase + stopPropagation so focused v-tabs (VSlideGroup) do not also
+  // switch routes when stepping frames with arrow keys.
+  e.preventDefault();
+  e.stopPropagation();
 
   if (e.code === 'Space') {
-    e.preventDefault();
     togglePlayback();
     return;
   }
   if (e.code === 'ArrowLeft') {
-    e.preventDefault();
     step(-1);
     return;
   }
   if (e.code === 'ArrowRight') {
-    e.preventDefault();
     step(1);
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeyDown));
-onUnmounted(() => window.removeEventListener('keydown', onKeyDown));
+onMounted(() => window.addEventListener('keydown', onKeyDown, true));
+onUnmounted(() => window.removeEventListener('keydown', onKeyDown, true));
 </script>
 
 <template>
