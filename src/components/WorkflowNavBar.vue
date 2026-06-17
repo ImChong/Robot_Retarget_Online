@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { mdiChevronLeft, mdiChevronRight, mdiPlayCircle, mdiStopCircle } from '@mdi/js';
 import { useI18n } from '@/i18n';
 import { useWorkflowNav } from '@/composables/useWorkflowNav';
+import { useRetargetStore } from '@/stores/retarget';
 
 const { t } = useI18n();
 const {
@@ -14,6 +16,13 @@ const {
   runRetarget,
   cancelRetarget,
 } = useWorkflowNav();
+const retarget = useRetargetStore();
+
+const progressPct = computed(() =>
+  retarget.runProgress.total > 0
+    ? (100 * retarget.runProgress.done) / retarget.runProgress.total
+    : 0,
+);
 </script>
 
 <template>
@@ -38,43 +47,60 @@ const {
     </template>
 
     <template v-else-if="step === 'config'">
-      <v-tooltip :text="t('workflowPrevHint')" location="bottom">
-        <template #activator="{ props: tipProps }">
-          <span v-bind="tipProps" class="workflow-nav__activator">
-            <v-btn variant="tonal" size="small" :prepend-icon="mdiChevronLeft" @click="goToBvh">
-              {{ t('workflowPrev') }}
-            </v-btn>
-          </span>
-        </template>
-      </v-tooltip>
+      <div class="workflow-nav__config-group">
+        <div class="workflow-nav__actions">
+          <v-tooltip :text="t('workflowPrevHint')" location="bottom">
+            <template #activator="{ props: tipProps }">
+              <span v-bind="tipProps" class="workflow-nav__activator">
+                <v-btn variant="tonal" size="small" :prepend-icon="mdiChevronLeft" @click="goToBvh">
+                  {{ t('workflowPrev') }}
+                </v-btn>
+              </span>
+            </template>
+          </v-tooltip>
 
-      <v-tooltip :text="canGoConfig ? t('runRetarget') : t('noMotionHint')" location="bottom">
-        <template #activator="{ props: tipProps }">
-          <span v-bind="tipProps" class="workflow-nav__activator">
-            <v-btn
-              v-if="!isRetargetRunning"
-              color="primary"
-              variant="flat"
-              size="small"
-              :prepend-icon="mdiPlayCircle"
-              :disabled="!canGoConfig || isLoadingRobot"
-              @click="runRetarget"
-            >
-              {{ t('runRetarget') }}
-            </v-btn>
-            <v-btn
-              v-else
-              color="error"
-              variant="tonal"
-              size="small"
-              :prepend-icon="mdiStopCircle"
-              @click="cancelRetarget"
-            >
-              {{ t('cancel') }}
-            </v-btn>
+          <v-tooltip :text="canGoConfig ? t('runRetarget') : t('noMotionHint')" location="bottom">
+            <template #activator="{ props: tipProps }">
+              <span v-bind="tipProps" class="workflow-nav__activator workflow-nav__run-slot">
+                <v-btn
+                  color="primary"
+                  variant="flat"
+                  size="small"
+                  :prepend-icon="mdiPlayCircle"
+                  :disabled="!canGoConfig || isLoadingRobot"
+                  :class="{ 'workflow-nav__run-btn--hidden': isRetargetRunning }"
+                  @click="runRetarget"
+                >
+                  {{ t('runRetarget') }}
+                </v-btn>
+                <v-btn
+                  color="error"
+                  variant="tonal"
+                  size="small"
+                  :prepend-icon="mdiStopCircle"
+                  :class="{ 'workflow-nav__run-btn--hidden': !isRetargetRunning }"
+                  @click="cancelRetarget"
+                >
+                  {{ t('cancel') }}
+                </v-btn>
+              </span>
+            </template>
+          </v-tooltip>
+        </div>
+
+        <v-progress-linear
+          v-if="isRetargetRunning"
+          :model-value="progressPct"
+          color="primary"
+          height="16"
+          rounded
+          class="workflow-nav__progress"
+        >
+          <span class="text-caption">
+            {{ t('retargeting') }} {{ retarget.runProgress.done }}/{{ retarget.runProgress.total }}
           </span>
-        </template>
-      </v-tooltip>
+        </v-progress-linear>
+      </div>
     </template>
 
     <template v-else-if="step === 'preview'">
@@ -129,5 +155,37 @@ const {
 .workflow-nav__activator {
   display: inline-flex;
   pointer-events: auto;
+}
+
+.workflow-nav__config-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.workflow-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workflow-nav__run-slot {
+  display: inline-grid;
+}
+
+.workflow-nav__run-slot > .v-btn {
+  grid-area: 1 / 1;
+  width: 100%;
+}
+
+.workflow-nav__run-btn--hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.workflow-nav__progress {
+  pointer-events: none;
 }
 </style>
