@@ -23,6 +23,14 @@ const progressPct = computed(() =>
     ? (100 * retarget.runProgress.done) / retarget.runProgress.total
     : 0,
 );
+
+const runRetargetTooltip = computed(() => {
+  if (!canGoConfig.value) return t('noMotionHint');
+  if (isLoadingRobot.value) {
+    return retarget.isCustomRobot ? t('loadingUrdfHint') : t('loadingRobot');
+  }
+  return t('runRetarget');
+});
 </script>
 
 <template>
@@ -59,7 +67,7 @@ const progressPct = computed(() =>
             </template>
           </v-tooltip>
 
-          <v-tooltip :text="canGoConfig ? t('runRetarget') : t('noMotionHint')" location="bottom">
+          <v-tooltip :text="runRetargetTooltip" location="bottom">
             <template #activator="{ props: tipProps }">
               <span v-bind="tipProps" class="workflow-nav__activator workflow-nav__run-slot">
                 <v-btn
