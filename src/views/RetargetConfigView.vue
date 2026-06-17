@@ -31,6 +31,7 @@ import MappingTable from '@/components/MappingTable.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import CustomUrdfImportDialog from '@/components/CustomUrdfImportDialog.vue';
 import EngineToggle from '@/components/EngineToggle.vue';
+import WorkflowNavBar from '@/components/WorkflowNavBar.vue';
 import { downloadBlob } from '@/lib/export/motion';
 
 const { t } = useI18n();
@@ -534,11 +535,11 @@ onUnmounted(() => {
 
         <div class="sidebar-footer d-flex flex-column ga-2 pt-3 mt-auto">
           <v-btn
-            v-if="!store.isBusy"
+            v-if="store.status !== 'running'"
             color="primary"
             size="large"
             :prepend-icon="mdiPlayCircle"
-            :disabled="!motion.hasMotion"
+            :disabled="!motion.hasMotion || store.isLoadingRobot"
             block
             @click="run"
           >
@@ -568,7 +569,10 @@ onUnmounted(() => {
     </MobileSidePanel>
 
     <div class="main-col d-flex flex-column flex-grow-1">
-      <div ref="viewportEl" class="viewport" />
+      <div class="viewport-wrap">
+        <div ref="viewportEl" class="viewport" />
+        <WorkflowNavBar />
+      </div>
       <Transition name="loading-strip-slide" @after-leave="onLoadingStripAfterLeave">
         <div
           v-if="stripVisible && loadingText"
@@ -654,13 +658,17 @@ onUnmounted(() => {
   min-width: 0;
   min-height: 0;
 }
-.viewport {
+.viewport-wrap {
   flex: 1 1 55%;
   min-height: 0;
   position: relative;
 }
+.viewport {
+  position: absolute;
+  inset: 0;
+}
 @media (max-width: 959.98px) {
-  .viewport {
+  .viewport-wrap {
     flex: 0 0 38vh;
     min-height: 220px;
   }

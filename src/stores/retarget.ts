@@ -63,6 +63,8 @@ export const useRetargetStore = defineStore('retarget', {
   }),
   getters: {
     isBusy: (s) => s.status === 'loading-robot' || s.status === 'running',
+    isLoadingRobot: (s) => s.status === 'loading-robot',
+    isRetargetRunning: (s) => s.status === 'running',
     isCustomRobot: (s) => s.robotId === CUSTOM_ROBOT_ID,
     robotDisplayLabel: (s) =>
       s.robotId === CUSTOM_ROBOT_ID && s.customRobot

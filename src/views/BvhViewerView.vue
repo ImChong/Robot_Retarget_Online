@@ -17,6 +17,7 @@ import JointTreePanel from '@/components/JointTreePanel.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import VideoToBvhDialog from '@/components/VideoToBvhDialog.vue';
 import SmplxImportDialog from '@/components/SmplxImportDialog.vue';
+import WorkflowNavBar from '@/components/WorkflowNavBar.vue';
 
 const { t } = useI18n();
 const { mdAndUp } = useDisplay();
@@ -252,13 +253,16 @@ onUnmounted(() => {
 
     <FileDropZone class="main-col flex-grow-1" @load="loadText">
       <div class="viewport-col d-flex flex-column">
-        <div ref="viewportEl" class="viewport flex-grow-1" />
-        <div v-if="!motion.hasMotion" class="empty-hint d-flex flex-column align-center justify-center">
-          <div class="text-h6 text-medium-emphasis mb-1">{{ t('noMotion') }}</div>
-          <div class="text-body-2 text-disabled px-4 text-center">{{ t('dropHint') }}</div>
-          <v-btn class="mt-4 mobile-open-btn" color="primary" variant="tonal" :prepend-icon="mdiFolderOpen" @click="openFilePicker">
-            {{ t('openBvh') }}
-          </v-btn>
+        <div class="viewport-wrap flex-grow-1">
+          <div ref="viewportEl" class="viewport" />
+          <WorkflowNavBar />
+          <div v-if="!motion.hasMotion" class="empty-hint d-flex flex-column align-center justify-center">
+            <div class="text-h6 text-medium-emphasis mb-1">{{ t('noMotion') }}</div>
+            <div class="text-body-2 text-disabled px-4 text-center">{{ t('dropHint') }}</div>
+            <v-btn class="mt-4 mobile-open-btn" color="primary" variant="tonal" :prepend-icon="mdiFolderOpen" @click="openFilePicker">
+              {{ t('openBvh') }}
+            </v-btn>
+          </div>
         </div>
         <PlaybackBar v-if="motion.hasMotion" :controller="playback" />
       </div>
@@ -298,14 +302,19 @@ onUnmounted(() => {
   height: 100%;
   position: relative;
 }
-.viewport {
+.viewport-wrap {
   position: relative;
   min-height: 0;
+}
+.viewport {
+  position: absolute;
+  inset: 0;
 }
 .empty-hint {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  z-index: 1;
 }
 .empty-hint .mobile-open-btn {
   pointer-events: auto;

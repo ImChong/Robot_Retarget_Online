@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useAppTheme } from '@/composables/useAppTheme';
+import { useMotionStore } from '@/stores/motion';
+import { useRetargetStore } from '@/stores/retarget';
 import { mdiTranslate, mdiGithub, mdiWeatherSunny, mdiWeatherNight, mdiCoffee } from '@mdi/js';
 import SponsorDialog from '@/components/SponsorDialog.vue';
 
@@ -12,16 +14,32 @@ const { isDark, toggleAppTheme } = useAppTheme();
 const { mdAndUp } = useDisplay();
 const route = useRoute();
 const router = useRouter();
+const motion = useMotionStore();
+const retarget = useRetargetStore();
 
 const tabs = computed(() => [
-  { value: 'bvh', label: t('navBvh'), step: 1 },
-  { value: 'config', label: t('navConfig'), step: 2 },
-  { value: 'preview', label: t('navPreview'), step: 3 },
+  { value: 'bvh', label: t('navBvh'), step: 1, disabled: false, disabledHint: '' },
+  {
+    value: 'config',
+    label: t('navConfig'),
+    step: 2,
+    disabled: !motion.hasMotion,
+    disabledHint: t('navConfigDisabledHint'),
+  },
+  {
+    value: 'preview',
+    label: t('navPreview'),
+    step: 3,
+    disabled: !retarget.hasHistory,
+    disabledHint: t('navPreviewDisabledHint'),
+  },
 ]);
 
 const currentTab = computed({
   get: () => (route.name as string) ?? 'bvh',
   set: (v: string) => {
+    const tab = tabs.value.find((item) => item.value === v);
+    if (tab?.disabled) return;
     router.push({ name: v });
   },
 });
@@ -41,8 +59,18 @@ void locale.value;
         </div>
 
         <v-tabs v-if="mdAndUp" v-model="currentTab" color="primary" class="app-bar-tabs">
-          <v-tab v-for="tab in tabs" :key="tab.value" :value="tab.value">
-            <span class="tab-with-step">
+          <v-tab v-for="tab in tabs" :key="tab.value" :value="tab.value" :disabled="tab.disabled">
+            <v-tooltip v-if="tab.disabled && tab.disabledHint" :text="tab.disabledHint" location="bottom">
+              <template #activator="{ props: tipProps }">
+                <span v-bind="tipProps" class="tab-tooltip-wrap">
+                  <span class="tab-with-step">
+                    <span class="tab-step" aria-hidden="true">{{ tab.step }}</span>
+                    <span class="tab-label">{{ tab.label }}</span>
+                  </span>
+                </span>
+              </template>
+            </v-tooltip>
+            <span v-else class="tab-with-step">
               <span class="tab-step" aria-hidden="true">{{ tab.step }}</span>
               <span class="tab-label">{{ tab.label }}</span>
             </span>
@@ -97,7 +125,7 @@ void locale.value;
     </v-app-bar>
 
     <v-bottom-navigation v-if="!mdAndUp" v-model="currentTab" grow color="primary" class="bottom-nav">
-      <v-btn v-for="tab in tabs" :key="tab.value" :value="tab.value">
+      <v-btn v-for="tab in tabs" :key="tab.value" :value="tab.value" :disabled="tab.disabled">
         <span class="tab-with-step tab-with-step--compact">
           <span class="tab-step" aria-hidden="true">{{ tab.step }}</span>
           <span class="tab-label">{{ tab.label }}</span>
@@ -275,6 +303,11 @@ void locale.value;
 
 .tab-label {
   line-height: 1.2;
+}
+
+.tab-tooltip-wrap {
+  display: inline-flex;
+  align-items: center;
 }
 
 .app-bar-tabs :deep(.v-tab--selected) .tab-step,
