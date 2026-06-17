@@ -17,6 +17,7 @@ import JointTreePanel from '@/components/JointTreePanel.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import VideoToBvhDialog from '@/components/VideoToBvhDialog.vue';
 import SmplxImportDialog from '@/components/SmplxImportDialog.vue';
+import WorkflowNavBar from '@/components/WorkflowNavBar.vue';
 
 const { t } = useI18n();
 const { mdAndUp } = useDisplay();
@@ -260,6 +261,7 @@ onUnmounted(() => {
             {{ t('openBvh') }}
           </v-btn>
         </div>
+        <WorkflowNavBar v-if="!mdAndUp" variant="inline" />
         <PlaybackBar v-if="motion.hasMotion" :controller="playback" />
       </div>
     </FileDropZone>

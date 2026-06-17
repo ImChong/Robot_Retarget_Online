@@ -31,6 +31,7 @@ import MappingTable from '@/components/MappingTable.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import CustomUrdfImportDialog from '@/components/CustomUrdfImportDialog.vue';
 import EngineToggle from '@/components/EngineToggle.vue';
+import WorkflowNavBar from '@/components/WorkflowNavBar.vue';
 import { downloadBlob } from '@/lib/export/motion';
 
 const { t } = useI18n();
@@ -582,6 +583,8 @@ onUnmounted(() => {
           {{ loadingText }}
         </div>
       </Transition>
+
+      <WorkflowNavBar v-if="!mdAndUp" variant="inline" />
 
       <div class="tables-panel">
         <v-tabs v-model="activeTab" density="compact" color="primary" show-arrows>

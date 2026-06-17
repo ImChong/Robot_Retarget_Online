@@ -11,6 +11,22 @@ const messages: Record<string, { zh: string; en: string }> = {
   navBvh: { zh: 'BVH 预览', en: 'BVH Viewer' },
   navConfig: { zh: '重定向设置', en: 'Retarget Config' },
   navPreview: { zh: '重定向预览', en: 'Retarget Preview' },
+  navConfigDisabledHint: {
+    zh: '请先在 BVH 预览页加载动作文件或示例',
+    en: 'Load a motion in BVH Viewer first',
+  },
+  navPreviewDisabledHint: {
+    zh: '请先完成重定向',
+    en: 'Run retargeting first',
+  },
+  workflowNext: { zh: '下一步', en: 'Next' },
+  workflowPrev: { zh: '上一步', en: 'Previous' },
+  workflowNextHint: { zh: '进入重定向设置', en: 'Go to Retarget Config' },
+  workflowNextDisabledHint: {
+    zh: '请先在 BVH 预览页加载动作文件或示例',
+    en: 'Load a motion in BVH Viewer first',
+  },
+  workflowPrevHint: { zh: '返回 BVH 预览', en: 'Back to BVH Viewer' },
 
   openBvh: { zh: '打开 BVH 文件', en: 'Open BVH File' },
   loadSample: { zh: '加载示例动作 BVH', en: 'Load Sample Motion BVH' },

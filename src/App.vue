@@ -4,24 +4,45 @@ import { useRoute, useRouter } from 'vue-router';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useAppTheme } from '@/composables/useAppTheme';
+import { useWorkflowNav } from '@/composables/useWorkflowNav';
+import { useMotionStore } from '@/stores/motion';
+import { useRetargetStore } from '@/stores/retarget';
 import { mdiTranslate, mdiGithub, mdiWeatherSunny, mdiWeatherNight, mdiCoffee } from '@mdi/js';
 import SponsorDialog from '@/components/SponsorDialog.vue';
+import WorkflowNavBar from '@/components/WorkflowNavBar.vue';
 
 const { t, toggleLocale, localeLabel, locale } = useI18n();
 const { isDark, toggleAppTheme } = useAppTheme();
 const { mdAndUp } = useDisplay();
 const route = useRoute();
 const router = useRouter();
+const motion = useMotionStore();
+const retarget = useRetargetStore();
+const { showNav } = useWorkflowNav();
 
 const tabs = computed(() => [
-  { value: 'bvh', label: t('navBvh'), step: 1 },
-  { value: 'config', label: t('navConfig'), step: 2 },
-  { value: 'preview', label: t('navPreview'), step: 3 },
+  { value: 'bvh', label: t('navBvh'), step: 1, disabled: false, disabledHint: '' },
+  {
+    value: 'config',
+    label: t('navConfig'),
+    step: 2,
+    disabled: !motion.hasMotion,
+    disabledHint: t('navConfigDisabledHint'),
+  },
+  {
+    value: 'preview',
+    label: t('navPreview'),
+    step: 3,
+    disabled: !retarget.hasHistory,
+    disabledHint: t('navPreviewDisabledHint'),
+  },
 ]);
 
 const currentTab = computed({
   get: () => (route.name as string) ?? 'bvh',
   set: (v: string) => {
+    const tab = tabs.value.find((item) => item.value === v);
+    if (tab?.disabled) return;
     router.push({ name: v });
   },
 });
@@ -41,8 +62,18 @@ void locale.value;
         </div>
 
         <v-tabs v-if="mdAndUp" v-model="currentTab" color="primary" class="app-bar-tabs">
-          <v-tab v-for="tab in tabs" :key="tab.value" :value="tab.value">
-            <span class="tab-with-step">
+          <v-tab v-for="tab in tabs" :key="tab.value" :value="tab.value" :disabled="tab.disabled">
+            <v-tooltip v-if="tab.disabled && tab.disabledHint" :text="tab.disabledHint" location="bottom">
+              <template #activator="{ props: tipProps }">
+                <span v-bind="tipProps" class="tab-tooltip-wrap">
+                  <span class="tab-with-step">
+                    <span class="tab-step" aria-hidden="true">{{ tab.step }}</span>
+                    <span class="tab-label">{{ tab.label }}</span>
+                  </span>
+                </span>
+              </template>
+            </v-tooltip>
+            <span v-else class="tab-with-step">
               <span class="tab-step" aria-hidden="true">{{ tab.step }}</span>
               <span class="tab-label">{{ tab.label }}</span>
             </span>
@@ -97,7 +128,7 @@ void locale.value;
     </v-app-bar>
 
     <v-bottom-navigation v-if="!mdAndUp" v-model="currentTab" grow color="primary" class="bottom-nav">
-      <v-btn v-for="tab in tabs" :key="tab.value" :value="tab.value">
+      <v-btn v-for="tab in tabs" :key="tab.value" :value="tab.value" :disabled="tab.disabled">
         <span class="tab-with-step tab-with-step--compact">
           <span class="tab-step" aria-hidden="true">{{ tab.step }}</span>
           <span class="tab-label">{{ tab.label }}</span>
@@ -106,11 +137,18 @@ void locale.value;
     </v-bottom-navigation>
 
     <v-main class="app-main">
-      <router-view v-slot="{ Component }">
-        <keep-alive>
-          <component :is="Component" />
-        </keep-alive>
-      </router-view>
+      <div class="app-main-inner">
+        <div v-if="mdAndUp && showNav" class="workflow-strip">
+          <WorkflowNavBar variant="bar" />
+        </div>
+        <div class="app-main-content">
+          <router-view v-slot="{ Component }">
+            <keep-alive>
+              <component :is="Component" />
+            </keep-alive>
+          </router-view>
+        </div>
+      </div>
     </v-main>
 
     <SponsorDialog v-model="sponsorOpen" />
@@ -145,6 +183,26 @@ void locale.value;
 .app-main {
   height: calc(100dvh - var(--app-bar-height) - var(--app-bottom-nav-height));
   overflow: hidden;
+}
+
+.app-main-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.app-main-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workflow-strip {
+  flex-shrink: 0;
+  padding: 6px 16px;
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background: rgb(var(--v-theme-surface));
 }
 
 .app-bar :deep(.v-toolbar__content) {
@@ -275,6 +333,11 @@ void locale.value;
 
 .tab-label {
   line-height: 1.2;
+}
+
+.tab-tooltip-wrap {
+  display: inline-flex;
+  align-items: center;
 }
 
 .app-bar-tabs :deep(.v-tab--selected) .tab-step,
