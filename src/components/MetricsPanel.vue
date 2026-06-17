@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
 import { mdiChevronDown, mdiChevronUp, mdiMagnifyRemoveOutline, mdiDragHorizontalVariant } from '@mdi/js';
 import { useI18n } from '@/i18n';
 import type { RetargetResult } from '@/lib/retarget/types';
@@ -26,7 +26,9 @@ const errorChartRef = ref<InstanceType<typeof ErrorChart> | null>(null);
 const jointChartRef = ref<InstanceType<typeof JointSeriesChart> | null>(null);
 
 const MIN_BODY_H = 168;
-const panelBodyH = ref(MIN_BODY_H);
+/** Survives keep-alive deactivation and MetricsPanel remounts within the session. */
+let savedPanelBodyH = MIN_BODY_H;
+const panelBodyH = ref(savedPanelBodyH);
 const dragging = ref(false);
 const panelRoot = ref<HTMLElement | null>(null);
 const resizeHandleEl = ref<HTMLElement | null>(null);
@@ -91,7 +93,10 @@ function resizeActiveChart() {
 function updateMaxHeight() {
   const root = panelRoot.value?.closest('.main-col') as HTMLElement | null;
   if (!root) return;
-  maxBodyH.value = Math.max(MIN_BODY_H, Math.floor(root.clientHeight * 0.5));
+  const colH = root.clientHeight;
+  // keep-alive hides inactive views (clientHeight 0); don't clamp the saved height then.
+  if (colH < MIN_BODY_H) return;
+  maxBodyH.value = Math.max(MIN_BODY_H, Math.floor(colH * 0.5));
   if (panelBodyH.value > maxBodyH.value) panelBodyH.value = maxBodyH.value;
 }
 
@@ -166,6 +171,10 @@ onMounted(() => {
     ro.observe(root);
   }
 });
+onActivated(() => {
+  updateMaxHeight();
+  resizeActiveChart();
+});
 onDeactivated(() => {
   endResizeDrag();
 });
@@ -174,7 +183,8 @@ onUnmounted(() => {
   ro?.disconnect();
 });
 
-watch(panelBodyH, () => {
+watch(panelBodyH, (h) => {
+  savedPanelBodyH = h;
   emit('resize');
   resizeActiveChart();
 });
