@@ -4,11 +4,7 @@ import { useI18n } from '@/i18n';
 import type { RetargetResult } from '@/lib/retarget/types';
 import { usePlotlyChart } from '@/composables/usePlotlyChart';
 import type { Data } from 'plotly.js';
-
-/** Aggregate mean error across all keypoints (per frame). */
-export const ERROR_SERIES_MEAN = '__mean__';
-/** Aggregate max error across all keypoints (per frame). */
-export const ERROR_SERIES_MAX = '__max__';
+import { ERROR_SERIES_MEAN, ERROR_SERIES_MAX } from './errorChartConstants';
 
 const props = defineProps<{
   result: RetargetResult;

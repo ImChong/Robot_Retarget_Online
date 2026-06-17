@@ -3,7 +3,8 @@ import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted,
 import { mdiChevronDown, mdiChevronUp, mdiMagnifyRemoveOutline, mdiDragHorizontalVariant } from '@mdi/js';
 import { useI18n } from '@/i18n';
 import type { RetargetResult } from '@/lib/retarget/types';
-import ErrorChart, { ERROR_SERIES_MAX, ERROR_SERIES_MEAN } from '@/components/ErrorChart.vue';
+import ErrorChart from '@/components/ErrorChart.vue';
+import { ERROR_SERIES_MAX, ERROR_SERIES_MEAN } from '@/components/errorChartConstants';
 import JointSeriesChart from '@/components/JointSeriesChart.vue';
 
 const props = defineProps<{
