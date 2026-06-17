@@ -14,9 +14,9 @@ const route = useRoute();
 const router = useRouter();
 
 const tabs = computed(() => [
-  { value: 'bvh', label: t('navBvh') },
-  { value: 'config', label: t('navConfig') },
-  { value: 'preview', label: t('navPreview') },
+  { value: 'bvh', label: t('navBvh'), step: 1 },
+  { value: 'config', label: t('navConfig'), step: 2 },
+  { value: 'preview', label: t('navPreview'), step: 3 },
 ]);
 
 const currentTab = computed({
@@ -41,7 +41,12 @@ void locale.value;
         </div>
 
         <v-tabs v-if="mdAndUp" v-model="currentTab" color="primary" class="app-bar-tabs">
-          <v-tab v-for="tab in tabs" :key="tab.value" :value="tab.value">{{ tab.label }}</v-tab>
+          <v-tab v-for="tab in tabs" :key="tab.value" :value="tab.value">
+            <span class="tab-with-step">
+              <span class="tab-step" aria-hidden="true">{{ tab.step }}</span>
+              <span class="tab-label">{{ tab.label }}</span>
+            </span>
+          </v-tab>
         </v-tabs>
 
         <div class="app-bar-actions">
@@ -92,7 +97,12 @@ void locale.value;
     </v-app-bar>
 
     <v-bottom-navigation v-if="!mdAndUp" v-model="currentTab" grow color="primary" class="bottom-nav">
-      <v-btn v-for="tab in tabs" :key="tab.value" :value="tab.value">{{ tab.label }}</v-btn>
+      <v-btn v-for="tab in tabs" :key="tab.value" :value="tab.value">
+        <span class="tab-with-step tab-with-step--compact">
+          <span class="tab-step" aria-hidden="true">{{ tab.step }}</span>
+          <span class="tab-label">{{ tab.label }}</span>
+        </span>
+      </v-btn>
     </v-bottom-navigation>
 
     <v-main class="app-main">
@@ -233,6 +243,45 @@ void locale.value;
 
 .sponsor-btn :deep(.v-icon) {
   color: #e2566a;
+}
+
+.tab-with-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tab-with-step--compact {
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tab-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  flex-shrink: 0;
+  background: rgba(var(--v-theme-on-surface), 0.08);
+  color: rgba(var(--v-theme-on-surface), 0.55);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.14);
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.tab-label {
+  line-height: 1.2;
+}
+
+.app-bar-tabs :deep(.v-tab--selected) .tab-step,
+.bottom-nav :deep(.v-btn--selected) .tab-step {
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+  border-color: transparent;
 }
 
 </style>
