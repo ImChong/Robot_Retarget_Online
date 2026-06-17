@@ -108,7 +108,7 @@ try {
 
   // --- BVH Viewer: load a dog mocap sample ---
   await page.goto(`${base}/#/bvh`);
-  await page.getByText('加载示例动作').click();
+  await page.getByText('加载示例动作 BVH').click();
   await page.getByText('Dog walk', { exact: false }).click();
   await sleep(2500);
   await orbit(4, 280);

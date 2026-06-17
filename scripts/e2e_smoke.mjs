@@ -69,7 +69,7 @@ try {
 
   // ---- Page 1: BVH viewer + sample motion ----
   await page.goto(`http://localhost:${PORT}/#/bvh`);
-  await page.getByText('加载示例动作').click();
+  await page.getByText('加载示例动作 BVH').click();
   await page.getByText('Walk 行走', { exact: false }).click();
   await page.waitForTimeout(2500);
   await page.screenshot({ path: `${OUT_DIR}/1_bvh_viewer.png` });
