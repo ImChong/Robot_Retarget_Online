@@ -5,7 +5,12 @@ import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useAppTheme } from '@/composables/useAppTheme';
 import type { PlaybackController } from '@/composables/usePlayback';
-import { isPlaybackKeyCode, shouldIgnorePlaybackKeys } from '@/lib/playbackKeys';
+import {
+  isPlaybackKeyCode,
+  shouldIgnorePlaybackKeys,
+  shouldSuppressPlaybackKeyUp,
+  suppressPlaybackKeyEvent,
+} from '@/lib/playbackKeys';
 
 const props = defineProps<{ controller: PlaybackController }>();
 const { t } = useI18n();
@@ -41,15 +46,18 @@ function togglePlayback() {
   props.controller.toggle();
 }
 
+function shouldHandlePlaybackKey(e: KeyboardEvent): boolean {
+  if (shouldIgnorePlaybackKeys(e.target)) return false;
+  if (state.frameCount <= 0) return false;
+  return isPlaybackKeyCode(e.code);
+}
+
 function onKeyDown(e: KeyboardEvent) {
-  if (shouldIgnorePlaybackKeys(e.target)) return;
-  if (state.frameCount <= 0) return;
-  if (!isPlaybackKeyCode(e.code)) return;
+  if (!shouldHandlePlaybackKey(e)) return;
 
   // Capture phase + stopPropagation so focused v-tabs (VSlideGroup) do not also
-  // switch routes when stepping frames with arrow keys.
-  e.preventDefault();
-  e.stopPropagation();
+  // switch routes when using playback shortcuts (arrows step frames; Space toggles play).
+  suppressPlaybackKeyEvent(e);
 
   if (e.code === 'Space') {
     togglePlayback();
@@ -64,8 +72,20 @@ function onKeyDown(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeyDown, true));
-onUnmounted(() => window.removeEventListener('keydown', onKeyDown, true));
+function onKeyUp(e: KeyboardEvent) {
+  if (!shouldHandlePlaybackKey(e)) return;
+  if (!shouldSuppressPlaybackKeyUp(e.code)) return;
+  suppressPlaybackKeyEvent(e);
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeyDown, true);
+  window.addEventListener('keyup', onKeyUp, true);
+});
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeyDown, true);
+  window.removeEventListener('keyup', onKeyUp, true);
+});
 </script>
 
 <template>

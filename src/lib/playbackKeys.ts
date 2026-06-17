@@ -14,3 +14,14 @@ export function shouldIgnorePlaybackKeys(target: EventTarget | null): boolean {
 export function isPlaybackKeyCode(code: string): boolean {
   return code === 'Space' || code === 'ArrowLeft' || code === 'ArrowRight';
 }
+
+/** Block native behavior (tab activation, page scroll) for handled playback keys. */
+export function suppressPlaybackKeyEvent(e: Pick<KeyboardEvent, 'preventDefault' | 'stopPropagation'>): void {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+/** Space also needs keyup suppression so focused v-tab buttons do not synthesize a click. */
+export function shouldSuppressPlaybackKeyUp(code: string): boolean {
+  return code === 'Space';
+}

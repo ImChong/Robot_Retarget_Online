@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { isPlaybackKeyCode } from '@/lib/playbackKeys';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  isPlaybackKeyCode,
+  shouldSuppressPlaybackKeyUp,
+  suppressPlaybackKeyEvent,
+} from '@/lib/playbackKeys';
 
 describe('playbackKeys', () => {
   it('recognizes playback key codes', () => {
@@ -7,5 +11,19 @@ describe('playbackKeys', () => {
     expect(isPlaybackKeyCode('ArrowRight')).toBe(true);
     expect(isPlaybackKeyCode('Space')).toBe(true);
     expect(isPlaybackKeyCode('KeyA')).toBe(false);
+  });
+
+  it('only suppresses keyup for Space', () => {
+    expect(shouldSuppressPlaybackKeyUp('Space')).toBe(true);
+    expect(shouldSuppressPlaybackKeyUp('ArrowLeft')).toBe(false);
+    expect(shouldSuppressPlaybackKeyUp('ArrowRight')).toBe(false);
+  });
+
+  it('suppresses default and propagation', () => {
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
+    suppressPlaybackKeyEvent({ preventDefault, stopPropagation });
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(stopPropagation).toHaveBeenCalledOnce();
   });
 });
