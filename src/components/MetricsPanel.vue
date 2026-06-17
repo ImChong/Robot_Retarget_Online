@@ -344,6 +344,7 @@ watch(activeTab, () => {
   background: rgba(0, 0, 0, 0.12);
   position: relative;
   z-index: 1;
+  overflow: hidden;
 }
 .metrics-panel.dragging {
   user-select: none;
@@ -405,6 +406,8 @@ watch(activeTab, () => {
   flex-direction: column;
   position: relative;
   isolation: isolate;
+  contain: paint;
+  clip-path: inset(0);
 }
 .chart-window :deep(.chart-root),
 .chart-window :deep(.chart),
@@ -413,5 +416,22 @@ watch(activeTab, () => {
 }
 .chart-window :deep(.plot-container) {
   overflow: hidden;
+}
+/* iOS WebKit: Plotly's draglayer can extend past the chart and steal touches from playback controls. */
+@media (pointer: coarse) {
+  .chart-window :deep(.draglayer),
+  .chart-window :deep(.draglayer rect),
+  .chart-window :deep(.nsewdrag),
+  .chart-window :deep(.nsdrag),
+  .chart-window :deep(.ewdrag),
+  .chart-window :deep(.wdrag),
+  .chart-window :deep(.edrag),
+  .chart-window :deep(.swdrag),
+  .chart-window :deep(.sedrag) {
+    pointer-events: none !important;
+  }
+  .chart-window :deep(.js-plotly-plot) {
+    touch-action: none;
+  }
 }
 </style>

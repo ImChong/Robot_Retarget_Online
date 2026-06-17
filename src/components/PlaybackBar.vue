@@ -146,6 +146,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown, true));
   flex-shrink: 0;
   position: relative;
   z-index: 3;
+  touch-action: manipulation;
 }
 .playback-bar--light {
   background: rgba(255, 255, 255, 0.94);

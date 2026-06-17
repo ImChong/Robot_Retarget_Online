@@ -308,6 +308,8 @@ onUnmounted(() => {
 .main-col {
   min-width: 0;
   min-height: 0;
+  position: relative;
+  isolation: isolate;
 }
 .viewport-wrap {
   min-height: 0;
