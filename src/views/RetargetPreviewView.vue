@@ -19,6 +19,7 @@ import { usePlayback } from '@/composables/usePlayback';
 import PlaybackBar from '@/components/PlaybackBar.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import MetricsPanel from '@/components/MetricsPanel.vue';
+import WorkflowNavBar from '@/components/WorkflowNavBar.vue';
 import { blendQpos } from '@/lib/viewport/poseBlend';
 import { exportCsv, exportJson, exportNpz, downloadBlob } from '@/lib/export/motion';
 
@@ -277,7 +278,10 @@ onUnmounted(() => {
     </MobileSidePanel>
 
     <div class="main-col d-flex flex-column flex-grow-1">
-      <div ref="viewportEl" class="viewport flex-grow-1" />
+      <div class="viewport-wrap flex-grow-1">
+        <div ref="viewportEl" class="viewport" />
+        <WorkflowNavBar />
+      </div>
       <MetricsPanel v-if="store.result" :result="store.result" :frame="currentFrame" @resize="onMetricsResize" />
       <PlaybackBar v-if="store.result" :controller="playback" />
     </div>
@@ -305,9 +309,13 @@ onUnmounted(() => {
   min-width: 0;
   min-height: 0;
 }
-.viewport {
+.viewport-wrap {
   min-height: 0;
   position: relative;
+}
+.viewport {
+  position: absolute;
+  inset: 0;
   overflow: hidden;
 }
 .info-line {

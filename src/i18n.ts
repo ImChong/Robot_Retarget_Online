@@ -27,6 +27,13 @@ const messages: Record<string, { zh: string; en: string }> = {
     en: 'Load a motion in BVH Viewer first',
   },
   workflowPrevHint: { zh: '返回 BVH 预览', en: 'Back to BVH Viewer' },
+  workflowBackBvh: { zh: '返回 BVH 预览', en: 'Back to BVH Viewer' },
+  workflowBackConfig: { zh: '返回重定向设置', en: 'Back to Retarget Config' },
+  workflowBackConfigHint: { zh: '返回重定向设置', en: 'Back to Retarget Config' },
+  workflowBackConfigDisabledHint: {
+    zh: '请先在 BVH 预览页加载动作文件或示例',
+    en: 'Load a motion in BVH Viewer first',
+  },
 
   openBvh: { zh: '打开 BVH 文件', en: 'Open BVH File' },
   loadSample: { zh: '加载示例动作 BVH', en: 'Load Sample Motion BVH' },

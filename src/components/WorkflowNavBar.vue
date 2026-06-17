@@ -4,8 +4,16 @@ import { useI18n } from '@/i18n';
 import { useWorkflowNav } from '@/composables/useWorkflowNav';
 
 const { t } = useI18n();
-const { step, canGoConfig, isLoadingRobot, isRetargetRunning, goToConfig, goToBvh, runRetarget, cancelRetarget } =
-  useWorkflowNav();
+const {
+  step,
+  canGoConfig,
+  isLoadingRobot,
+  isRetargetRunning,
+  goToConfig,
+  goToBvh,
+  runRetarget,
+  cancelRetarget,
+} = useWorkflowNav();
 </script>
 
 <template>
@@ -63,6 +71,34 @@ const { step, canGoConfig, isLoadingRobot, isRetargetRunning, goToConfig, goToBv
               @click="cancelRetarget"
             >
               {{ t('cancel') }}
+            </v-btn>
+          </span>
+        </template>
+      </v-tooltip>
+    </template>
+
+    <template v-else-if="step === 'preview'">
+      <v-tooltip :text="t('workflowPrevHint')" location="bottom">
+        <template #activator="{ props: tipProps }">
+          <span v-bind="tipProps" class="workflow-nav__activator">
+            <v-btn variant="tonal" size="small" :prepend-icon="mdiChevronLeft" @click="goToBvh">
+              {{ t('workflowBackBvh') }}
+            </v-btn>
+          </span>
+        </template>
+      </v-tooltip>
+
+      <v-tooltip :text="t('workflowBackConfigHint')" location="bottom">
+        <template #activator="{ props: tipProps }">
+          <span v-bind="tipProps" class="workflow-nav__activator">
+            <v-btn
+              variant="tonal"
+              size="small"
+              :prepend-icon="mdiChevronLeft"
+              :disabled="!canGoConfig"
+              @click="goToConfig"
+            >
+              {{ t('workflowBackConfig') }}
             </v-btn>
           </span>
         </template>
