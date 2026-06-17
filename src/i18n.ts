@@ -13,7 +13,7 @@ const messages: Record<string, { zh: string; en: string }> = {
   navPreview: { zh: '重定向预览', en: 'Retarget Preview' },
 
   openBvh: { zh: '打开 BVH 文件', en: 'Open BVH File' },
-  loadSample: { zh: '加载 BVH 示例动作', en: 'Load Sample BVH Motion' },
+  loadSample: { zh: '加载示例动作 BVH', en: 'Load Sample Motion BVH' },
   sampleHumanoid: { zh: '双足人形 (LAFAN1)', en: 'Humanoid (LAFAN1)' },
   sampleQuadruped: { zh: '四足动物', en: 'Quadruped' },
   dropHint: { zh: '拖拽 .bvh 文件到此处，或点击上方按钮选择文件', en: 'Drag & drop a .bvh file here, or use the button above' },
