@@ -109,12 +109,6 @@ defineExpose({ resetZoom, isZoomed, resize });
 
 <template>
   <div class="chart-root">
-    <div v-if="plottedSeries.items.length" class="d-flex flex-wrap align-center ga-3 mb-1 text-caption chart-toolbar">
-      <span v-for="s in plottedSeries.items" :key="s.id">
-        <span class="legend" :style="{ background: s.color }" />
-        {{ s.label }}
-      </span>
-    </div>
     <div v-if="!plottedSeries.items.length" class="text-caption text-disabled mb-1">{{ t('selectKeypointsHint') }}</div>
     <div ref="chartEl" class="chart" />
   </div>
@@ -133,16 +127,5 @@ defineExpose({ resetZoom, isZoomed, resize });
   min-height: 120px;
   border-radius: 6px;
   overflow: hidden;
-}
-.chart-toolbar {
-  flex-shrink: 0;
-  min-height: 20px;
-}
-.legend {
-  display: inline-block;
-  width: 14px;
-  height: 3px;
-  vertical-align: middle;
-  margin-right: 4px;
 }
 </style>
