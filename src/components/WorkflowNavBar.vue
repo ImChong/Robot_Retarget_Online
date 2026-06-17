@@ -61,24 +61,24 @@ const progressPct = computed(() =>
 
           <v-tooltip :text="canGoConfig ? t('runRetarget') : t('noMotionHint')" location="bottom">
             <template #activator="{ props: tipProps }">
-              <span v-bind="tipProps" class="workflow-nav__activator">
+              <span v-bind="tipProps" class="workflow-nav__activator workflow-nav__run-slot">
                 <v-btn
-                  v-if="!isRetargetRunning"
                   color="primary"
                   variant="flat"
                   size="small"
                   :prepend-icon="mdiPlayCircle"
                   :disabled="!canGoConfig || isLoadingRobot"
+                  :class="{ 'workflow-nav__run-btn--hidden': isRetargetRunning }"
                   @click="runRetarget"
                 >
                   {{ t('runRetarget') }}
                 </v-btn>
                 <v-btn
-                  v-else
                   color="error"
                   variant="tonal"
                   size="small"
                   :prepend-icon="mdiStopCircle"
+                  :class="{ 'workflow-nav__run-btn--hidden': !isRetargetRunning }"
                   @click="cancelRetarget"
                 >
                   {{ t('cancel') }}
@@ -169,6 +169,20 @@ const progressPct = computed(() =>
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.workflow-nav__run-slot {
+  display: inline-grid;
+}
+
+.workflow-nav__run-slot > .v-btn {
+  grid-area: 1 / 1;
+  width: 100%;
+}
+
+.workflow-nav__run-btn--hidden {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .workflow-nav__progress {
