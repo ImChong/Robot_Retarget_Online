@@ -535,11 +535,11 @@ onUnmounted(() => {
 
         <div class="sidebar-footer d-flex flex-column ga-2 pt-3 mt-auto">
           <v-btn
-            v-if="!store.isBusy"
+            v-if="store.status !== 'running'"
             color="primary"
             size="large"
             :prepend-icon="mdiPlayCircle"
-            :disabled="!motion.hasMotion"
+            :disabled="!motion.hasMotion || store.isLoadingRobot"
             block
             @click="run"
           >

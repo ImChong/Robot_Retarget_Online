@@ -16,7 +16,8 @@ export function useWorkflowNav() {
   const canGoConfig = computed(() => motion.hasMotion);
   const canGoPreview = computed(() => retarget.hasHistory);
   const showNav = computed(() => step.value === 'bvh' || step.value === 'config');
-  const isBusy = computed(() => retarget.isBusy);
+  const isLoadingRobot = computed(() => retarget.isLoadingRobot);
+  const isRetargetRunning = computed(() => retarget.isRetargetRunning);
 
   function goToConfig() {
     if (canGoConfig.value) void router.push({ name: 'config' });
@@ -27,7 +28,7 @@ export function useWorkflowNav() {
   }
 
   async function runRetarget() {
-    if (!canGoConfig.value || retarget.isBusy) return;
+    if (!canGoConfig.value || isLoadingRobot.value || isRetargetRunning.value) return;
     await retarget.run();
     if (retarget.status === 'done') await router.push({ name: 'preview' });
   }
@@ -41,7 +42,8 @@ export function useWorkflowNav() {
     showNav,
     canGoConfig,
     canGoPreview,
-    isBusy,
+    isLoadingRobot,
+    isRetargetRunning,
     goToConfig,
     goToBvh,
     runRetarget,

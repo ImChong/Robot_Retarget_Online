@@ -4,7 +4,8 @@ import { useI18n } from '@/i18n';
 import { useWorkflowNav } from '@/composables/useWorkflowNav';
 
 const { t } = useI18n();
-const { step, canGoConfig, isBusy, goToConfig, goToBvh, runRetarget, cancelRetarget } = useWorkflowNav();
+const { step, canGoConfig, isLoadingRobot, isRetargetRunning, goToConfig, goToBvh, runRetarget, cancelRetarget } =
+  useWorkflowNav();
 </script>
 
 <template>
@@ -43,12 +44,12 @@ const { step, canGoConfig, isBusy, goToConfig, goToBvh, runRetarget, cancelRetar
         <template #activator="{ props: tipProps }">
           <span v-bind="tipProps" class="workflow-nav__activator">
             <v-btn
-              v-if="!isBusy"
+              v-if="!isRetargetRunning"
               color="primary"
               variant="flat"
               size="small"
               :prepend-icon="mdiPlayCircle"
-              :disabled="!canGoConfig"
+              :disabled="!canGoConfig || isLoadingRobot"
               @click="runRetarget"
             >
               {{ t('runRetarget') }}
