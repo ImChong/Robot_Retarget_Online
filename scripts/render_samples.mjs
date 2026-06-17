@@ -61,7 +61,7 @@ try {
   for (const job of JOBS) {
     // load sample on the BVH page
     await page.goto(`http://localhost:${PORT}/#/bvh`);
-    await page.getByText('加载示例动作').click();
+    await page.getByText('加载 BVH 示例动作').click();
     await page.getByText(job.label, { exact: false }).click();
     await page.waitForTimeout(800);
 

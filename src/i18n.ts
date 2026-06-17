@@ -13,7 +13,7 @@ const messages: Record<string, { zh: string; en: string }> = {
   navPreview: { zh: '重定向预览', en: 'Retarget Preview' },
 
   openBvh: { zh: '打开 BVH 文件', en: 'Open BVH File' },
-  loadSample: { zh: '加载示例动作', en: 'Load Sample Motion' },
+  loadSample: { zh: '加载 BVH 示例动作', en: 'Load Sample BVH Motion' },
   sampleHumanoid: { zh: '双足人形 (LAFAN1)', en: 'Humanoid (LAFAN1)' },
   sampleQuadruped: { zh: '四足动物', en: 'Quadruped' },
   dropHint: { zh: '拖拽 .bvh 文件到此处，或点击上方按钮选择文件', en: 'Drag & drop a .bvh file here, or use the button above' },
@@ -75,7 +75,7 @@ const messages: Record<string, { zh: string; en: string }> = {
   },
 
   // SMPL-X / AMASS input (user-supplied body model, in-browser)
-  smplxImport: { zh: 'SMPL-X / AMASS', en: 'SMPL-X / AMASS' },
+  smplxImport: { zh: 'SMPL-X / AMASS 转 BVH', en: 'SMPL-X / AMASS → BVH' },
   smplxTitle: { zh: '导入 SMPL-X / AMASS 动作', en: 'Import SMPL-X / AMASS Motion' },
   smplxHint: {
     zh: '在浏览器内把 SMPL-X 形状 + AMASS 动作（.npz）转换为关键点，复用既有预览与重定向链路，可重定向到 H1、Kuavo 等 SMPL-X 机器人。',
