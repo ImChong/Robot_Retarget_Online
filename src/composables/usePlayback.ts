@@ -15,17 +15,41 @@ export function usePlayback() {
   });
   /** True after the user explicitly pauses; cleared when they press play. */
   const userPausedPlayback = ref(false);
+  /** -1 / +1 while the user holds an arrow key for smooth scrubbing. */
+  const scrubDirection = ref<-1 | 0 | 1>(0);
+
+  function wrapLoopFrame(frame: number): number {
+    let f = frame % state.frameCount;
+    if (f < 0) f += state.frameCount;
+    return f;
+  }
+
+  function advanceFrame(delta: number) {
+    state.frame += delta;
+    if (state.loop) {
+      if (state.frame >= state.frameCount || state.frame < 0) {
+        state.frame = wrapLoopFrame(state.frame);
+      }
+      return;
+    }
+    if (state.frame >= state.frameCount) {
+      state.frame = state.frameCount - 1;
+      if (scrubDirection.value) stopScrub();
+      else state.playing = false;
+    } else if (state.frame < 0) {
+      state.frame = 0;
+      if (scrubDirection.value) stopScrub();
+    }
+  }
 
   function tick(dt: number) {
-    if (!state.playing || state.frameCount === 0) return;
-    state.frame += dt * state.fps * state.speed;
-    if (state.frame >= state.frameCount) {
-      if (state.loop) state.frame %= state.frameCount;
-      else {
-        state.frame = state.frameCount - 1;
-        state.playing = false;
-      }
+    if (state.frameCount === 0) return;
+    if (scrubDirection.value !== 0) {
+      advanceFrame(scrubDirection.value * dt * state.fps * state.speed);
+      return;
     }
+    if (!state.playing) return;
+    advanceFrame(dt * state.fps * state.speed);
   }
 
   /** Fractional frame for sub-frame pose interpolation during playback. */
@@ -36,7 +60,7 @@ export function usePlayback() {
       if (f < 0) f += state.frameCount;
       return f;
     }
-    return Math.min(state.frame, state.frameCount - 1);
+    return Math.max(0, Math.min(state.frame, state.frameCount - 1));
   });
 
   function play() {
@@ -49,20 +73,35 @@ export function usePlayback() {
     userPausedPlayback.value = true;
   }
 
+  function startScrub(dir: -1 | 1) {
+    scrubDirection.value = dir;
+    state.playing = true;
+    userPausedPlayback.value = false;
+  }
+
+  function stopScrub() {
+    scrubDirection.value = 0;
+    pause();
+  }
+
   return {
     state,
     userPausedPlayback,
+    scrubDirection,
     tick,
     frameIndex: computed(() => Math.min(Math.floor(state.frame), Math.max(state.frameCount - 1, 0))),
     poseFrame,
     play,
     pause,
+    startScrub,
+    stopScrub,
     toggle: () => (state.playing ? pause() : play()),
     seek: (f: number) => (state.frame = f),
     setMotion: (frameCount: number, fps: number) => {
       state.frameCount = frameCount;
       state.fps = fps;
       state.frame = 0;
+      scrubDirection.value = 0;
     },
   };
 }

@@ -21,7 +21,7 @@ export function suppressPlaybackKeyEvent(e: Pick<KeyboardEvent, 'preventDefault'
   e.stopPropagation();
 }
 
-/** Space also needs keyup suppression so focused v-tab buttons do not synthesize a click. */
+/** Suppress keyup defaults for handled playback keys (Space click synthesis, arrow scroll). */
 export function shouldSuppressPlaybackKeyUp(code: string): boolean {
-  return code === 'Space';
+  return code === 'Space' || code === 'ArrowLeft' || code === 'ArrowRight';
 }

@@ -36,6 +36,8 @@ const frameShort = computed(
 
 const speeds = [0.25, 0.5, 1, 1.5, 2];
 
+let scrubbingDir: -1 | 0 | 1 = 0;
+
 function step(delta: number) {
   props.controller.pause();
   const f = Math.floor(state.frame) + delta;
@@ -63,17 +65,26 @@ function onKeyDown(e: KeyboardEvent) {
     togglePlayback();
     return;
   }
-  if (e.code === 'ArrowLeft') {
-    step(-1);
+  if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+    const dir = e.code === 'ArrowLeft' ? -1 : 1;
+    if (e.repeat) {
+      props.controller.startScrub(dir);
+      scrubbingDir = dir;
+    } else {
+      step(dir);
+    }
     return;
-  }
-  if (e.code === 'ArrowRight') {
-    step(1);
   }
 }
 
 function onKeyUp(e: KeyboardEvent) {
   if (!shouldHandlePlaybackKey(e)) return;
+  if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+    if (scrubbingDir !== 0) {
+      props.controller.stopScrub();
+      scrubbingDir = 0;
+    }
+  }
   if (!shouldSuppressPlaybackKeyUp(e.code)) return;
   suppressPlaybackKeyEvent(e);
 }

@@ -13,10 +13,11 @@ describe('playbackKeys', () => {
     expect(isPlaybackKeyCode('KeyA')).toBe(false);
   });
 
-  it('only suppresses keyup for Space', () => {
+  it('suppresses keyup for playback keys', () => {
     expect(shouldSuppressPlaybackKeyUp('Space')).toBe(true);
-    expect(shouldSuppressPlaybackKeyUp('ArrowLeft')).toBe(false);
-    expect(shouldSuppressPlaybackKeyUp('ArrowRight')).toBe(false);
+    expect(shouldSuppressPlaybackKeyUp('ArrowLeft')).toBe(true);
+    expect(shouldSuppressPlaybackKeyUp('ArrowRight')).toBe(true);
+    expect(shouldSuppressPlaybackKeyUp('KeyA')).toBe(false);
   });
 
   it('suppresses default and propagation', () => {
