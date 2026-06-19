@@ -69,7 +69,12 @@ export class SceneManager {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(this.renderer.domElement);
-    this.renderer.domElement.style.display = 'block';
+    const canvas = this.renderer.domElement;
+    canvas.style.display = 'block';
+    // Keep the WebGL layer below HTML overlays on iOS WebKit (canvas can steal touches otherwise).
+    canvas.style.position = 'absolute';
+    canvas.style.inset = '0';
+    canvas.style.zIndex = '0';
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     const t = options.target ?? [0, 0, 0.8];

@@ -314,11 +314,18 @@ onUnmounted(() => {
 .viewport-wrap {
   min-height: 0;
   position: relative;
+  isolation: isolate;
 }
 .viewport {
   position: absolute;
   inset: 0;
   overflow: hidden;
+  z-index: 0;
+}
+.viewport :deep(canvas) {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 .info-line {
   display: flex;
@@ -329,6 +336,7 @@ onUnmounted(() => {
   position: absolute;
   top: 12px;
   left: 12px;
-  z-index: 4;
+  z-index: 6;
+  transform: translateZ(0);
 }
 </style>

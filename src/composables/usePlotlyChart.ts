@@ -17,8 +17,9 @@ function buildPlotConfig(): Partial<Config> {
   return {
     responsive: true,
     displayModeBar: false,
+    // Touch: fully static plots avoid Plotly's drag/hover SVG layers that can cover the page on iOS WebKit.
+    staticPlot: touch,
     scrollZoom: !touch,
-    // Touch: disable double-tap zoom so Plotly does not keep a full-viewport drag layer active.
     doubleClick: touch ? false : 'reset+autosize',
   };
 }
