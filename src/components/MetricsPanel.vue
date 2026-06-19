@@ -2,6 +2,7 @@
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
 import { mdiChevronDown, mdiChevronUp, mdiMagnifyRemoveOutline, mdiDragHorizontalVariant } from '@mdi/js';
 import { useI18n } from '@/i18n';
+import { isCoarsePointerDevice } from '@/lib/plotlyTouch';
 import type { RetargetResult } from '@/lib/retarget/types';
 import ErrorChart from '@/components/ErrorChart.vue';
 import { ERROR_SERIES_MAX, ERROR_SERIES_MEAN } from '@/components/errorChartConstants';
@@ -17,6 +18,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const touchUi = isCoarsePointerDevice();
 
 const activeTab = ref<'error' | 'position' | 'velocity'>('error');
 const expanded = ref(true);
@@ -225,7 +227,7 @@ watch(activeTab, () => {
 <template>
   <div ref="panelRoot" class="metrics-panel" :class="{ dragging }">
     <div
-      v-if="expanded"
+      v-if="expanded && !touchUi"
       ref="resizeHandleEl"
       class="resize-handle d-flex align-center justify-center"
       :title="t('dragResizeMetrics')"
@@ -343,7 +345,7 @@ watch(activeTab, () => {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(0, 0, 0, 0.12);
   position: relative;
-  z-index: 1;
+  z-index: 2;
   overflow: hidden;
 }
 .metrics-panel.dragging {
@@ -368,6 +370,8 @@ watch(activeTab, () => {
   pointer-events: none;
 }
 .metrics-header {
+  position: relative;
+  z-index: 3;
   min-height: 36px;
   padding-right: 4px;
 }
@@ -417,10 +421,18 @@ watch(activeTab, () => {
 .chart-window :deep(.plot-container) {
   overflow: hidden;
 }
-/* iOS WebKit: Plotly's draglayer can extend past the chart and steal touches from playback controls. */
-@media (pointer: coarse) {
+/* iOS WebKit: Plotly SVG overlays can extend past the chart and steal touches from controls below. */
+@media (pointer: coarse), (hover: none) {
+  .chart-window {
+    pointer-events: none;
+  }
+  .chart-window :deep(.js-plotly-plot),
+  .chart-window :deep(.plot-container),
+  .chart-window :deep(.svg-container),
+  .chart-window :deep(.main-svg),
   .chart-window :deep(.draglayer),
   .chart-window :deep(.draglayer rect),
+  .chart-window :deep(.hoverlayer),
   .chart-window :deep(.nsewdrag),
   .chart-window :deep(.nsdrag),
   .chart-window :deep(.ewdrag),
@@ -429,9 +441,7 @@ watch(activeTab, () => {
   .chart-window :deep(.swdrag),
   .chart-window :deep(.sedrag) {
     pointer-events: none !important;
-  }
-  .chart-window :deep(.js-plotly-plot) {
-    touch-action: none;
+    touch-action: none !important;
   }
 }
 </style>

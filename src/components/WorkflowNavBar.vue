@@ -146,7 +146,8 @@ const runRetargetTooltip = computed(() => {
   position: absolute;
   top: 12px;
   right: 12px;
-  z-index: 5;
+  z-index: 6;
+  transform: translateZ(0);
   display: flex;
   align-items: center;
   justify-content: flex-end;
