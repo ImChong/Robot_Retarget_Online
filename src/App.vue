@@ -259,6 +259,9 @@ void locale.value;
 
 .bottom-nav {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  position: relative;
+  z-index: 8;
+  transform: translateZ(0);
 }
 
 .locale-btn {

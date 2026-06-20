@@ -372,6 +372,7 @@ watch(activeTab, () => {
 .metrics-header {
   position: relative;
   z-index: 3;
+  transform: translateZ(0);
   min-height: 36px;
   padding-right: 4px;
 }
