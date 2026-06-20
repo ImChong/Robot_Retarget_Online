@@ -112,8 +112,21 @@ async function main() {
     await page.waitForTimeout(1500);
     await page.screenshot({ path: join(OUT_DIR, '02-preview-loaded.png') });
 
-    // ---- Preview: workflow nav ----
-    log('step', 'tap workflow back to config');
+    // ---- Preview: ensure autoplay is running, then exercise controls while playing ----
+    log('step', 'verify controls respond during active playback');
+    const frameBeforePlay = await readPlaybackFrame(page);
+    await page.waitForTimeout(1200);
+    const frameDuringPlay = await readPlaybackFrame(page);
+    if (frameDuringPlay <= frameBeforePlay) {
+      await page.locator('.playback-bar .v-btn').nth(1).tap();
+      await page.waitForTimeout(800);
+    }
+    const framePlaying = await readPlaybackFrame(page);
+    await page.waitForTimeout(800);
+    const frameStillPlaying = await readPlaybackFrame(page);
+    if (frameStillPlaying <= framePlaying) throw new Error('Preview animation is not playing');
+
+    log('step', 'tap workflow back to config (while playing)');
     await page.locator('.workflow-nav').getByRole('button', { name: '返回重定向设置' }).tap();
     await page.waitForTimeout(1200);
     await page.screenshot({ path: join(OUT_DIR, '03-nav-config.png') });
@@ -121,15 +134,16 @@ async function main() {
     log('step', 'return to preview via bottom nav');
     await page.getByRole('button', { name: /重定向预览|3/ }).tap();
     await page.waitForTimeout(1200);
+    await page.waitForTimeout(1000);
 
-    // ---- Panel FAB ----
-    log('step', 'open side panel FAB');
+    // ---- Panel FAB (while playing) ----
+    log('step', 'open side panel FAB during playback');
     await openMobilePanel(page);
     await page.screenshot({ path: join(OUT_DIR, '04-panel-open.png') });
     await closeMobilePanel(page);
 
-    // ---- Metrics collapse/expand ----
-    log('step', 'collapse and expand metrics panel');
+    // ---- Metrics collapse/expand (while playing) ----
+    log('step', 'collapse and expand metrics panel during playback');
     const metricsToggle = page.locator('.metrics-header .v-btn').last();
     await metricsToggle.tap();
     await page.waitForTimeout(800);
@@ -138,23 +152,27 @@ async function main() {
     await page.waitForTimeout(800);
 
     // ---- Playback play/pause ----
-    log('step', 'play then pause');
+    log('step', 'pause then play again');
     const frameBefore = await readPlaybackFrame(page);
     const playBtn = page.locator('.playback-bar .v-btn').nth(1);
     await playBtn.tap();
-    await page.waitForTimeout(1500);
-    const framePlaying = await readPlaybackFrame(page);
-    await playBtn.tap();
     await page.waitForTimeout(600);
     const framePaused = await readPlaybackFrame(page);
+    await playBtn.tap();
+    await page.waitForTimeout(1500);
+    const frameResumed = await readPlaybackFrame(page);
+    await playBtn.tap();
+    await page.waitForTimeout(600);
     await page.screenshot({ path: join(OUT_DIR, '06-playback-tested.png') });
 
-    const playAdvanced = framePlaying > frameBefore;
-    log('result', `frames: before=${frameBefore} playing=${framePlaying} paused=${framePaused}`);
+    const playAdvanced = frameResumed > framePaused;
+    log('result', `frames: before=${frameBefore} paused=${framePaused} resumed=${frameResumed}`);
     if (!playAdvanced) throw new Error('Play button did not advance playback in WebKit');
 
-    // ---- Bottom nav ----
-    log('step', 'tap bottom nav BVH tab');
+    // ---- Bottom nav (while playing) ----
+    log('step', 'tap bottom nav BVH tab during playback');
+    await playBtn.tap();
+    await page.waitForTimeout(400);
     await page.locator('.bottom-nav').getByRole('button', { name: 'BVH 预览', exact: true }).tap();
     await page.waitForTimeout(1000);
     await page.screenshot({ path: join(OUT_DIR, '07-bottom-nav.png') });

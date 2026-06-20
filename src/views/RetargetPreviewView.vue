@@ -22,12 +22,14 @@ import MetricsPanel from '@/components/MetricsPanel.vue';
 import WorkflowNavBar from '@/components/WorkflowNavBar.vue';
 import { blendQpos } from '@/lib/viewport/poseBlend';
 import { exportCsv, exportJson, exportNpz, downloadBlob } from '@/lib/export/motion';
+import { isCoarsePointerDevice } from '@/lib/plotlyTouch';
 
 const { t } = useI18n();
 const { mdAndUp } = useDisplay();
 const motion = useMotionStore();
 const store = useRetargetStore();
 const playback = usePlayback();
+const touchUi = isCoarsePointerDevice();
 
 const viewportEl = ref<HTMLElement | null>(null);
 const sceneManager = shallowRef<SceneManager | null>(null);
@@ -38,6 +40,8 @@ const showGhost = ref(true);
 const followCamera = ref(true);
 const panelOpen = ref(false);
 const currentFrame = computed(() => playback.frameIndex.value);
+/** iOS WebKit: an actively rendering WebGL canvas can steal touches from HTML overlays. */
+const passTouchToOverlays = computed(() => touchUi && playback.state.playing);
 const isViewActive = ref(false);
 let setupSeq = 0;
 let displayedHistoryId: string | null = null;
@@ -184,6 +188,14 @@ watch(
 watch(mdAndUp, () => sceneManager.value?.resize());
 watch(panelOpen, () => nextTick(() => sceneManager.value?.resize()));
 
+function syncCanvasTouchTarget() {
+  const canvas = sceneManager.value?.renderer.domElement;
+  if (!canvas || !touchUi) return;
+  canvas.style.pointerEvents = playback.state.playing ? 'none' : 'auto';
+}
+
+watch(() => playback.state.playing, syncCanvasTouchTarget);
+
 function onMetricsResize() {
   nextTick(() => sceneManager.value?.resize());
 }
@@ -201,6 +213,7 @@ onMounted(() => {
   });
   sm.start();
   sceneManager.value = sm;
+  syncCanvasTouchTarget();
   if (store.activeHistoryId) void setupResultScene();
 });
 
@@ -278,9 +291,17 @@ onUnmounted(() => {
     </MobileSidePanel>
 
     <div class="main-col d-flex flex-column flex-grow-1">
-      <div class="viewport-wrap flex-grow-1">
-        <div ref="viewportEl" class="viewport" />
-        <WorkflowNavBar />
+      <div class="viewport-stack flex-grow-1">
+        <div class="viewport-wrap">
+          <div
+            ref="viewportEl"
+            class="viewport"
+            :class="{ 'viewport--pass-touch': passTouchToOverlays }"
+          />
+        </div>
+        <div class="viewport-overlays">
+          <WorkflowNavBar />
+        </div>
       </div>
       <MetricsPanel v-if="store.result" :result="store.result" :frame="currentFrame" @resize="onMetricsResize" />
       <PlaybackBar v-if="store.result" :controller="playback" />
@@ -311,10 +332,24 @@ onUnmounted(() => {
   position: relative;
   isolation: isolate;
 }
+.viewport-stack {
+  position: relative;
+  min-height: 0;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+}
 .viewport-wrap {
+  flex: 1 1 0;
   min-height: 0;
   position: relative;
   isolation: isolate;
+}
+.viewport-overlays {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
 }
 .viewport {
   position: absolute;
@@ -326,6 +361,12 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   z-index: 0;
+}
+@media (pointer: coarse), (hover: none) {
+  .viewport--pass-touch,
+  .viewport--pass-touch :deep(canvas) {
+    pointer-events: none !important;
+  }
 }
 .info-line {
   display: flex;
