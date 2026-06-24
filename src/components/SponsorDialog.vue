@@ -112,8 +112,8 @@ body.sponsor-dialog-open {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: blur(16px);
-  -webkit-filter: blur(16px);
+  filter: blur(8px);
+  -webkit-filter: blur(8px);
   transform: scale(1.08);
 }
 
@@ -126,8 +126,8 @@ body.sponsor-dialog-open {
   margin: 0;
   cursor: default;
   background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .sponsor-dialog-card {
