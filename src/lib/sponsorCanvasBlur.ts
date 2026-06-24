@@ -4,7 +4,7 @@
  * is open (same workaround pattern as frosted overlays over three.js viewports).
  */
 
-const BLUR_PX = 16;
+const BLUR_PX = 8;
 
 export function mountSponsorCanvasBlurs(host: HTMLElement): () => void {
   const layers: HTMLElement[] = [];
