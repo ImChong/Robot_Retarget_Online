@@ -356,10 +356,12 @@ watch(activeTab, () => {
   top: 0;
   left: 0;
   right: 0;
-  height: 8px;
+  height: 10px;
   cursor: ns-resize;
-  z-index: 2;
-  transform: translateY(-4px);
+  /* Above .metrics-header (z-index 3) so the header no longer swallows the
+     drag; kept inside the panel (no negative translate) so .metrics-panel's
+     overflow: hidden doesn't clip the grab area. */
+  z-index: 4;
 }
 .resize-handle:hover .resize-icon,
 .metrics-panel.dragging .resize-icon {
