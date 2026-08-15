@@ -50,6 +50,35 @@ function blockingAncestor(el: Element | null): string | null {
   return null;
 }
 
+/**
+ * Ancestors forced onto their own GPU layer. Promotion is the leading suspect
+ * for iOS dropping click synthesis, so name every one on the chain.
+ */
+function compositedAncestors(el: Element | null): string[] {
+  const found: string[] = [];
+  let node: Element | null = el;
+  while (node) {
+    const cs = getComputedStyle(node);
+    const why: string[] = [];
+    if (cs.transform && cs.transform !== 'none') why.push('transform');
+    const backdrop = cs.backdropFilter || (cs as unknown as Record<string, string>).webkitBackdropFilter;
+    if (backdrop && backdrop !== 'none') why.push('backdrop-filter');
+    if (cs.filter && cs.filter !== 'none') why.push('filter');
+    if (cs.willChange && cs.willChange !== 'auto') why.push(`will-change:${cs.willChange}`);
+    if (why.length) found.push(`${describe(node)}[${why.join('+')}]`);
+    node = node.parentElement;
+  }
+  return found;
+}
+
+/** The element that would actually receive the activation, and its state. */
+function activationTarget(el: Element | null): string {
+  const control = el?.closest('button,a,[role="button"],input,select');
+  if (!control) return 'none';
+  const disabled = control.hasAttribute('disabled') || control.getAttribute('aria-disabled') === 'true';
+  return `${describe(control)} disabled=${disabled}`;
+}
+
 interface TapRecord {
   target: string;
   x: number;
@@ -116,18 +145,55 @@ export function installTouchDebug(): void {
   }
   emit(`[env] ${env()}`);
   emit(`[ua] ${navigator.userAgent.slice(0, 90)}`);
-  emit('[ready] tap a button that does not work');
+  emit('[ready] tap CTRL below, then a dead app button');
+
+  /*
+   * Control experiment: a bare <button> owned by this overlay, outside the app's
+   * markup, styling and stacking. If CTRL clicks but app buttons do not, the
+   * cause is in the app; if CTRL is dead too, it is document- or browser-wide.
+   */
+  const control = document.createElement('button');
+  control.type = 'button';
+  control.textContent = 'CTRL';
+  control.style.cssText = [
+    'position:fixed',
+    'right:8px',
+    'top:calc(28% - 40px)',
+    'z-index:2147483647',
+    'pointer-events:auto',
+    'min-width:64px',
+    'min-height:44px',
+    'font:12px/1 ui-monospace,monospace',
+    'color:#000',
+    'background:#8ef',
+    'border:2px solid #fff',
+    'border-radius:8px',
+  ].join(';');
+  let controlTaps = 0;
+  control.addEventListener('click', () => emit(`[ctrl] CLICK OK (${++controlTaps})`));
+  document.body.appendChild(control);
 
   let tap: TapRecord | null = null;
   let clickTimer: ReturnType<typeof setTimeout> | null = null;
+  /** WebKit fires pointerdown *before* touchstart, so stash it until the record exists. */
+  let pendingPointerDown: { seen: boolean; prevented: boolean } = { seen: false, prevented: false };
 
   const on = (type: string, fn: (e: Event) => void) =>
     document.addEventListener(type, fn, { capture: true, passive: true });
+
+  /** Report a pending tap before it is replaced, so rapid taps each get a verdict. */
+  function flushPending() {
+    if (clickTimer) clearTimeout(clickTimer);
+    clickTimer = null;
+    if (tap && tap.sawTouchEnd) emit('  >> CLICK NOT DISPATCHED');
+    tap = null;
+  }
 
   on('touchstart', (e) => {
     const te = e as TouchEvent;
     const t = te.touches[0];
     if (!t) return;
+    flushPending();
     const el = te.target instanceof Element ? te.target : null;
     tap = {
       target: describe(te.target),
@@ -138,26 +204,37 @@ export function installTouchDebug(): void {
       vvHeight: Math.round(vv?.height ?? 0),
       startedAt: performance.now(),
       moved: 0,
-      sawPointerDown: false,
+      sawPointerDown: pendingPointerDown.seen,
       sawPointerUp: false,
-      sawTouchEnd: false,
       sawCancel: null,
-      preventedOn: [],
+      sawTouchEnd: false,
+      preventedOn: pendingPointerDown.prevented ? ['pointerdown'] : [],
     };
+    pendingPointerDown = { seen: false, prevented: false };
     const hit = document.elementFromPoint(t.clientX, t.clientY);
+    const composited = compositedAncestors(el);
     emit('');
     emit(`[tap] ${tap.target} @${Math.round(t.clientX)},${Math.round(t.clientY)}`);
-    emit(`  touchAction=${resolvedTouchAction(el)} peNoneAncestor=${blockingAncestor(el) ?? 'none'}`);
+    emit(`  control=${activationTarget(el)}`);
+    emit(`  touchAction=${resolvedTouchAction(el)} peNone=${blockingAncestor(el) ?? 'none'}`);
+    emit(`  gpuLayers=${composited.length ? composited.slice(0, 3).join(' < ') : 'none'}`);
     if (hit && hit !== te.target && !hit.contains(te.target as Node)) {
       emit(`  !! elementFromPoint=${describe(hit)} differs from target`);
     }
   });
 
-  on('pointerdown', () => {
-    if (tap) tap.sawPointerDown = true;
+  on('pointerdown', (e) => {
+    if (tap) {
+      tap.sawPointerDown = true;
+      if (e.defaultPrevented) tap.preventedOn.push('pointerdown');
+    } else {
+      pendingPointerDown = { seen: true, prevented: e.defaultPrevented };
+    }
   });
-  on('pointerup', () => {
-    if (tap) tap.sawPointerUp = true;
+  on('pointerup', (e) => {
+    if (!tap) return;
+    tap.sawPointerUp = true;
+    if (e.defaultPrevented) tap.preventedOn.push('pointerup');
   });
   on('pointercancel', () => {
     if (tap) tap.sawCancel = 'pointercancel';

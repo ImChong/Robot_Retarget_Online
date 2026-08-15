@@ -178,7 +178,6 @@ onUnmounted(() => {
   position: relative;
   z-index: 4;
   touch-action: manipulation;
-  transform: translateZ(0);
 }
 .playback-bar--light {
   background: rgba(255, 255, 255, 0.94);
