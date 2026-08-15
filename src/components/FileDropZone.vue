@@ -46,7 +46,7 @@ defineExpose({ readFile });
   inset: 0;
   z-index: 30;
   background: rgba(20, 24, 30, 0.82);
-  border: 2px dashed rgba(79, 195, 247, 0.7);
+  border: 2px dashed rgba(var(--v-theme-primary), 0.7);
   pointer-events: none;
 }
 </style>

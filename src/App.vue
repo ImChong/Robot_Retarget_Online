@@ -6,7 +6,7 @@ import { useI18n } from '@/i18n';
 import { useAppTheme } from '@/composables/useAppTheme';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore } from '@/stores/retarget';
-import { mdiTranslate, mdiGithub, mdiWeatherSunny, mdiWeatherNight, mdiCoffee } from '@mdi/js';
+import { mdiGithub, mdiWeatherSunny, mdiWeatherNight, mdiCoffee } from '@mdi/js';
 import SponsorDialog from '@/components/SponsorDialog.vue';
 
 const { t, toggleLocale, localeLabel, locale } = useI18n();
@@ -52,13 +52,14 @@ void locale.value;
 
 <template>
   <v-app>
-    <v-app-bar density="comfortable" flat border class="app-bar">
-      <div class="app-bar-inner">
-        <div class="app-bar-brand" :aria-label="t('appTitleBilingual')">
-          <span class="app-title-text font-weight-bold">{{ t('appTitleBilingual') }}</span>
-        </div>
+    <v-app-bar :height="56" flat class="site-header">
+      <div class="header-inner">
+        <router-link :to="{ name: 'bvh' }" class="site-title" :aria-label="t('appTitleBilingual')">
+          <span class="site-title-icon" aria-hidden="true">🔄</span>
+          <span class="site-title-text">{{ t('appTitleBilingual') }}</span>
+        </router-link>
 
-        <v-tabs v-if="mdAndUp" v-model="currentTab" color="primary" class="app-bar-tabs">
+        <v-tabs v-if="mdAndUp" v-model="currentTab" color="primary" class="header-nav">
           <v-tab v-for="tab in tabs" :key="tab.value" :value="tab.value" :disabled="tab.disabled">
             <v-tooltip v-if="tab.disabled && tab.disabledHint" :text="tab.disabledHint" location="bottom">
               <template #activator="{ props: tipProps }">
@@ -77,49 +78,46 @@ void locale.value;
           </v-tab>
         </v-tabs>
 
-        <div class="app-bar-actions">
-          <v-btn
-            :icon="isDark ? mdiWeatherSunny : mdiWeatherNight"
-            variant="text"
-            :aria-label="isDark ? t('themeDark') : t('themeLight')"
-            :title="isDark ? t('themeDark') : t('themeLight')"
-            @click="toggleAppTheme"
-          />
-          <v-btn
-            v-if="mdAndUp"
-            variant="text"
-            :prepend-icon="mdiTranslate"
-            class="locale-btn"
-            :aria-label="localeLabel"
-            :title="localeLabel"
+        <div class="header-right">
+          <a
+            class="github-link"
+            href="https://github.com/ImChong/Robot_Retarget_Online"
+            target="_blank"
+            rel="noopener noreferrer"
+            :aria-label="t('viewOnGithub')"
+            :title="t('viewOnGithub')"
+          >
+            <v-icon :icon="mdiGithub" size="16" />
+            <span class="github-link-text">GitHub</span>
+          </a>
+          <button
+            type="button"
+            class="header-btn lang-toggle"
+            :aria-label="t('switchLanguage')"
+            :title="t('switchLanguage')"
             @click="toggleLocale"
           >
             {{ localeLabel }}
-          </v-btn>
-          <v-btn
-            v-else
-            variant="text"
-            :icon="mdiTranslate"
-            class="locale-btn"
-            :aria-label="localeLabel"
-            :title="localeLabel"
-            @click="toggleLocale"
-          />
-          <v-btn
-            :icon="mdiCoffee"
-            variant="text"
-            class="sponsor-btn"
+          </button>
+          <button
+            type="button"
+            class="header-btn theme-toggle"
+            :aria-label="isDark ? t('themeDark') : t('themeLight')"
+            :title="isDark ? t('themeDark') : t('themeLight')"
+            @click="toggleAppTheme"
+          >
+            <v-icon :icon="isDark ? mdiWeatherSunny : mdiWeatherNight" size="17" />
+          </button>
+          <button
+            type="button"
+            class="header-btn sponsor-toggle"
             :aria-label="t('sponsorTitle')"
             :title="t('sponsorTitle')"
+            aria-haspopup="dialog"
             @click="sponsorOpen = true"
-          />
-          <v-btn
-            :icon="mdiGithub"
-            variant="text"
-            href="https://github.com/ImChong/Robot_Retarget_Online"
-            target="_blank"
-            rel="noopener"
-          />
+          >
+            <v-icon :icon="mdiCoffee" size="17" />
+          </button>
         </div>
       </div>
     </v-app-bar>
@@ -146,12 +144,37 @@ void locale.value;
 </template>
 
 <style>
+/*
+ * Site palette — mirrors the Notion-inspired tokens of imchong.github.io
+ * (`css/style.css`); `data-theme` is set on <html> by useAppTheme.
+ * Header chrome follows Humanoid_Robot_Learning_Paper_Notebooks'
+ * `.site-header` (bold sans title, GitHub text link, 36×30 pill toggles).
+ */
 :root {
-  --app-bar-height: 64px;
-  --app-bar-outer-height: calc(56px + 2px); /* comfortable toolbar + top/bottom border */
-  --app-bar-icon-size: 36px;
-  --app-bar-edge-inset: calc((var(--app-bar-outer-height) - var(--app-bar-icon-size)) / 2);
+  --rro-header-bg: #222222;
+  --rro-border: #3d3d3d;
+  --rro-text: #e8e8e4;
+  --rro-text-muted: #9b9a97;
+  --rro-accent: #5b9cf6;
+  --rro-accent-hover: #7ab3ff;
+  --rro-hover-bg: #2f2f2f;
+  --rro-sponsor: #e2566a;
+  --rro-radius: 6px;
+  --rro-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial,
+    'Noto Sans SC', sans-serif;
+
+  --app-bar-height: 56px;
   --app-bottom-nav-height: 0px;
+}
+
+:root[data-theme='light'] {
+  --rro-header-bg: #ffffff;
+  --rro-border: #e8e8e4;
+  --rro-text: #37352f;
+  --rro-text-muted: #787774;
+  --rro-accent: #2d74da;
+  --rro-accent-hover: #1a5bb8;
+  --rro-hover-bg: #f7f6f3;
 }
 
 @media (max-width: 959.98px) {
@@ -175,105 +198,232 @@ void locale.value;
   overflow: hidden;
 }
 
-.app-bar :deep(.v-toolbar__content) {
-  width: 100%;
-  padding-inline: 16px;
+/*
+ * Header rules are scoped under `.site-header` (and paired with `.v-toolbar` /
+ * `.v-btn` where needed) so they outrank Vuetify's same-specificity resets,
+ * which are injected after this block — e.g. `[type='button'] { color: inherit }`.
+ */
+.site-header.v-toolbar {
+  background: var(--rro-header-bg);
+  border-bottom: 1px solid var(--rro-border);
+  backdrop-filter: blur(8px);
 }
 
-.app-bar-inner {
+.site-header .v-toolbar__content {
+  width: 100%;
+  padding-inline: 0;
+}
+
+.header-inner {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 0.75rem;
   width: 100%;
   min-width: 0;
+  height: 100%;
+  padding-inline: 24px;
 }
 
-.app-bar-brand {
-  display: flex;
+.site-title {
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  flex: 1 1 auto;
+  gap: 0.45rem;
   min-width: 0;
-  overflow: hidden;
-  padding-left: var(--app-bar-edge-inset);
+  font-family: var(--rro-font-sans);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--rro-text);
+  text-decoration: none;
+  transition: color 0.2s ease;
 }
 
-.app-title-text {
-  line-height: 1.2;
+.site-title:hover {
+  color: var(--rro-accent);
+}
+
+.site-title-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+.site-title-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.app-bar-actions {
+.header-right {
   display: flex;
   align-items: center;
+  gap: 0.7rem;
   flex: 0 0 auto;
+}
+
+.site-header .github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 30px;
+  font-family: var(--rro-font-sans);
+  font-size: 0.85rem;
+  color: var(--rro-text-muted);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.site-header .github-link:hover {
+  color: var(--rro-accent);
+}
+
+.site-header .header-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 36px;
+  height: 30px;
+  padding: 0 0.6rem;
+  background: none;
+  border: 1px solid var(--rro-border);
+  border-radius: var(--rro-radius);
+  color: var(--rro-text-muted);
+  font-family: var(--rro-font-sans);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.site-header .header-btn:hover {
+  border-color: var(--rro-accent);
+  color: var(--rro-text);
+}
+
+.site-header .header-btn:focus-visible {
+  outline: 2px solid var(--rro-accent);
+  outline-offset: 2px;
+}
+
+.site-header .lang-toggle:hover {
+  background: var(--rro-accent);
+  border-color: var(--rro-accent);
+  color: #fff;
+}
+
+.site-header .sponsor-toggle {
+  color: var(--rro-sponsor);
+}
+
+.site-header .sponsor-toggle:hover {
+  border-color: var(--rro-sponsor);
+  background: rgba(226, 86, 106, 0.12);
+  color: var(--rro-sponsor);
+}
+
+/* ===== Header nav (workflow steps) ===== */
+.header-nav {
   flex-shrink: 0;
 }
 
-@media (max-width: 768px) {
-  .app-title-text {
-    font-size: 0.94rem;
-    white-space: normal;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+.header-nav .v-tab.v-btn {
+  min-width: 0;
+  padding-inline: 14px;
+  font-family: var(--rro-font-sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--rro-text-muted);
+}
+
+.header-nav .v-tab.v-btn:hover {
+  color: var(--rro-text);
+}
+
+.header-nav .v-tab.v-btn--disabled {
+  color: var(--rro-text-muted);
+}
+
+.header-nav .v-tab.v-tab--selected {
+  color: var(--rro-accent);
+}
+
+@media (max-width: 959.98px) {
+  .header-inner {
+    gap: 0.5rem;
+    padding-inline: 12px;
   }
 
-  .app-bar-actions {
-    gap: 0;
-    padding-right: 2px;
+  .site-title {
+    flex: 1 1 0;
+    font-size: 0.96rem;
+  }
+
+  .header-right {
+    gap: 0.35rem;
+  }
+
+  .site-header .github-link {
+    font-size: 0.78rem;
+  }
+
+  .github-link-text {
+    display: none;
+  }
+
+  .site-header .header-btn {
+    min-width: 32px;
+    padding: 0 0.45rem;
   }
 }
 
 @media (min-width: 960px) {
-  .app-bar :deep(.v-toolbar__content) {
-    padding-inline: 16px;
-  }
-
-  .app-bar-inner {
+  .header-inner {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     column-gap: 16px;
     align-items: center;
   }
 
-  .app-bar-brand {
+  .site-title {
     justify-self: start;
-    flex: initial;
   }
 
-  .app-bar-tabs {
+  .header-nav {
     justify-self: center;
-    flex-shrink: 0;
   }
 
-  .app-bar-actions {
+  .header-right {
     justify-self: end;
-    padding-right: var(--app-bar-edge-inset);
   }
 }
 
-.bottom-nav {
+/* ===== Bottom nav (mobile workflow steps) ===== */
+.bottom-nav.v-bottom-navigation {
   padding-bottom: env(safe-area-inset-bottom, 0px);
   position: relative;
   z-index: 8;
   transform: translateZ(0);
+  background: var(--rro-header-bg);
+  border-top: 1px solid var(--rro-border);
 }
 
-.locale-btn {
-  min-width: 0 !important;
+.bottom-nav .v-btn {
+  font-family: var(--rro-font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--rro-text-muted);
 }
 
-.sponsor-btn {
-  min-width: 0 !important;
-}
-
-.sponsor-btn :deep(.v-icon) {
-  color: #e2566a;
+.bottom-nav .v-btn--selected {
+  color: var(--rro-accent);
 }
 
 .tab-with-step {
@@ -298,9 +448,9 @@ void locale.value;
   font-weight: 600;
   line-height: 1;
   flex-shrink: 0;
-  background: rgba(var(--v-theme-on-surface), 0.08);
-  color: rgba(var(--v-theme-on-surface), 0.55);
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.14);
+  background: var(--rro-hover-bg);
+  color: var(--rro-text-muted);
+  border: 1px solid var(--rro-border);
   transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 
@@ -313,8 +463,8 @@ void locale.value;
   align-items: center;
 }
 
-.app-bar-tabs :deep(.v-tab--selected) .tab-step,
-.bottom-nav :deep(.v-btn--selected) .tab-step {
+.header-nav .v-tab--selected .tab-step,
+.bottom-nav .v-btn--selected .tab-step {
   background: rgb(var(--v-theme-primary));
   color: rgb(var(--v-theme-on-primary));
   border-color: transparent;

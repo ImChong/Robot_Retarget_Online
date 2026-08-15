@@ -1,27 +1,49 @@
 import type { Layout, Shape } from 'plotly.js';
+import { appTheme, type AppTheme } from '@/composables/useAppTheme';
 
-/** Shared dark-theme layout for metrics charts. */
-export function buildDarkLayout(overrides?: Partial<Layout>): Partial<Layout> {
+/** Chart chrome per theme — derived from the site palette (see src/plugins/vuetify.ts). */
+const CHART_THEMES = {
+  dark: {
+    paper: 'rgba(0, 0, 0, 0.18)',
+    font: 'rgba(232, 232, 228, 0.6)',
+    grid: 'rgba(232, 232, 228, 0.12)',
+    hoverBg: '#2f2f2f',
+    hoverBorder: 'rgba(232, 232, 228, 0.2)',
+    hoverFont: '#e8e8e4',
+  },
+  light: {
+    paper: 'rgba(55, 53, 47, 0.04)',
+    font: 'rgba(55, 53, 47, 0.65)',
+    grid: 'rgba(55, 53, 47, 0.12)',
+    hoverBg: '#ffffff',
+    hoverBorder: 'rgba(55, 53, 47, 0.2)',
+    hoverFont: '#37352f',
+  },
+} as const satisfies Record<AppTheme, unknown>;
+
+/** Shared layout for metrics charts, themed to match the current app theme. */
+export function buildChartLayout(overrides?: Partial<Layout>): Partial<Layout> {
+  const c = CHART_THEMES[appTheme.value];
   return {
-    paper_bgcolor: 'rgba(0, 0, 0, 0.18)',
+    paper_bgcolor: c.paper,
     plot_bgcolor: 'transparent',
-    font: { color: 'rgba(255,255,255,0.55)', size: 10 },
+    font: { color: c.font, size: 10 },
     margin: { l: 50, r: 12, t: 8, b: 28 },
     xaxis: {
-      gridcolor: 'rgba(255,255,255,0.12)',
-      zerolinecolor: 'rgba(255,255,255,0.12)',
+      gridcolor: c.grid,
+      zerolinecolor: c.grid,
       title: { text: '' },
     },
     yaxis: {
-      gridcolor: 'rgba(255,255,255,0.12)',
-      zerolinecolor: 'rgba(255,255,255,0.12)',
+      gridcolor: c.grid,
+      zerolinecolor: c.grid,
       title: { text: '' },
     },
     hovermode: 'x unified',
     hoverlabel: {
-      bgcolor: '#1e1e1e',
-      bordercolor: 'rgba(255,255,255,0.2)',
-      font: { color: '#fff', size: 11 },
+      bgcolor: c.hoverBg,
+      bordercolor: c.hoverBorder,
+      font: { color: c.hoverFont, size: 11 },
     },
     ...overrides,
   };

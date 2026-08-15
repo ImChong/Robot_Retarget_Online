@@ -176,7 +176,7 @@ function num(v: string | number): number {
 }
 .mapping-row.highlighted,
 .mapping-row:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--v-theme-on-surface), 0.06);
 }
 .mono {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
@@ -187,7 +187,7 @@ function num(v: string | number): number {
   font-size: 0.82rem;
 }
 .detail-row td {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--v-theme-on-surface), 0.04);
 }
 .offset-field {
   max-width: 86px;

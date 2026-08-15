@@ -678,7 +678,7 @@ onUnmounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--rro-border);
 }
 .table-scroll {
   overflow: auto;
@@ -713,8 +713,8 @@ onUnmounted(() => {
   padding-bottom: 0;
 }
 .loading-strip {
-  background: rgba(79, 195, 247, 0.08);
-  color: rgba(255, 255, 255, 0.87);
+  background: rgba(var(--v-theme-primary), 0.08);
+  color: rgb(var(--v-theme-on-surface));
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 .loading-strip--success {
@@ -739,7 +739,7 @@ onUnmounted(() => {
   min-height: 100%;
 }
 .sidebar-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--rro-border);
   padding-top: 12px;
 }
 </style>
