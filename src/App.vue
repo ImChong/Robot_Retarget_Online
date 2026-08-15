@@ -165,6 +165,8 @@ void locale.value;
 
   --app-bar-height: 56px;
   --app-bottom-nav-height: 0px;
+  /* Apple HIG minimum hit area; see the "Touch input" block at the end. */
+  --rro-tap-target: 44px;
 }
 
 :root[data-theme='light'] {
@@ -468,6 +470,94 @@ void locale.value;
   background: rgb(var(--v-theme-primary));
   color: rgb(var(--v-theme-on-primary));
   border-color: transparent;
+}
+
+/*
+ * ===== Touch input (iOS Safari / WebKit) =====
+ *
+ * Two independent problems made the controls feel dead on iPhone. Neither is a
+ * stacking or hit-testing fault — every box was exactly where it looked:
+ *
+ * 1. Everything inherited `touch-action: auto`, so Safari kept double-tap-zoom
+ *    armed over each control and withheld the synthetic `click` while it waited
+ *    to see whether a second tap was coming. Tapping twice in quick succession
+ *    (play/pause, frame stepping, workflow nav) zoomed the page instead of
+ *    activating the button. `manipulation` still allows scrolling and
+ *    pinch-zoom — it only drops the double-tap gesture, and the wait with it.
+ *    It is declared on the root because touch-action resolves as the
+ *    intersection along the hit-test chain, so one declaration covers every
+ *    descendant (including overlays teleported to <body>) while the three.js
+ *    canvas keeps OrbitControls' stricter `touch-action: none`.
+ *
+ * 2. The global `VBtn` comfortable density (src/plugins/vuetify.ts) subtracts
+ *    8px, so our `size="small"` chrome rendered at 20–28 CSS px — the metrics
+ *    collapse toggle was 20x20 and the workflow nav buttons 134x20. Apple's
+ *    minimum is 44x44pt, so a fingertip mostly landed outside the box and the
+ *    tap did nothing at all.
+ *
+ * This block must stay last: it widens `.site-header .header-btn`, which the
+ * `max-width: 959.98px` block above narrows at the same specificity.
+ */
+html {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (pointer: coarse), (hover: none) {
+  /*
+   * Vuetify buttons clip to their own box (`.v-btn { overflow: hidden }`), so
+   * their hit area has to come from the box itself rather than a pseudo-element.
+   * `min-*` only ever grows a control, and the `.v-application` prefix keeps
+   * these ahead of the per-view scoped rules that place `.panel-fab`.
+   */
+  .v-application .panel-fab.v-btn,
+  .v-application .workflow-nav .v-btn,
+  .v-application .playback-bar .v-btn,
+  .v-application .metrics-header .v-btn,
+  .v-application .metrics-header .v-tab {
+    min-width: var(--rro-tap-target);
+    min-height: var(--rro-tap-target);
+  }
+
+  /*
+   * VTabs pins its slide group to the density height and paints it with
+   * `contain: content`, so a taller .v-tab grows and is then clipped straight
+   * back to 36px of hit area. Open the track up to match the tabs inside it.
+   */
+  .v-application .metrics-header .v-tabs,
+  .v-application .metrics-header .v-slide-group__container,
+  .v-application .metrics-header .v-slide-group__content {
+    height: var(--rro-tap-target);
+  }
+
+  /*
+   * The header links are native elements with no clipping, so they keep their
+   * pill look and take the missing height from a centred overlay. Widening them
+   * to a full 44px also pushes centre-to-centre spacing past 44, so neighbouring
+   * overlays meet edge to edge instead of reaching over each other's pills.
+   */
+  .site-header .header-btn,
+  .site-header .github-link {
+    min-width: var(--rro-tap-target);
+  }
+
+  .site-header .header-btn,
+  .site-header .github-link,
+  .site-header .site-title {
+    position: relative;
+  }
+
+  .site-header .header-btn::after,
+  .site-header .github-link::after,
+  .site-header .site-title::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, var(--rro-tap-target));
+    height: var(--rro-tap-target);
+    transform: translate(-50%, -50%);
+  }
 }
 
 </style>

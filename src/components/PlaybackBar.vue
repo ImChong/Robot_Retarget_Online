@@ -124,7 +124,7 @@ onUnmounted(() => {
 
       <v-slider
         v-model="sliderValue"
-        class="flex-grow-1 mx-1"
+        class="flex-grow-1 playback-slider"
         :min="0"
         :max="Math.max(state.frameCount - 1, 0)"
         :step="1"
@@ -186,6 +186,16 @@ onUnmounted(() => {
 }
 .playback-row--transport {
   min-width: 0;
+}
+.playback-slider {
+  margin-inline: 4px;
+}
+/* At frame 0 the thumb surface overhangs the start of the track; on touch that
+   halo lands on the "next frame" button and swallows its taps. */
+@media (pointer: coarse), (hover: none) {
+  .playback-slider {
+    margin-inline: 18px;
+  }
 }
 .playback-row--meta {
   margin-top: 2px;

@@ -23,6 +23,7 @@ Non-obvious caveats:
 
 - `tests/robots/parity/*.test.ts` are **skipped by default** — they need Python-generated GMR reference JSON (`python3 scripts/gmr_reference_all.py`). This is optional validation; skipped is the expected state.
 - `scripts/e2e_smoke.mjs` is an optional headless smoke test that needs Chromium and a prior `npm run build`; it is not part of `npm test`.
+- `scripts/webkit_preview_verify.mjs` drives the full workflow on an emulated iPhone in Playwright's WebKit and guards the touch contract: every control must resolve to `touch-action: manipulation` (otherwise Safari holds the click back for double-tap-to-zoom) and have a ≥44×44pt effective hit area. Run it against a live dev/preview server (`node scripts/webkit_preview_verify.mjs --url http://localhost:3000`) after any change to the app chrome. It needs `npx playwright-core install webkit` (plus `install-deps webkit` on Linux) and is not part of `npm test`.
 - `mujoco-js` ships an ~11 MB WASM bundle (excluded from Vite dep optimization). The build prints a `Module "module" has been externalized for browser compatibility` warning from `mujoco_wasm.js` and a large-chunk note — both are expected, not errors.
 - To exercise the app end-to-end without uploading files: BVH Viewer → "Loading example actions" → "Walk (sample)", then Retarget Preview → "Start redirection". Bundled samples live in `public/sample_motions/`.
 
