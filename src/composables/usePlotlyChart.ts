@@ -94,6 +94,10 @@ export function usePlotlyChart(
     const el = elRef.value;
     const P = plotly.value;
     if (!el || !P) return;
+    // Collapsing the metrics panel hides the chart (v-show) but still fires the
+    // resize watcher; Plotly rejects a display:none div, which surfaced as an
+    // unhandled rejection every time the panel was toggled.
+    if (!el.offsetParent && getComputedStyle(el).position !== 'fixed') return;
     P.Plots.resize(el);
   }
 
