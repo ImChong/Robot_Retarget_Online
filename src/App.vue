@@ -208,7 +208,8 @@ void locale.value;
 .site-header.v-toolbar {
   background: var(--rro-header-bg);
   border-bottom: 1px solid var(--rro-border);
-  backdrop-filter: blur(8px);
+  /* No backdrop-filter: --rro-header-bg is fully opaque, so it blurred nothing
+     visible and only cost a compositing layer. See the "Touch input" block. */
 }
 
 .site-header .v-toolbar__content {
@@ -410,7 +411,6 @@ void locale.value;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   position: relative;
   z-index: 8;
-  transform: translateZ(0);
   background: var(--rro-header-bg);
   border-top: 1px solid var(--rro-border);
 }

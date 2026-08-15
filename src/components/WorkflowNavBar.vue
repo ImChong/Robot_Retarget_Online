@@ -147,7 +147,6 @@ const runRetargetTooltip = computed(() => {
   top: 12px;
   right: 12px;
   z-index: 6;
-  transform: translateZ(0);
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -155,8 +154,10 @@ const runRetargetTooltip = computed(() => {
   padding: 4px 6px;
   border-radius: 10px;
   pointer-events: none;
-  background: rgba(var(--v-theme-surface), 0.78);
-  backdrop-filter: blur(8px);
+  /* No backdrop-filter: this floats over the WebGL canvas, which backdrop-filter
+     cannot blur anyway (the reason src/lib/sponsorCanvasBlur.ts exists), so it
+     only cost a compositing layer. Raise the tint to stay legible without it. */
+  background: rgba(var(--v-theme-surface), 0.9);
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.28);
 }
