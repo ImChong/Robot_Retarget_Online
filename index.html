@@ -19,6 +19,42 @@
         } catch (e) {}
       })();
     </script>
+    <script>
+      // Touch diagnostics, armed before any bundle runs so nothing escapes it.
+      // Inert unless the URL contains `touchdebug`; see src/lib/touchDebug.ts.
+      (function () {
+        if (!location.href.includes('touchdebug')) return;
+        var probe = (window.__touchProbe = { prevented: [], listeners: [] });
+        var TOUCHY = /^(touch|pointer|mouse|click)/;
+        var frames = function (skip) {
+          return ((new Error().stack || '').split('\n').slice(skip, skip + 3).join(' | ') || '?')
+            .replace(/https?:\/\/[^/]+/g, '')
+            .slice(0, 220);
+        };
+        var origPreventDefault = Event.prototype.preventDefault;
+        Event.prototype.preventDefault = function () {
+          if (TOUCHY.test(this.type)) {
+            probe.prevented.push({ type: this.type, stack: frames(2) });
+            if (probe.prevented.length > 60) probe.prevented.shift();
+          }
+          return origPreventDefault.apply(this, arguments);
+        };
+        var origAdd = EventTarget.prototype.addEventListener;
+        EventTarget.prototype.addEventListener = function (type, fn, opts) {
+          var global = this === window || this === document || this === document.body;
+          if (global && TOUCHY.test(type)) {
+            probe.listeners.push({
+              type: type,
+              on: this === window ? 'window' : this === document ? 'document' : 'body',
+              capture: opts === true || !!(opts && opts.capture),
+              passive: !!(opts && opts.passive),
+              stack: frames(2),
+            });
+          }
+          return origAdd.apply(this, arguments);
+        };
+      })();
+    </script>
     <style>
       html,
       body {
