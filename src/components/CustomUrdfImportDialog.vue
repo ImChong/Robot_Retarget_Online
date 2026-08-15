@@ -143,11 +143,11 @@ function onFileChosen(e: Event) {
   font-size: 0.78rem;
   padding: 0.4rem 0.55rem;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--v-theme-on-surface), 0.06);
 }
 .drop-zone {
   min-height: 148px;
-  border: 2px dashed rgba(79, 195, 247, 0.45);
+  border: 2px dashed rgba(var(--v-theme-primary), 0.45);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -157,8 +157,8 @@ function onFileChosen(e: Event) {
   transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 .drop-zone--active {
-  border-color: rgba(79, 195, 247, 0.95);
-  background: rgba(79, 195, 247, 0.08);
+  border-color: rgba(var(--v-theme-primary), 0.95);
+  background: rgba(var(--v-theme-primary), 0.08);
 }
 .drop-zone--loading {
   pointer-events: none;

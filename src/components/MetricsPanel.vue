@@ -342,8 +342,8 @@ watch(activeTab, () => {
 <style scoped>
 .metrics-panel {
   flex-shrink: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.12);
+  border-top: 1px solid var(--rro-border);
+  background: rgb(var(--v-theme-surface));
   position: relative;
   z-index: 2;
   overflow: hidden;

@@ -225,6 +225,8 @@ const messages: Record<string, { zh: string; en: string }> = {
   openPanel: { zh: '打开控制面板', en: 'Open control panel' },
   themeDark: { zh: '切换到白天模式', en: 'Switch to light mode' },
   themeLight: { zh: '切换到黑夜模式', en: 'Switch to dark mode' },
+  switchLanguage: { zh: 'Switch to English', en: '切换为中文' },
+  viewOnGithub: { zh: '在 GitHub 上查看源码', en: 'View source on GitHub' },
 
   importUrdf: { zh: '导入自定义 URDF', en: 'Import Custom URDF' },
   customRobot: { zh: '自定义机器人', en: 'Custom robot' },
@@ -310,6 +312,7 @@ export function useI18n() {
     t,
     locale,
     toggleLocale,
-    localeLabel: computed(() => (locale.value === 'zh' ? 'EN' : '中')),
+    /** Short label on the header language pill — always names the *other* language. */
+    localeLabel: computed(() => (locale.value === 'zh' ? 'EN' : '中文')),
   };
 }

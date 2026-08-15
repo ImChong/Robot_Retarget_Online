@@ -10,9 +10,16 @@ const stored =
   typeof localStorage !== 'undefined' ? (localStorage.getItem(STORAGE_KEY) as AppTheme | null) : null;
 export const appTheme = ref<AppTheme>(stored === 'light' ? 'light' : 'dark');
 
+/** Page backgrounds — mirrors the Vuetify theme `background` colors (and the pre-paint script in index.html). */
+const PAGE_BACKGROUND: Record<AppTheme, string> = {
+  dark: '#191919',
+  light: '#f7f6f3',
+};
+
 function syncDocumentBackground(theme: AppTheme) {
   if (typeof document === 'undefined') return;
-  document.documentElement.style.background = theme === 'light' ? '#f5f6f8' : '#14161a';
+  document.documentElement.style.background = PAGE_BACKGROUND[theme];
+  document.documentElement.dataset.theme = theme;
 }
 
 function notifyThemeChange(theme: AppTheme) {

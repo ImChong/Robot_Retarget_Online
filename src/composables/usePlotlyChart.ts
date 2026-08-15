@@ -1,6 +1,7 @@
 import { onMounted, onUnmounted, ref, shallowRef, watch, type Ref } from 'vue';
 import type { Config, Data, Layout, PlotlyHTMLElement } from 'plotly.js';
-import { buildDarkLayout, frameCursorShape } from '@/lib/plotlyTheme';
+import { buildChartLayout, frameCursorShape } from '@/lib/plotlyTheme';
+import { appTheme } from '@/composables/useAppTheme';
 import { isCoarsePointerDevice } from '@/lib/plotlyTouch';
 
 type PlotlyModule = typeof import('plotly.js-dist-min');
@@ -52,7 +53,7 @@ export function usePlotlyChart(
     plotly.value = mod.default;
     const { data, layout } = buildFigure();
     const touch = isCoarsePointerDevice();
-    const merged = buildDarkLayout({
+    const merged = buildChartLayout({
       ...layout,
       dragmode: touch ? false : (layout?.dragmode ?? 'zoom'),
     });
@@ -118,6 +119,11 @@ export function usePlotlyChart(
       void syncCursor();
     });
   }
+
+  // Chart chrome (paper/grid/hover colors) is baked into the layout — redraw on theme switch.
+  watch(appTheme, () => {
+    void draw();
+  });
 
   return { isZoomed, resetZoom, draw, resize };
 }

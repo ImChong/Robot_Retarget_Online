@@ -35,7 +35,7 @@ watch(mdAndUp, (up) => {
   flex-shrink: 0;
   height: 100%;
   min-height: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid var(--rro-border);
   overflow-y: auto;
   position: relative;
   z-index: 2;

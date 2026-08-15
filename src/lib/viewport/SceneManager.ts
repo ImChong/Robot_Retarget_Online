@@ -13,18 +13,19 @@ export interface SceneManagerOptions {
   floor?: boolean;
 }
 
+/** Neutral greys tuned to the site palette (see src/plugins/vuetify.ts). */
 const VIEWPORT_THEMES = {
   dark: {
-    background: 0x16181d,
+    background: 0x1c1c1c,
     fogNear: 14,
     fogFar: 34,
-    floor: ['#23262c', '#2b2f37'] as const,
+    floor: ['#262626', '#2f2f2f'] as const,
   },
   light: {
-    background: 0xe8eaef,
+    background: 0xeceae5,
     fogNear: 18,
     fogFar: 42,
-    floor: ['#d8dce3', '#c8cdd6'] as const,
+    floor: ['#e8e8e4', '#dcdbd5'] as const,
   },
 } as const;
 

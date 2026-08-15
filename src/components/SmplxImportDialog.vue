@@ -145,8 +145,8 @@ async function load() {
   transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 .pick-row--set {
-  border-color: rgba(79, 195, 247, 0.7);
-  background: rgba(79, 195, 247, 0.06);
+  border-color: rgba(var(--v-theme-primary), 0.7);
+  background: rgba(var(--v-theme-primary), 0.06);
 }
 .pick-text {
   flex: 1 1 auto;

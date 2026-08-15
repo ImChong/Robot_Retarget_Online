@@ -62,7 +62,7 @@ function toggle(index: number) {
   white-space: nowrap;
 }
 .joint-row:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--v-theme-on-surface), 0.06);
 }
 .joint-row.selected {
   background: rgba(255, 183, 77, 0.18);

@@ -208,7 +208,7 @@ function cancel() {
 <style scoped>
 .drop-zone {
   min-height: 132px;
-  border: 2px dashed rgba(79, 195, 247, 0.45);
+  border: 2px dashed rgba(var(--v-theme-primary), 0.45);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -218,8 +218,8 @@ function cancel() {
   transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 .drop-zone--active {
-  border-color: rgba(79, 195, 247, 0.95);
-  background: rgba(79, 195, 247, 0.08);
+  border-color: rgba(var(--v-theme-primary), 0.95);
+  background: rgba(var(--v-theme-primary), 0.08);
 }
 .drop-zone--disabled {
   pointer-events: none;

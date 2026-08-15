@@ -171,8 +171,8 @@ onUnmounted(() => {
 
 <style scoped>
 .playback-bar {
-  background: rgba(29, 32, 38, 0.92);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(34, 34, 34, 0.92);
+  border-top: 1px solid var(--rro-border);
   padding: 4px 8px 6px;
   flex-shrink: 0;
   position: relative;
@@ -182,7 +182,7 @@ onUnmounted(() => {
 }
 .playback-bar--light {
   background: rgba(255, 255, 255, 0.94);
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: 1px solid var(--rro-border);
 }
 .playback-row--transport {
   min-width: 0;

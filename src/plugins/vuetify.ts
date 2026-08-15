@@ -22,32 +22,44 @@ export default createVuetify({
   theme: {
     defaultTheme: initialTheme,
     themes: {
+      // Palette mirrors the Notion-inspired tokens of imchong.github.io
+      // (`css/style.css` :root / [data-theme='light']).
       dark: {
         dark: true,
         colors: {
-          background: '#14161a',
-          surface: '#1d2026',
-          'surface-light': '#262a31',
-          primary: '#4fc3f7',
-          secondary: '#9575cd',
-          success: '#66bb6a',
-          warning: '#ffa726',
-          error: '#ef5350',
-          info: '#29b6f6',
+          background: '#191919', // --bg
+          surface: '#222222', // --bg-alt
+          'surface-light': '#2f2f2f', // --surface
+          'surface-bright': '#2f2f2f',
+          'surface-variant': '#3d3d3d', // --border
+          'on-background': '#e8e8e4', // --text
+          'on-surface': '#e8e8e4',
+          primary: '#5b9cf6', // --accent
+          'on-primary': '#191919', // dark ink reads better on the light-blue accent
+          secondary: '#a78bfa',
+          'on-secondary': '#191919',
+          success: '#5cb885',
+          warning: '#e0a33f',
+          error: '#e2686a',
+          info: '#5b9cf6',
         },
       },
       light: {
         dark: false,
         colors: {
-          background: '#f5f6f8',
-          surface: '#ffffff',
-          'surface-light': '#eef0f3',
-          primary: '#0288d1',
-          secondary: '#7e57c2',
-          success: '#43a047',
-          warning: '#fb8c00',
-          error: '#e53935',
-          info: '#039be5',
+          background: '#f7f6f3', // --bg-alt (page canvas)
+          surface: '#ffffff', // --surface
+          'surface-light': '#f7f6f3',
+          'surface-bright': '#ffffff',
+          'surface-variant': '#e8e8e4', // --border
+          'on-background': '#37352f', // --text
+          'on-surface': '#37352f',
+          primary: '#2d74da', // --accent
+          secondary: '#6d5bd0',
+          success: '#2f855a',
+          warning: '#b9761f',
+          error: '#c9453f',
+          info: '#2d74da',
         },
       },
     },
