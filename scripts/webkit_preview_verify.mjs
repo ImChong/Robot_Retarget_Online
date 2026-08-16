@@ -237,6 +237,25 @@ async function main() {
       );
     }
 
+    log('step', 'tap fallback stays dormant where click works');
+    await page.evaluate(() => {
+      window.__clickLog = [];
+      document.addEventListener(
+        'click',
+        (e) => window.__clickLog.push(e.isTrusted),
+        { capture: true },
+      );
+    });
+    // The already-selected metrics tab: re-selecting it changes no state, so
+    // this counts clicks without disturbing the playback checks below.
+    await tapCentre(page, page.locator('.metrics-header .v-tab').first());
+    await page.waitForTimeout(700);
+    const clickLog = await page.evaluate(() => window.__clickLog);
+    check(
+      clickLog.length === 1 && clickLog[0] === true,
+      `one tap produced ${clickLog.length} click(s) (${clickLog.join(',')}); the tap fallback must not double-fire where the browser dispatches click itself`,
+    );
+
     log('step', 'tap controls during active playback');
     const before = await readFrame(page);
     await page.waitForTimeout(1000);
