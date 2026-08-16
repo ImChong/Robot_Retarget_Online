@@ -12,11 +12,16 @@
  * Nothing in the page can fix that, so this bridges the gap: when a tap
  * produces no click, dispatch one.
  *
- * It costs nothing on healthy browsers. The first tap on a real control decides
- * which mode we are in — see a native click and the shim is disabled for the
- * session; see none and it takes over. So a browser that behaves never gets a
- * synthetic event, and the one that does not behave only risks a duplicate on
- * that single probing tap.
+ * The decision is made per tap, never once per session. An earlier version
+ * latched a session-wide "this browser is fine" flag the first time it saw any
+ * click it had not sent itself, which the device then disproved: one late click
+ * — arriving after the tap that caused it had already been forgotten — switched
+ * the shim off for good, so a single control worked once and everything
+ * afterwards stayed dead.
+ *
+ * Per-tap needs no such flag. On a healthy browser the click lands within a few
+ * tens of milliseconds, well inside the wait, and cancels the pending timer, so
+ * nothing synthetic is ever dispatched. Only silence produces a click.
  */
 
 /** Only taps that land on something activatable count, and only they get a click. */
@@ -28,8 +33,12 @@ const MOVE_TOLERANCE_PX = 12;
 const MAX_TAP_MS = 700;
 /** How long to wait for the browser's own click before standing in for it. */
 const CLICK_WAIT_MS = 400;
-
-type Mode = 'probing' | 'native' | 'shim';
+/**
+ * A browser that delivers clicks later than the wait would activate twice, so a
+ * native click landing this soon after one we sent for the same control is
+ * treated as the duplicate and dropped.
+ */
+const DUPLICATE_WINDOW_MS = 900;
 
 interface PendingTap {
   target: Element;
@@ -44,11 +53,12 @@ export function installTapFallback(): void {
   // Pointer-only devices synthesise clicks natively; there is nothing to bridge.
   if (!('ontouchstart' in window) && navigator.maxTouchPoints === 0) return;
 
-  let mode: Mode = 'probing';
   let pending: PendingTap | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  /** Our own clicks, so observing one is not mistaken for the browser working. */
+  /** Our own clicks, so we never mistake one for the browser's. */
   const dispatched = new WeakSet<Event>();
+  /** The most recent click we stood in for, to catch a late native duplicate. */
+  let standIn: { control: Element; at: number } | null = null;
 
   function clearPending() {
     if (timer) clearTimeout(timer);
@@ -102,7 +112,7 @@ export function installTapFallback(): void {
     (e) => {
       const tap = pending;
       pending = null;
-      if (!tap || mode === 'native') return;
+      if (!tap) return;
       // A cancelled default means the page handled this gesture itself.
       if (e.defaultPrevented) return;
       if (tap.moved > MOVE_TOLERANCE_PX) return;
@@ -115,7 +125,6 @@ export function installTapFallback(): void {
       timer = setTimeout(() => {
         timer = null;
         // No click arrived for a clean tap on a real control: stand in for it.
-        mode = 'shim';
         const click = new MouseEvent('click', {
           bubbles: true,
           cancelable: true,
@@ -126,6 +135,7 @@ export function installTapFallback(): void {
           clientY: tap.y,
         });
         dispatched.add(click);
+        standIn = { control, at: Date.now() };
         control.dispatchEvent(click);
       }, CLICK_WAIT_MS);
     },
@@ -136,9 +146,22 @@ export function installTapFallback(): void {
     'click',
     (e) => {
       if (dispatched.has(e)) return;
-      // The browser produced a click on its own, so it needs no help.
-      mode = 'native';
+
+      // The browser got there first, so the tap needs no stand-in.
       clearPending();
+
+      // A browser slower than CLICK_WAIT_MS would otherwise activate the control
+      // twice; drop the straggler rather than let it toggle state back.
+      if (
+        standIn &&
+        Date.now() - standIn.at < DUPLICATE_WINDOW_MS &&
+        e.target instanceof Node &&
+        (standIn.control === e.target || standIn.control.contains(e.target))
+      ) {
+        standIn = null;
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      }
     },
     { capture: true },
   );

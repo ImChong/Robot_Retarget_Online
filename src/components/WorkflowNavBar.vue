@@ -153,7 +153,12 @@ const runRetargetTooltip = computed(() => {
   gap: 8px;
   padding: 4px 6px;
   border-radius: 10px;
-  pointer-events: none;
+  /* Opaque pill, so it takes its own taps rather than passing them through.
+     It used to be pointer-events: none with the children opting back in, which
+     left every button here under a pointer-events: none ancestor — a pattern
+     iOS was observed treating as non-activatable. .viewport-overlays above it
+     stays click-through, so the rest of the 3D viewport still orbits. */
+  pointer-events: auto;
   /* No backdrop-filter: this floats over the WebGL canvas, which backdrop-filter
      cannot blur anyway (the reason src/lib/sponsorCanvasBlur.ts exists), so it
      only cost a compositing layer. Raise the tint to stay legible without it. */
@@ -164,7 +169,6 @@ const runRetargetTooltip = computed(() => {
 
 .workflow-nav__activator {
   display: inline-flex;
-  pointer-events: auto;
 }
 
 .workflow-nav__config-group {
@@ -172,7 +176,6 @@ const runRetargetTooltip = computed(() => {
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
-  pointer-events: auto;
 }
 
 .workflow-nav__actions {
