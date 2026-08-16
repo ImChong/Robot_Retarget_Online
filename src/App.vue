@@ -6,7 +6,7 @@ import { useI18n } from '@/i18n';
 import { useAppTheme } from '@/composables/useAppTheme';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore } from '@/stores/retarget';
-import { mdiGithub, mdiWeatherSunny, mdiWeatherNight, mdiCoffee } from '@mdi/js';
+import { mdiWeatherSunny, mdiWeatherNight, mdiCoffee } from '@mdi/js';
 import SponsorDialog from '@/components/SponsorDialog.vue';
 
 const { t, toggleLocale, localeLabel, locale } = useI18n();
@@ -87,7 +87,6 @@ void locale.value;
             :aria-label="t('viewOnGithub')"
             :title="t('viewOnGithub')"
           >
-            <v-icon :icon="mdiGithub" size="16" />
             <span class="github-link-text">GitHub</span>
           </a>
           <button
@@ -268,7 +267,6 @@ void locale.value;
 .site-header .github-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
   height: 30px;
   font-family: var(--rro-font-sans);
   font-size: 0.85rem;
@@ -373,10 +371,6 @@ void locale.value;
 
   .site-header .github-link {
     font-size: 0.78rem;
-  }
-
-  .github-link-text {
-    display: none;
   }
 
   .site-header .header-btn {
