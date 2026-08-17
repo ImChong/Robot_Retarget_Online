@@ -552,6 +552,18 @@ html {
     height: var(--rro-tap-target);
     transform: translate(-50%, -50%);
   }
+
+  /*
+   * The drawer and dialog scrims close on `click`, but they are plain <div>s,
+   * and Safari has never dispatched click for a tap on an element it does not
+   * consider clickable — tapping beside the panel left it open. `cursor:
+   * pointer` is what makes Safari consider one clickable; src/lib/tapFallback.ts
+   * covers the device that dispatches no mouse events at all.
+   */
+  .v-navigation-drawer__scrim,
+  .v-overlay__scrim {
+    cursor: pointer;
+  }
 }
 
 </style>
