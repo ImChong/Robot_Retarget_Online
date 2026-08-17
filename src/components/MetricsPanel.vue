@@ -2,7 +2,6 @@
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
 import { mdiChevronDown, mdiChevronUp, mdiMagnifyRemoveOutline, mdiDragHorizontalVariant } from '@mdi/js';
 import { useI18n } from '@/i18n';
-import { isCoarsePointerDevice } from '@/lib/plotlyTouch';
 import type { RetargetResult } from '@/lib/retarget/types';
 import ErrorChart from '@/components/ErrorChart.vue';
 import { ERROR_SERIES_MAX, ERROR_SERIES_MEAN } from '@/components/errorChartConstants';
@@ -18,7 +17,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const touchUi = isCoarsePointerDevice();
 
 const activeTab = ref<'error' | 'position' | 'velocity'>('error');
 const expanded = ref(true);
@@ -38,6 +36,8 @@ const panelRoot = ref<HTMLElement | null>(null);
 const resizeHandleEl = ref<HTMLElement | null>(null);
 const maxBodyH = ref(MIN_BODY_H * 3);
 let capturedPointerId: number | null = null;
+let dragStartY = 0;
+let dragStartH = MIN_BODY_H;
 
 const JOINT_PREFS = [
   'left_knee',
@@ -168,6 +168,8 @@ function onResizeDragStart(e: PointerEvent) {
   capturedPointerId = e.pointerId;
   resizeHandleEl.value = e.currentTarget as HTMLElement;
   updateMaxHeight();
+  dragStartY = e.clientY;
+  dragStartH = panelBodyH.value;
   resizeHandleEl.value.setPointerCapture(e.pointerId);
   attachWindowPointerListeners();
   e.preventDefault();
@@ -175,10 +177,10 @@ function onResizeDragStart(e: PointerEvent) {
 
 function onResizeDragMove(e: PointerEvent) {
   if (!dragging.value) return;
-  const root = panelRoot.value;
-  if (!root) return;
-  const rect = root.getBoundingClientRect();
-  const next = rect.bottom - e.clientY - 36;
+  // Anchored to where the drag began, so the panel edge tracks the pointer
+  // whatever the chrome above the body measures — 36px on a mouse, taller on
+  // touch, where the handle has its own row and the tabs are 44pt.
+  const next = dragStartH + (dragStartY - e.clientY);
   panelBodyH.value = Math.max(MIN_BODY_H, Math.min(maxBodyH.value, next));
   emit('resize');
   resizeActiveChart();
@@ -227,10 +229,13 @@ watch(activeTab, () => {
 <template>
   <div ref="panelRoot" class="metrics-panel" :class="{ dragging }">
     <div
-      v-if="expanded && !touchUi"
+      v-if="expanded"
       ref="resizeHandleEl"
       class="resize-handle d-flex align-center justify-center"
       :title="t('dragResizeMetrics')"
+      :aria-label="t('dragResizeMetrics')"
+      role="separator"
+      aria-orientation="horizontal"
       @pointerdown="onResizeDragStart"
       @pointermove="onResizeDragMove"
       @pointerup="onResizeDragEnd"
@@ -362,6 +367,9 @@ watch(activeTab, () => {
      drag; kept inside the panel (no negative translate) so .metrics-panel's
      overflow: hidden doesn't clip the grab area. */
   z-index: 4;
+  /* The drag runs on pointermove, so the browser must not claim the gesture
+     for panning first — on touch it would scroll the metrics body instead. */
+  touch-action: none;
 }
 .resize-handle:hover .resize-icon,
 .metrics-panel.dragging .resize-icon {
@@ -423,9 +431,34 @@ watch(activeTab, () => {
 .chart-window :deep(.plot-container) {
   overflow: hidden;
 }
-/* iOS WebKit: Plotly SVG overlays can extend past the chart and steal touches from controls below. */
+/*
+ * Touch rules, three of them:
+ *
+ * 1. A finger cannot aim at a 10px strip, and there is no hover to reveal it,
+ *    so the handle takes a row of its own above the tabs: grabbable, always
+ *    visible, and never overlapping the 44pt tab targets it would sit on.
+ * 2. At the smallest panel height the chart is squeezed below the height it
+ *    can draw in, and `overflow: hidden` used to clip the axis labels and the
+ *    legend with no way to reach them. Give the chart the room it needs and
+ *    let the body scroll to it; `pointer-events: none` on the chart means a
+ *    finger over it scrolls the body underneath.
+ * 3. iOS WebKit: Plotly SVG overlays can extend past the chart and steal
+ *    touches from the controls below.
+ */
 @media (pointer: coarse), (hover: none) {
+  .resize-handle {
+    position: relative;
+    height: 26px;
+  }
+  .resize-icon {
+    opacity: 0.55;
+  }
+  .metrics-body {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
   .chart-window {
+    min-height: 220px;
     pointer-events: none;
   }
   .chart-window :deep(.js-plotly-plot),
