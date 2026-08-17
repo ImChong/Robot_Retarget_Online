@@ -423,9 +423,25 @@ watch(activeTab, () => {
 .chart-window :deep(.plot-container) {
   overflow: hidden;
 }
-/* iOS WebKit: Plotly SVG overlays can extend past the chart and steal touches from controls below. */
+/*
+ * Touch rules, two of them:
+ *
+ * 1. There is no drag handle here (it would sit over the tabs), so the body
+ *    keeps its minimum height and the chart was squeezed below the height it
+ *    can draw in — axis labels and the legend ended up clipped by
+ *    `overflow: hidden` with no way to reach them. Give the chart the room it
+ *    needs and let the body scroll to it instead; `pointer-events: none` on
+ *    the chart means a finger over it scrolls the body underneath.
+ * 2. iOS WebKit: Plotly SVG overlays can extend past the chart and steal
+ *    touches from the controls below.
+ */
 @media (pointer: coarse), (hover: none) {
+  .metrics-body {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
   .chart-window {
+    min-height: 220px;
     pointer-events: none;
   }
   .chart-window :deep(.js-plotly-plot),
