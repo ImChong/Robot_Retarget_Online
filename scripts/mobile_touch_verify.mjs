@@ -8,6 +8,7 @@
  * a tap — the iOS 26.6 behaviour documented in src/lib/tapFallback.ts:
  *
  *   1. the metrics ("data") panel scrolls, so no chart is clipped out of reach,
+ *      and drag-resizes from its handle,
  *   2. tapping the scrim beside the side panel closes it, and
  *   3. the history dropdown opens on a tap, and closes on a tap outside.
  *
@@ -233,6 +234,46 @@ async function checkMetricsScroll(page, cdp, shot) {
   await body.evaluate((el) => el.scrollTo(0, 0));
 }
 
+/** The metrics panel must also be resizable by dragging its handle. */
+async function checkResizeHandle(page, cdp, shot) {
+  log('check', 'metrics panel resizes by dragging its handle');
+  const handle = page.locator('.resize-handle');
+  const body = page.locator('.metrics-body');
+  const bodyH = () => body.evaluate((el) => Math.round(el.getBoundingClientRect().height));
+
+  const handleBox = await handle.boundingBox();
+  check(Boolean(handleBox), 'no resize handle on a touch device');
+  if (!handleBox) return;
+  check(
+    handleBox.height >= 20,
+    `resize handle is only ${Math.round(handleBox.height)}px tall — not grabbable with a finger`,
+  );
+  const overlapsTabs = await page.evaluate(() => {
+    const h = document.querySelector('.resize-handle')?.getBoundingClientRect();
+    const tab = document.querySelector('.metrics-header .v-tab')?.getBoundingClientRect();
+    return h && tab ? h.bottom > tab.top + 1 : null;
+  });
+  check(overlapsTabs === false, 'the resize handle sits over the tabs and would swallow their taps');
+
+  const before = await bodyH();
+  const centre = { x: handleBox.x + handleBox.width / 2, y: handleBox.y + handleBox.height / 2 };
+  await swipeUp(page, cdp, centre, 120);
+  const grown = await bodyH();
+  check(
+    grown > before + 60,
+    `dragging the handle up grew the panel by only ${grown - before}px (wanted ~120)`,
+  );
+  await shot('metrics-resized.png');
+
+  const grownBox = await handle.boundingBox();
+  await swipeUp(page, cdp, { x: grownBox.x + grownBox.width / 2, y: grownBox.y + grownBox.height / 2 }, -120);
+  const shrunk = await bodyH();
+  check(
+    shrunk < grown - 60,
+    `dragging the handle back down shrank the panel by only ${grown - shrunk}px`,
+  );
+}
+
 /** 2. + 3. Side panel dismissal and the history dropdown. */
 async function checkPanel(page, shot) {
   log('check', 'side panel: scrim dismissal and the history dropdown');
@@ -336,6 +377,7 @@ async function runPass(browser, { suppressMouse, label }) {
     });
     await shot('preview.png');
     await checkMetricsScroll(page, cdp, shot);
+    await checkResizeHandle(page, cdp, shot);
     await checkPanel(page, shot);
   } finally {
     const fatal = errors.filter((e) => !e.includes('favicon') && !e.includes('GroupMarkerNotSet'));
