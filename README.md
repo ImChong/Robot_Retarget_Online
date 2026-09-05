@@ -18,6 +18,18 @@ solver — preserves the relative structure between keypoints).
 纯前端实现的人形机器人动作重定向工具：BVH 动捕预览 → 重定向参数配置 → 机器人动作预览与导出，
 全部计算（含 MuJoCo 正运动学/雅可比与微分 IK）在浏览器内完成。
 
+## Demo · 在线演示
+
+[![在线演示：BVH 预览加载 LAFAN1 行走动捕并播放；重定向设置里查看 Unitree G1 与人体骨架的关键点对应关系和两阶段映射表；重定向预览一键求解，机器人动作回放、人体关键点叠加与逐帧误差曲线，并导出 NPZ / CSV / JSON](media/site-demo.gif)](https://imchong.github.io/Robot_Retarget_Online/)
+
+↑ [在线站点](https://imchong.github.io/Robot_Retarget_Online/)三步走完整流程（无需安装、无后端）：
+**① BVH 预览** 打开自己的 `.bvh` 或直接加载 LAFAN1 示例动作，播放/拖动时间轴看动捕；
+**② 重定向设置** 选机器人（示例为 Unitree G1 29 DoF）与引擎，查看人体关节 ↔ 机器人 body 的关键点对应（3D 连线）与两阶段权重映射表；
+**③ 重定向预览** 一键求解（1800 帧 ~1.1 s），机器人动作回放并叠加人体关键点、逐帧误差曲线，导出 NPZ / CSV / JSON。
+
+The GIF is recorded from the built site by `node scripts/record_site_demo.mjs`
+(Playwright + ffmpeg; needs `npm run build` first).
+
 ## Pages · 功能页面
 
 | Page | 功能 |
@@ -82,6 +94,7 @@ npm test           # unit + engine integration tests (runs MuJoCo WASM in Node)
 npm run typecheck
 npm run build      # production build to dist/
 node scripts/e2e_smoke.mjs   # headless full-pipeline smoke test (needs chromium)
+node scripts/record_site_demo.mjs   # re-record media/site-demo.gif (needs ffmpeg, gifsicle optional)
 ```
 
 ### Sample motions
