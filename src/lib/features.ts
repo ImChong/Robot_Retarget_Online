@@ -1,18 +1,19 @@
 /**
  * Runtime feature flags.
  *
- * Quadruped retargeting (Unitree Go2 / A1 + dog mocap samples) is gated so the
- * production site on `main` stays clean until the feature is verified. The robot
- * MJCF/mesh assets and dog BVH samples still ship in the build — only the UI
- * entry points (robot dropdown + sample list) are hidden.
+ * Quadruped retargeting (Unitree Go2 / A1 + dog mocap samples) shipped hidden
+ * behind this flag until it was verified (`tests/quadruped.test.ts` covers
+ * walk / run / idle on both robots; `scripts/e2e_quadruped.mjs` drives the full
+ * browser flow). It is now surfaced by default; the flag stays as a per-visit
+ * kill switch: open any deployment with `?quadruped=0` to hide the UI entry
+ * points (robot dropdown + sample list) for that page load.
  *
- * Reveal it on any deployment by visiting a URL with `?quadruped=1`.
  * The flag is evaluated once per page load from the URL only (no localStorage
- * persistence — otherwise a one-time test visit would keep the UI visible forever).
- * To surface it for everyone, flip `DEFAULT_QUADRUPED` to `true`.
+ * persistence — otherwise a one-time visit would pin the choice forever).
+ * To hide it for everyone again, flip `DEFAULT_QUADRUPED` to `false`.
  */
 
-const DEFAULT_QUADRUPED = false;
+const DEFAULT_QUADRUPED = true;
 
 /** Parse `name` from a query string and from an optional hash-router suffix. */
 export function readUrlParam(search: string, hash: string, name: string): string | null {
