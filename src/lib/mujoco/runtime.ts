@@ -116,6 +116,17 @@ export function removeVfsTree(mujoco: MujocoModule, path: string) {
   }
 }
 
+/**
+ * True once a robot's WASM objects were freed (`disposeRobotModel`, e.g. via
+ * `resetMujocoModule()` when another robot was loaded — only one robot is kept
+ * alive). Views that cached the `RobotModel` must stop touching it: any
+ * `data`/`model` access on a deleted embind object throws a BindingError.
+ */
+export function isRobotModelDisposed(robot: RobotModel): boolean {
+  const d = robot.data as unknown as { isDeleted?: () => boolean };
+  return typeof d.isDeleted === 'function' ? d.isDeleted() : false;
+}
+
 /** Drop a built-in robot from the in-memory cache and free its WASM assets. */
 export function unloadRobot(robotId: string) {
   const cached = loadedRobots.get(robotId);

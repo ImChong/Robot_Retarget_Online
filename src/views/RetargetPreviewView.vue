@@ -11,7 +11,7 @@ import {
   formatRetargetHistoryLabel,
   formatRetargetTimestamp,
 } from '@/lib/retarget/historyLabel';
-import type { RobotModel } from '@/lib/mujoco/runtime';
+import { isRobotModelDisposed, type RobotModel } from '@/lib/mujoco/runtime';
 import { buildRobotScene, type RobotSceneObject } from '@/lib/mujoco/threeScene';
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { buildKeypointCloud, type KeypointCloud } from '@/lib/viewport/skeletonView';
@@ -136,7 +136,9 @@ function applyFrame(f: number) {
   const result = store.result;
   const robot = robotModel.value;
   const scene = robotScene.value;
-  if (!result || !robot || !scene) return;
+  // Another page may have freed this robot's WASM objects (only one robot is
+  // kept alive — see prepareRobotSlot); touching them would throw.
+  if (!result || !robot || !scene || isRobotModelDisposed(robot)) return;
   const playing = playback.state.playing;
   const frame = playing ? f : Math.max(0, Math.min(Math.floor(f), result.frameCount - 1));
   const qpos = robot.data.qpos as Float64Array;
@@ -219,6 +221,15 @@ onMounted(() => {
 
 onActivated(() => {
   isViewActive.value = true;
+  // Drop a robot that was freed while another page loaded a different one
+  // *before* the render loop ticks: start() runs the first frame synchronously,
+  // and an exception there would skip the rebuild below and leave the stale
+  // scene (and a blank viewport) in place for good.
+  if (robotModel.value && isRobotModelDisposed(robotModel.value)) {
+    robotModel.value = null;
+    robotScene.value?.dispose();
+    robotScene.value = null;
+  }
   sceneManager.value?.start();
   if (store.activeHistoryId && (store.activeHistoryId !== displayedHistoryId || !robotScene.value)) {
     void setupResultScene();

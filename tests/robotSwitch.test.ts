@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { loadRobot } from '../src/lib/mujoco/runtime';
+import { isRobotModelDisposed, loadRobot } from '../src/lib/mujoco/runtime';
 import { clearCustomRobotCache, loadCustomRobot, parseCustomRobotImport } from '../src/lib/mujoco/customRobot';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -47,6 +47,17 @@ describe('robot switching memory', () => {
         expect(robot.model.nbody).toBeGreaterThan(1);
       }
     }
+  }, 120_000);
+
+  it('reports a robot freed by a later load as disposed (views must drop it)', async () => {
+    const first = await loadRobot('unitree_go2');
+    expect(isRobotModelDisposed(first)).toBe(false);
+    const second = await loadRobot('unitree_a1'); // evicts go2: only one robot stays alive
+    expect(isRobotModelDisposed(first)).toBe(true);
+    expect(isRobotModelDisposed(second)).toBe(false);
+    const same = await loadRobot('unitree_a1'); // cache hit keeps the same live object
+    expect(same).toBe(second);
+    expect(isRobotModelDisposed(second)).toBe(false);
   }, 120_000);
 
   it('alternates built-in robots and custom URDF imports', async () => {

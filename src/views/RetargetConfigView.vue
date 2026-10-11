@@ -16,7 +16,7 @@ import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore, CUSTOM_ROBOT_ID } from '@/stores/retarget';
-import { getRobotManifest, type RobotManifestEntry, type RobotModel } from '@/lib/mujoco/runtime';
+import { getRobotManifest, type RobotManifestEntry, type RobotModel, isRobotModelDisposed } from '@/lib/mujoco/runtime';
 import { QUADRUPED_ENABLED } from '@/lib/features';
 import { motionMatchesRobot } from '@/lib/motionKind';
 import { buildRobotScene, type RobotSceneObject } from '@/lib/mujoco/threeScene';
@@ -393,7 +393,12 @@ onMounted(async () => {
   await ensureRobotScene();
 });
 
-onActivated(() => sceneManager.value?.start());
+onActivated(() => {
+  sceneManager.value?.start();
+  // The preview page may have reloaded a different robot for a history entry,
+  // freeing the one shown here (only one robot is kept alive): rebuild it.
+  if (robotModel.value && isRobotModelDisposed(robotModel.value)) void ensureRobotScene();
+});
 onDeactivated(() => sceneManager.value?.stop());
 onUnmounted(() => {
   clearHideStripTimer();

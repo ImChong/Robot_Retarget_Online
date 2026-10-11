@@ -34,8 +34,8 @@ The GIF is recorded from the built site by `node scripts/record_site_demo.mjs`
 
 | Page | 功能 |
 | --- | --- |
-| **BVH Viewer** | BVHView 风格的动捕预览：拖拽打开 `.bvh`、胶囊体骨架渲染、播放/拖动时间轴/变速、关节层级树与关节信息；**视频生成 BVH（浏览器内 MediaPipe 姿态估计，实验性）** |
-| **Retarget Config** | 引擎选择（GMR / OmniRetarget）、机器人选择（Unitree G1 / Booster T1 等）、IK 关键点映射表（两阶段权重/偏移）、人体缩放表、求解器参数；配置 JSON 与 GMR `ik_config` 双向兼容 |
+| **BVH Viewer** | BVHView 风格的动捕预览：拖拽打开 `.bvh`、胶囊体骨架渲染、播放/拖动时间轴/变速、关节层级树与关节信息；示例动作含 LAFAN1 人形与 Labrador 狗四足动捕；**视频生成 BVH（浏览器内 MediaPipe 姿态估计，实验性）** |
+| **Retarget Config** | 引擎选择（GMR / OmniRetarget）、机器人选择（人形 Unitree G1 / Booster T1 等，四足 Unitree Go2 / A1）、IK 关键点映射表（两阶段权重/偏移）、人体缩放表、求解器参数；配置 JSON 与 GMR `ik_config` 双向兼容 |
 | **Retarget Preview** | 引擎切换、一键重定向（带进度）、机器人动作回放、人体关键点叠加对比、逐帧误差曲线、导出 NPZ / CSV / JSON |
 
 ## How it works · 技术要点
@@ -109,6 +109,11 @@ The legacy procedural generator (`scripts/gen_sample_bvh.py`) is kept for
 reference only. For the full dataset, download LAFAN1 and drop any `.bvh` into
 the app.
 
+`public/sample_motions/dog_*.bvh` (**walk, run, idle**, ~6–7 s each at 30 fps)
+are trimmed Labrador retriever mocap clips from Tencent's *Lifelike Agility and
+Play* dataset (MIT) for the quadruped workflow below; regenerate via
+`python3 scripts/prepare_dog_samples.py`.
+
 ## Quadruped retargeting · 四足机器人重定向
 
 Beyond humanoids, the same keypoint differential-IK engine retargets **animal
@@ -134,39 +139,38 @@ drop-in rather than a new algorithm. Related references surveyed:
 | **Robots** | **Unitree Go2** and **Unitree A1** (12 DoF), real MJCF + meshes from [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) (Unitree BSD-3). A `*_mocap.xml` variant adds four massless `*_foot` keypoint bodies at the foot tips (no added DoF). Canonical URDFs are also included under `public/robots/<id>/urdf/` as reference. |
 | **Mapping** | `bvh_quadruped_to_unitree_{go2,a1}.json`: `base/trunk ← b_Hips` (orientation + position) and `FL/FR/RL/RR_foot ← b_{Left,Right}Hand / b_{Left,Right}Toe` (position). A constant trunk-frame offset (clip-independent) and a 0.5 body scale fit the Labrador onto the smaller robots. |
 
-### Hidden preview · 暂时隐藏（URL 开关）
+### Usage · 使用方式
 
-The quadruped workflow is **hidden in the public UI by default** (Go2 / A1 in the
-robot dropdown and the **Dog … (Quadruped)** sample clips). The MJCF assets,
-dog BVH samples, and retargeting configs still ship in the build — only the UI
-entry points are gated (`src/lib/features.ts`).
+The quadruped workflow is **on by default**: in *BVH Viewer → Load sample* the
+**Dog walk / run / idle (Quadruped)** clips sit in their own group, and
+**Unitree Go2 / A1** appear in the *Retarget Config* robot dropdown. Loading a
+dog clip auto-selects Go2 and greys out the humanoid robots (and loading a
+LAFAN1 clip switches back to a humanoid and greys out Go2 / A1) — the motion
+family must match the robot's ik_config convention. Then run retargeting and
+export as usual (NPZ `dof_pos` has 12 columns in the robot's MJCF joint order —
+see `dof_names` in the CSV / JSON export).
 
-四足重定向流程在公开站点上**默认隐藏**（机器人下拉中的 Go2 / A1，以及示例动作里的狗动捕
-条目）。相关资产与引擎代码仍随构建发布，只是 UI 入口被关掉。
+四足流程**默认开启**：*BVH 预览 → 加载示例动作* 中有独立的「四足动物」分组（Dog walk / run / idle），
+*重定向设置* 的机器人下拉里有 **Unitree Go2 / A1**。加载狗动捕后自动切到 Go2 并灰掉人形机器人
+（加载 LAFAN1 人形动作则切回人形并灰掉 Go2 / A1）——动作类型必须与机器人 ik_config 的约定一致。
+之后照常重定向、导出（NPZ 的 `dof_pos` 为 12 列，顺序同机器人 MJCF 的关节顺序，见 CSV / JSON 导出中的 `dof_names`）。
 
-**Reveal it** by opening the site with a `quadruped` query parameter. The flag is
-read from the URL on each page load only (not persisted — a prior test visit
-with `?quadruped=1` will not keep the menu visible on later visits without the
-parameter):
+To hide the quadruped entry points for one visit (e.g. a humanoid-only demo),
+open the site with `?quadruped=0` — the hash-router form
+`…/#/bvh?quadruped=0` also works. The flag is read from the URL on each page
+load only and never persisted; the site-wide default is `DEFAULT_QUADRUPED` in
+`src/lib/features.ts`.
 
-**启用方式**：在 URL 中带上 `quadruped` 查询参数后打开页面。每次加载只读 URL
-（不写入 `localStorage`；之前用过 `?quadruped=1` 测试，之后不带参数打开也不会
-一直显示四足入口）：
+如需在某次访问中隐藏四足入口（例如只演示人形），在 URL 中带 `?quadruped=0`（hash 后的
+`…/#/bvh?quadruped=0` 亦可）。该开关每次加载只读 URL、不写入 `localStorage`；
+站点默认值见 `src/lib/features.ts` 的 `DEFAULT_QUADRUPED`。
 
-| | URL |
-| --- | --- |
-| **Production 线上** | <https://imchong.github.io/Robot_Retarget_Online/?quadruped=1> |
-| **Local dev 本地** | <http://localhost:3000/?quadruped=1> |
-| **Hash-router form** (also works) | `…/Robot_Retarget_Online/#/bvh?quadruped=1` |
-
-After enabling, reload if needed, then in *BVH Viewer* pick a **Dog …
-(Quadruped)** sample and in *Retarget Config* choose **Unitree Go2/A1**.
-启用后若菜单未出现可刷新页面；在 *BVH Viewer* 加载 **Dog … (Quadruped)** 示例，
-再在 *Retarget Config* 选择 **Unitree Go2/A1**。
-
-Validated headless: across walk/run/idle the robot stands at ≈0.28 m with the
-four feet tracked to **~1–2 cm** and the trunk within ~10° of the dog's
-(faithful pitch). Reproduce:
+Validated headless (`tests/quadruped.test.ts`, walk / run / idle × Go2 / A1):
+the robot stands at ≈0.28–0.29 m, the four feet track their targets to
+**~0.7–2.2 cm** on average (worst single frame ≈7–13 cm) and the trunk stays
+within ~8–12° of the dog's (faithful pitch). `scripts/e2e_quadruped.mjs`
+drives the same flow in a headless browser (sample menu → auto robot switch →
+retarget → NPZ export, both robots, all three clips). Reproduce:
 
 ```bash
 # trimmed dog clips from a local checkout of the Lifelike-Agility raw_mocap_data
@@ -174,6 +178,8 @@ python3 scripts/prepare_dog_samples.py --raw /path/to/raw_mocap_data
 # regenerate the foot-keypoint robot variants from a Menagerie checkout
 python3 scripts/add_quadruped_foot_sites.py go2.xml go2_mocap.xml 0.213
 npx vitest run tests/quadruped.test.ts
+npm run build && node scripts/e2e_quadruped.mjs   # headless browser flow (needs chromium)
+node scripts/record_quadruped.mjs   # narrated demo video of the flow (needs system ffmpeg)
 ```
 
 ## Deploy

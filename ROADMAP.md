@@ -55,12 +55,16 @@ Milestones / 里程碑:
 
 Delivered beyond the original plan / 超出原计划的部分:
 mobile-responsive layout + drawers, dark/light theme, LAFAN1-derived sample
-clips (walk / run / dance / fall & get-up / jumps), per-robot regression tests.
+clips (walk / run / dance / fall & get-up / jumps), per-robot regression tests,
+**quadruped retargeting** (Labrador dog mocap → Unitree Go2 / A1 via root +
+four-feet keypoint IK; verified in `tests/quadruped.test.ts` and
+`scripts/e2e_quadruped.mjs`, surfaced in the UI by default since issue #92).
 
 Robots shipped today / 当前已支持机器人 (BVH/LAFAN1, selectable in UI): `unitree_g1`,
 `unitree_g1_with_hands`, `booster_t1_29dof`, `stanford_toddy`, `fourier_n1`,
-`engineai_pm01`, `pal_talos` (+ quadrupeds `unitree_go2` / `unitree_a1` behind the
-`?quadruped=1` URL flag). A further 10 GMR robots (`unitree_h1`, `unitree_h1_2`,
+`engineai_pm01`, `pal_talos` (+ quadrupeds `unitree_go2` / `unitree_a1` for the
+bundled dog mocap clips — on by default, `?quadruped=0` hides them for a visit;
+see README *Quadruped retargeting*). A further 10 GMR robots (`unitree_h1`, `unitree_h1_2`,
 `kuavo_s45`, `hightorque_hi`, `berkeley_humanoid_lite`, `booster_k1`,
 `pnd_adam_lite`, `tienkung`, `fourier_gr3`, `booster_t1`) have no `bvh_lafan1`
 config — they are keyed to SMPL-X joint names and surface via the **SMPL-X input
