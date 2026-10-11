@@ -179,6 +179,7 @@ python3 scripts/prepare_dog_samples.py --raw /path/to/raw_mocap_data
 python3 scripts/add_quadruped_foot_sites.py go2.xml go2_mocap.xml 0.213
 npx vitest run tests/quadruped.test.ts
 npm run build && node scripts/e2e_quadruped.mjs   # headless browser flow (needs chromium)
+node scripts/record_quadruped.mjs   # narrated demo video of the flow (needs system ffmpeg)
 ```
 
 ## Deploy
