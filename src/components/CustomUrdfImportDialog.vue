@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { mdiClose, mdiUpload } from '@mdi/js';
+import { icons } from '@/lib/icons';
 import { useI18n } from '@/i18n';
 import { useRetargetStore } from '@/stores/retarget';
 
@@ -69,7 +69,7 @@ function onFileChosen(e: Event) {
     <v-card>
       <v-card-title class="d-flex align-center justify-space-between py-3">
         <span>{{ t('urdfSpecTitle') }}</span>
-        <v-btn :icon="mdiClose" variant="text" size="small" :disabled="loading" @click="close" />
+        <v-btn :icon="icons.close" variant="text" size="small" :disabled="loading" @click="close" />
       </v-card-title>
 
       <v-card-text class="pb-2">
@@ -107,7 +107,7 @@ function onFileChosen(e: Event) {
             class="mt-3"
             variant="tonal"
             size="small"
-            :prepend-icon="mdiUpload"
+            :prepend-icon="icons.upload"
             @click="fileInput?.click()"
           >
             {{ t('urdfBrowse') }}
@@ -133,16 +133,16 @@ function onFileChosen(e: Event) {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 8px;
 }
 .spec-code {
   display: block;
   white-space: pre-wrap;
   word-break: break-all;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 0.78rem;
-  padding: 0.4rem 0.55rem;
-  border-radius: 4px;
+  font-family: var(--rro-font-mono);
+  font-size: 0.75rem;
+  padding: 8px 12px;
+  border-radius: var(--rro-radius);
   background: rgba(var(--v-theme-on-surface), 0.06);
 }
 .drop-zone {
@@ -153,8 +153,10 @@ function onFileChosen(e: Event) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 1.25rem 1rem;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  padding: 24px 16px;
+  transition:
+    border-color var(--rro-dur-color) var(--rro-ease),
+    background-color var(--rro-dur-color) var(--rro-ease);
 }
 .drop-zone--active {
   border-color: rgba(var(--v-theme-primary), 0.95);

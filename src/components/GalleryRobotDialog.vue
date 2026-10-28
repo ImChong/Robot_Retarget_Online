@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useDisplay } from 'vuetify';
-import { mdiClose, mdiDownload, mdiMagnify, mdiOpenInNew } from '@mdi/js';
+import { icons } from '@/lib/icons';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore } from '@/stores/retarget';
@@ -109,7 +109,7 @@ function select(r: GalleryRobot) {
   error.value = null;
 }
 
-watch(open, (v) => {
+function onOpenChange(v: boolean) {
   if (v) {
     // Reopen on the robot loaded last time, when the loaded motion still allows it.
     const loaded = store.customRobot;
@@ -126,7 +126,9 @@ watch(open, (v) => {
   } else if (!importing.value) {
     error.value = null;
   }
-});
+}
+// Immediate: the config page mounts this dialog lazily, already open.
+watch(open, onOpenChange, { immediate: true });
 
 async function load() {
   const robot = selected.value;
@@ -153,7 +155,7 @@ async function load() {
     <v-card :class="{ 'gallery-card--capped': !xs }">
       <v-card-title class="d-flex align-center justify-space-between py-3">
         <span class="text-truncate">{{ t('galleryTitle') }}</span>
-        <v-btn :icon="mdiClose" variant="text" size="small" :disabled="importing" @click="open = false" />
+        <v-btn :icon="icons.close" variant="text" size="small" :disabled="importing" @click="open = false" />
       </v-card-title>
 
       <div class="px-4 pb-2 d-flex flex-column ga-2">
@@ -161,7 +163,7 @@ async function load() {
           {{ t('galleryHint') }}
           <a :href="GALLERY_SITE_URL + 'web/'" target="_blank" rel="noopener" class="gallery-link">
             {{ t('galleryOpenSite') }}
-            <v-icon :icon="mdiOpenInNew" size="x-small" />
+            <v-icon :icon="icons.openExternal" size="x-small" />
           </a>
         </div>
         <v-alert v-if="motion.motionKind === 'smplx'" type="info" density="compact" variant="tonal" class="text-body-2">
@@ -192,7 +194,7 @@ async function load() {
           </v-btn-toggle>
           <v-text-field
             v-model="query"
-            :prepend-inner-icon="mdiMagnify"
+            :prepend-inner-icon="icons.search"
             :placeholder="t('gallerySearch')"
             density="compact"
             hide-details
@@ -263,7 +265,7 @@ async function load() {
       <v-card-actions class="gallery-actions px-4 pb-3 flex-wrap ga-2">
         <v-btn
           variant="text"
-          :prepend-icon="mdiOpenInNew"
+          :prepend-icon="icons.openExternal"
           :disabled="!selected"
           :href="selected ? selectedUrl : undefined"
           target="_blank"
@@ -273,7 +275,7 @@ async function load() {
         </v-btn>
         <v-spacer />
         <v-btn variant="text" :disabled="importing" @click="open = false">{{ t('close') }}</v-btn>
-        <v-btn color="primary" variant="flat" :prepend-icon="mdiDownload" :disabled="!canLoad" :loading="importing" @click="load">
+        <v-btn color="primary" variant="flat" :prepend-icon="icons.download" :disabled="!canLoad" :loading="importing" @click="load">
           {{ t('galleryLoad') }}
         </v-btn>
       </v-card-actions>
@@ -299,7 +301,7 @@ async function load() {
   width: 48px;
   height: 48px;
   object-fit: contain;
-  border-radius: 6px;
+  border-radius: var(--rro-radius);
   background: rgba(var(--v-theme-on-surface), 0.06);
 }
 .gallery-item {

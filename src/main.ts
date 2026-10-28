@@ -3,7 +3,10 @@ import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
 import vuetify from './plugins/vuetify';
-import { installTouchDebug } from './lib/touchDebug';
+// After Vuetify's stylesheet so the design tokens and overrides win ties.
+import '@fontsource-variable/geist';
+import '@fontsource-variable/geist-mono';
+import './styles/design.css';
 import { installTapFallback } from './lib/tapFallback';
 
 const app = createApp(App);
@@ -14,5 +17,8 @@ app.mount('#app');
 
 // Disables itself on any browser that dispatches click normally.
 installTapFallback();
-// No-op unless the URL contains `touchdebug`; see src/lib/touchDebug.ts.
-installTouchDebug();
+// Diagnostics overlay, fetched only when the URL contains `touchdebug`; see
+// src/lib/touchDebug.ts (index.html arms the event probe before this runs).
+if (location.href.includes('touchdebug')) {
+  void import('./lib/touchDebug').then((m) => m.installTouchDebug());
+}

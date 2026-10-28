@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import * as THREE from 'three';
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
-import { mdiDownload, mdiTune } from '@mdi/js';
+import { icons } from '@/lib/icons';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
@@ -131,33 +131,47 @@ function frameSmallRobot(root: THREE.Object3D) {
 }
 
 let blendedQpos = new Float64Array(0);
+let posedScene: RobotSceneObject | null = null;
+let posedResult: typeof store.result = null;
+let posedFrame = Number.NaN;
 
-function applyFrame(f: number) {
+/** Pose robot + keypoints for frame `f`; returns whether anything moved (a redraw is due). */
+function applyFrame(f: number): boolean {
   const result = store.result;
   const robot = robotModel.value;
   const scene = robotScene.value;
   // Another page may have freed this robot's WASM objects (only one robot is
   // kept alive — see prepareRobotSlot); touching them would throw.
-  if (!result || !robot || !scene || isRobotModelDisposed(robot)) return;
+  if (!result || !robot || !scene || isRobotModelDisposed(robot)) return false;
   const playing = playback.state.playing;
   const frame = playing ? f : Math.max(0, Math.min(Math.floor(f), result.frameCount - 1));
   const qpos = robot.data.qpos as Float64Array;
-  if (blendedQpos.length !== result.nq) blendedQpos = new Float64Array(result.nq);
-  if (playing) blendQpos(blendedQpos, result.qpos, result.nq, result.frameCount, frame);
-  else blendedQpos.set(result.qpos.subarray(frame * result.nq, (frame + 1) * result.nq));
-  qpos.set(blendedQpos);
-  robot.mujoco.mj_kinematics(robot.model, robot.data);
-  scene.update(robot.data);
-  if (playing) ghost.value?.updateBlend(result.scaledHuman, frame, result.humanBodyNames.length, result.frameCount);
-  else ghost.value?.update(result.scaledHuman, frame, result.humanBodyNames.length);
+  // Paused on an already-posed frame: skip the kinematics and the redraw.
+  const changed = playing || scene !== posedScene || result !== posedResult || frame !== posedFrame;
+  if (changed) {
+    if (blendedQpos.length !== result.nq) blendedQpos = new Float64Array(result.nq);
+    if (playing) blendQpos(blendedQpos, result.qpos, result.nq, result.frameCount, frame);
+    else blendedQpos.set(result.qpos.subarray(frame * result.nq, (frame + 1) * result.nq));
+    qpos.set(blendedQpos);
+    robot.mujoco.mj_kinematics(robot.model, robot.data);
+    scene.update(robot.data);
+    if (playing) ghost.value?.updateBlend(result.scaledHuman, frame, result.humanBodyNames.length, result.frameCount);
+    else ghost.value?.update(result.scaledHuman, frame, result.humanBodyNames.length);
+    posedScene = scene;
+    posedResult = result;
+    posedFrame = playing ? Number.NaN : frame;
+  }
 
   if (followCamera.value && sceneManager.value) {
     const sm = sceneManager.value;
     const tx = qpos[0];
     const ty = qpos[1];
-    const smooth = playing ? 1 : 0.08;
-    const dx = (tx - sm.controls.target.x) * smooth;
-    const dy = (ty - sm.controls.target.y) * smooth;
+    const ex = tx - sm.controls.target.x;
+    const ey = ty - sm.controls.target.y;
+    // Ease while paused, but land within 0.1 mm instead of creeping (each step is a redraw).
+    const smooth = playing || ex * ex + ey * ey < 1e-8 ? 1 : 0.08;
+    const dx = ex * smooth;
+    const dy = ey * smooth;
     sm.controls.target.x += dx;
     sm.controls.target.y += dy;
     // Rigidly pan the camera with the target so a translating robot (e.g. a
@@ -166,6 +180,7 @@ function applyFrame(f: number) {
     sm.camera.position.y += dy;
     sm.setDampingEnabled(!playing);
   }
+  return changed;
 }
 
 function onExport(kind: 'npz' | 'csv' | 'json') {
@@ -180,6 +195,7 @@ function onExport(kind: 'npz' | 'csv' | 'json') {
 
 watch(showGhost, (v) => {
   if (ghost.value) ghost.value.root.visible = v;
+  sceneManager.value?.invalidate();
 });
 watch(
   () => store.activeHistoryId,
@@ -209,9 +225,9 @@ onMounted(() => {
     target: [0, 0, 0.8],
   });
   sm.onTick((dt) => {
-    if (!robotScene.value) return;
+    if (!robotScene.value) return false;
     playback.tick(dt);
-    applyFrame(playback.poseFrame.value);
+    return applyFrame(playback.poseFrame.value);
   });
   sm.start();
   sceneManager.value = sm;
@@ -265,19 +281,21 @@ onUnmounted(() => {
       <v-card v-if="stats" variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('statsTitle') }}</v-card-title>
         <v-card-text class="text-body-2">
-          <div class="info-line"><span>{{ t('fileName') }}</span><b>{{ store.activeHistoryEntry?.bvhName }}</b></div>
-          <div v-if="store.activeHistoryEntry" class="info-line">
-            <span>{{ t('retargetTime') }}</span>
-            <b>{{ formatRetargetTimestamp(store.activeHistoryEntry.createdAt) }}</b>
-          </div>
-          <div class="info-line"><span>{{ t('robot') }}</span><b>{{ store.activeHistoryEntry?.robotLabel }}</b></div>
-          <div class="info-line">
-            <span>{{ t('engine') }}</span>
-            <b>{{ store.result?.engine === 'omniretarget' ? t('engineOmni') : t('engineGmr') }}</b>
-          </div>
-          <div class="info-line"><span>{{ t('frames') }}</span><b>{{ stats.frames }}</b></div>
-          <div class="info-line"><span>{{ t('solveTime') }}</span><b>{{ stats.time }}</b></div>
-          <div class="info-line"><span>{{ t('procSpeed') }}</span><b>{{ stats.speed }}</b></div>
+          <dl class="info-list">
+            <div class="info-line"><dt>{{ t('fileName') }}</dt><dd>{{ store.activeHistoryEntry?.bvhName }}</dd></div>
+            <div v-if="store.activeHistoryEntry" class="info-line">
+              <dt>{{ t('retargetTime') }}</dt>
+              <dd>{{ formatRetargetTimestamp(store.activeHistoryEntry.createdAt) }}</dd>
+            </div>
+            <div class="info-line"><dt>{{ t('robot') }}</dt><dd>{{ store.activeHistoryEntry?.robotLabel }}</dd></div>
+            <div class="info-line">
+              <dt>{{ t('engine') }}</dt>
+              <dd>{{ store.result?.engine === 'omniretarget' ? t('engineOmni') : t('engineGmr') }}</dd>
+            </div>
+            <div class="info-line"><dt>{{ t('frames') }}</dt><dd>{{ stats.frames }}</dd></div>
+            <div class="info-line"><dt>{{ t('solveTime') }}</dt><dd>{{ stats.time }}</dd></div>
+            <div class="info-line"><dt>{{ t('procSpeed') }}</dt><dd>{{ stats.speed }}</dd></div>
+          </dl>
         </v-card-text>
       </v-card>
 
@@ -285,20 +303,23 @@ onUnmounted(() => {
         <v-switch v-model="showGhost" :label="t('showGhost')" color="primary" density="compact" hide-details />
         <v-switch v-model="followCamera" :label="t('followCamera')" color="primary" density="compact" hide-details />
 
-        <div class="text-subtitle-2 mt-2">{{ t('export') }}</div>
-        <v-btn variant="tonal" :prepend-icon="mdiDownload" block @click="onExport('npz')">
+        <div class="panel-label">{{ t('export') }}</div>
+        <!-- NPZ is the format GMR training consumes; the other two are for inspection. -->
+        <v-btn color="primary" variant="tonal" :prepend-icon="icons.download" block @click="onExport('npz')">
           {{ t('exportNpz') }}
         </v-btn>
-        <v-btn variant="tonal" :prepend-icon="mdiDownload" block @click="onExport('csv')">
-          {{ t('exportCsv') }}
-        </v-btn>
-        <v-btn variant="tonal" :prepend-icon="mdiDownload" block @click="onExport('json')">
-          {{ t('exportJson') }}
-        </v-btn>
+        <div class="export-secondary">
+          <v-btn variant="text" :prepend-icon="icons.download" @click="onExport('csv')">
+            {{ t('exportCsv') }}
+          </v-btn>
+          <v-btn variant="text" :prepend-icon="icons.download" @click="onExport('json')">
+            {{ t('exportJson') }}
+          </v-btn>
+        </div>
       </template>
-      <div v-else class="text-caption text-disabled text-center mt-2">
+      <p v-else class="not-run text-body-2">
         {{ t('notRun') }}
-      </div>
+      </p>
     </MobileSidePanel>
 
     <div class="main-col d-flex flex-column flex-grow-1">
@@ -322,7 +343,7 @@ onUnmounted(() => {
       v-if="!mdAndUp"
       class="panel-fab"
       color="primary"
-      :icon="mdiTune"
+      :icon="icons.sliders"
       size="small"
       elevation="4"
       :title="t('openPanel')"
@@ -379,10 +400,14 @@ onUnmounted(() => {
     pointer-events: none !important;
   }
 }
-.info-line {
-  display: flex;
-  justify-content: space-between;
+.export-secondary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+.not-run {
+  margin: 8px 0 0;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 .panel-fab {
   position: absolute;

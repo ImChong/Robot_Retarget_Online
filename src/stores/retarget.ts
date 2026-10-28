@@ -24,7 +24,6 @@ import {
   type CustomRobotBundle,
 } from '@/lib/mujoco/customRobot';
 import { BUILTIN_GALLERY_LINKS, type GalleryRobot } from '@/lib/gallery/registry';
-import { runRetarget } from '@/lib/retarget/runner';
 import { findMissingBodies } from '@/lib/bvh/lafan1';
 import {
   defaultRobotIdForKind,
@@ -264,6 +263,9 @@ export const useRetargetStore = defineStore('retarget', {
         return;
       }
       try {
+        // The solver code is fetched on first run, alongside the robot load.
+        const runner = import('@/lib/retarget/runner');
+        runner.catch(() => undefined); // surfaced by the `await` below, not as an unhandled rejection
         const robot = await this.ensureRobot();
         const config = structuredClone(toRaw(this.config)) as GmrIkConfig;
 
@@ -281,6 +283,7 @@ export const useRetargetStore = defineStore('retarget', {
         this.runProgress = { done: 0, total: motion.lafan.frames.length };
         this.abortController = new AbortController();
 
+        const { runRetarget } = await runner;
         const result = await runRetarget({
           robot,
           config,
