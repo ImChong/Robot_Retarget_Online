@@ -163,6 +163,11 @@ const messages: Record<string, { zh: string; en: string }> = {
   damping: { zh: '阻尼 (damping)', en: 'Damping' },
   maxIter: { zh: '每帧最大迭代', en: 'Max iterations / frame' },
   velocityLimit: { zh: '关节速度限制', en: 'Joint velocity limit' },
+  quadrupedPlanner: { zh: '四足自然化（接触锁脚 + 平滑）', en: 'Natural quadruped (foot locking + smoothing)' },
+  quadrupedPlannerHint: {
+    zh: '躯干朝向取自四肢根部关键点，足端相对机器人髋部放置；着地脚锁定不滑、不穿地，摆动脚留出离地高度，并对关节做平滑。关闭则直接按映射表逐帧 IK。',
+    en: 'Trunk orientation from the four leg roots, feet placed relative to the robot hips; planted feet are locked (no slip, no ground penetration), swinging feet clear the floor, and joints are smoothed. Off = plain per-frame IK on the mapping table.',
+  },
 
   // Engine selection (GMR / OmniRetarget)
   engine: { zh: '重定向引擎', en: 'Retarget engine' },

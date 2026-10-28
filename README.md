@@ -170,6 +170,46 @@ drop-in rather than a new algorithm. Related references surveyed:
 | **Robots** | **Unitree Go2** and **Unitree A1** (12 DoF), real MJCF + meshes from [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) (Unitree BSD-3). A `*_mocap.xml` variant adds four massless `*_foot` keypoint bodies at the foot tips (no added DoF). Canonical URDFs are also included under `public/robots/<id>/urdf/` as reference. |
 | **Mapping** | `bvh_quadruped_to_unitree_{go2,a1}.json`: `base/trunk ← b_Hips` (orientation + position) and `FL/FR/RL/RR_foot ← b_{Left,Right}Hand / b_{Left,Right}Toe` (position). A constant trunk-frame offset (clip-independent) and a 0.5 body scale fit the Labrador onto the smaller robots. |
 
+### Natural quadruped motion · 四足自然化（默认开启）
+
+Plain per-frame keypoint IK copies everything wrong with raw animal mocap onto
+the robot: the dog's pelvis bone jitters at ~150°/s even when it stands still,
+its paws dip up to 5 cm below the floor, and planted paws slide. With
+**Retarget Config → Natural quadruped** (on by default for dog clips) the whole
+clip is planned before solving (`src/lib/retarget/quadruped.ts`), following the
+quadruped retargeting notes in
+[Robotics_Notebooks](https://github.com/ImChong/Robotics_Notebooks):
+
+1. **Trunk frame from keypoints** — Peng et al.'s `motion_imitation`
+   (`retarget_root_pose`): base at the centre of the four leg roots, heading
+   from hips to shoulders, roll removed and the clip's mean pitch levelled
+   (their per-robot `FORWARD_DIR_OFFSET`, made automatic); keypoints low-passed
+   (zero-phase).
+2. **Hip-relative feet** — same source (`retarget_pose`): each foot target is
+   the robot's own hip plus the dog's hip → paw offset, so the dog's longer
+   trunk does not drag the legs out of their natural stance; each stride is
+   centred under its hip (their hand-tuned `SIM_TOE_OFFSET_LOCAL`, made
+   automatic), and front paws use the paw joint, not the wrist.
+3. **Contact phases + foot locking** — the spatial stage of
+   [STMR](https://arxiv.org/abs/2404.11557) (T-RO 2025): a paw that is low and
+   slow is planted; a planted foot is held still on the floor (per-paw floor
+   level, no penetration), the correction is eased over the swing, and a
+   swinging foot keeps a minimum arc above the floor instead of scuffing.
+4. **Regularized IK** — a gentle pull toward the robot's rest keyframe (keeps
+   knees on their natural side) and toward the previous frame (no jumps).
+
+Measured on the robot's own kinematics (`src/lib/retarget/motionQuality.ts`,
+metrics after X-Morph's reference-quality table; `tests/quadruped.test.ts`),
+plain IK → natural, Go2 (A1 is within a few %):
+
+| clip | foot slip near floor (cm/s) | penetration p95 (cm) | joint jerk RMS | frames with a >0.25 rad joint jump | trunk roll/pitch wobble (°/s) |
+| --- | --- | --- | --- | --- | --- |
+| walk | 70.8 → **16.0** | 3.26 → **0.20** | 4874 → **805** | 37 → **1** | 117 → **42** |
+| run | 87.9 → **32.8** | 4.94 → **0.15** | 4095 → **846** | 49 → **2** | 106 → **45** |
+| idle | 30.1 → **8.8** | 2.62 → **0.06** | 3169 → **484** | 15 → **0** | 102 → **58** |
+
+关闭该开关即回到按映射表逐帧 IK 的旧行为；ik_config 与 NPZ 格式不变。
+
 ### Usage · 使用方式
 
 The quadruped workflow is **on by default**: in *BVH Viewer → Load sample* the
@@ -197,9 +237,10 @@ load only and never persisted; the site-wide default is `DEFAULT_QUADRUPED` in
 站点默认值见 `src/lib/features.ts` 的 `DEFAULT_QUADRUPED`。
 
 Validated headless (`tests/quadruped.test.ts`, walk / run / idle × Go2 / A1):
-the robot stands at ≈0.28–0.29 m, the four feet track their targets to
-**~0.7–2.2 cm** on average (worst single frame ≈7–13 cm) and the trunk stays
-within ~8–12° of the dog's (faithful pitch). `scripts/e2e_quadruped.mjs`
+with plain IK the robot stands at ≈0.28–0.29 m, the four feet track their
+targets to **~0.7–2.2 cm** on average (worst single frame ≈7–13 cm) and the
+trunk stays within ~8–12° of the dog's (faithful pitch); the natural-motion
+planner is checked against it on every clip (table above). `scripts/e2e_quadruped.mjs`
 drives the same flow in a headless browser (sample menu → auto robot switch →
 retarget → NPZ export, both robots, all three clips). Reproduce:
 
