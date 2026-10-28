@@ -4,6 +4,7 @@
  */
 
 import type { HumanFrame, HumanFrameBody } from '../bvh/lafan1';
+import type { CustomRobotBundle } from '../mujoco/customRobot';
 
 /** Retargeting engines selectable behind the same UI / ik_config. */
 export type RetargetEngineId = 'gmr' | 'omniretarget';
@@ -105,6 +106,8 @@ export interface RetargetHistoryEntry {
   /** Wall-clock time when the retarget run finished (ms since epoch). */
   createdAt: number;
   result: RetargetResult;
+  /** The imported robot this run used, so replaying it survives importing another. */
+  customRobot?: CustomRobotBundle;
 }
 
 /**

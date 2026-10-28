@@ -41,6 +41,10 @@ export default defineConfig({
           if (id.includes('@mediapipe')) return 'vendor-mediapipe';
           if (id.includes('plotly.js')) return 'vendor-plotly';
           if (id.includes('fflate')) return 'vendor-fflate';
+          // three.js loaders / exporters are only used by the lazily loaded
+          // gallery mesh converters (src/lib/gallery/): keep them out of the
+          // first-paint three.js chunk.
+          if (/three\/examples\/jsm\/(loaders|exporters)\//.test(id)) return undefined;
           if (id.includes('three')) return 'vendor-three';
           if (id.includes('vuetify')) return 'vendor-vuetify';
           return 'vendor';

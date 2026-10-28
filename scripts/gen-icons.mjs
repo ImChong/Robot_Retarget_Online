@@ -20,6 +20,7 @@ const assets = resolve(root, 'node_modules/@phosphor-icons/core/assets');
 /** key in the generated map → [phosphor icon name, weight] */
 const ICONS = {
   arrowCounterClockwise: ['arrow-counter-clockwise', 'regular'],
+  arrowSquareOut: ['arrow-square-out', 'regular'],
   arrowsClockwiseBold: ['arrows-clockwise', 'bold'],
   caretDown: ['caret-down', 'regular'],
   caretLeft: ['caret-left', 'regular'],
@@ -35,6 +36,7 @@ const ICONS = {
   downloadSimple: ['download-simple', 'regular'],
   folderOpen: ['folder-open', 'regular'],
   info: ['info', 'regular'],
+  magnifyingGlass: ['magnifying-glass', 'regular'],
   magicWand: ['magic-wand', 'regular'],
   magnifyingGlassMinus: ['magnifying-glass-minus', 'regular'],
   minusSquare: ['minus-square', 'regular'],
@@ -50,6 +52,7 @@ const ICONS = {
   skipForward: ['skip-forward', 'regular'],
   slidersHorizontal: ['sliders-horizontal', 'regular'],
   square: ['square', 'regular'],
+  squaresFour: ['squares-four', 'regular'],
   stop: ['stop', 'regular'],
   sun: ['sun', 'regular'],
   trash: ['trash', 'regular'],

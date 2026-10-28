@@ -134,6 +134,68 @@ export function createBlankConfig(baseBody: string, bodyNames: string[]): GmrIkC
   };
 }
 
+/** Dog-mocap foot joints, in the order of the leg patterns below (see the Go2 preset). */
+const QUADRUPED_LEGS: [human: string, leg: RegExp][] = [
+  ['b_LeftHand', /(?:^|[_-])(fl|lf)(?:[_-]|$)|front_?left|left_?front/i],
+  ['b_RightHand', /(?:^|[_-])(fr|rf)(?:[_-]|$)|front_?right|right_?front/i],
+  ['b_LeftToe', /(?:^|[_-])(rl|lh|hl|bl)(?:[_-]|$)|(rear|hind|back)_?left|left_?(rear|hind|back)/i],
+  ['b_RightToe', /(?:^|[_-])(rr|rh|hr|br)(?:[_-]|$)|(rear|hind|back)_?right|right_?(rear|hind|back)/i],
+];
+
+/**
+ * ik_config template for an imported quadruped: the Go2 preset (root + four
+ * feet keypoint IK) re-keyed onto this robot's root and the foot bodies found
+ * by name — `FL_foot` / `LF_FOOT` / `toe_fl` / `foot_front_left`, else the last body of that
+ * leg in tree order (the most distal one). The root rotation offset carries
+ * over unchanged: it maps the dog skeleton's hips onto any x-forward, z-up base.
+ */
+export function createBlankQuadrupedConfig(baseBody: string, bodyNames: string[]): GmrIkConfig {
+  const template = getDefaultConfig('unitree_go2');
+  const rootEntry = (table: Record<string, IkMatchEntry>) => table[template.robot_root_name];
+  const footEntry = Object.values(template.ik_match_table2).find((e) => e[0] !== template.human_root_name)!;
+  const bodies = bodyNames.filter((n) => n !== 'world' && n !== baseBody);
+
+  const ik_match_table1: Record<string, IkMatchEntry> = {
+    [baseBody]: rootEntry(template.ik_match_table1),
+  };
+  const ik_match_table2: Record<string, IkMatchEntry> = {
+    [baseBody]: rootEntry(template.ik_match_table2),
+  };
+  for (const [human, leg] of QUADRUPED_LEGS) {
+    const legBodies = bodies.filter((n) => leg.test(n));
+    const foot = legBodies.find((n) => /foot|toe|tip/i.test(n)) ?? legBodies[legBodies.length - 1];
+    if (foot) {
+      // A copy per foot: the mapping table edits offsets in place.
+      const entry = structuredClone(footEntry);
+      entry[0] = human;
+      ik_match_table2[foot] = entry;
+    }
+  }
+  return { ...template, robot_root_name: baseBody, ik_match_table1, ik_match_table2 };
+}
+
+/**
+ * A bundled GMR preset that fits an imported robot: one for the same motion
+ * family (`human_root`: `Hips` for LAFAN1 BVH, `b_Hips` for dog mocap) whose
+ * robot bodies all exist on it — e.g. the Unitree G1 / Go2 / A1 presets for the
+ * gallery's G1 / Go2 / A1 URDFs. `preferred` robot ids are tried first.
+ */
+export function matchPresetConfig(
+  humanRoot: string,
+  bodyNames: string[],
+  preferred: string[] = [],
+): GmrIkConfig | null {
+  const have = new Set(bodyNames);
+  const ids = [...new Set([...preferred, ...Object.keys(DEFAULT_CONFIGS)])];
+  for (const id of ids) {
+    const cfg = DEFAULT_CONFIGS[id];
+    if (!cfg || cfg.human_root_name !== humanRoot) continue;
+    const needed = [cfg.robot_root_name, ...Object.keys(cfg.ik_match_table1), ...Object.keys(cfg.ik_match_table2)];
+    if (needed.every((b) => have.has(b))) return structuredClone(cfg);
+  }
+  return null;
+}
+
 export function validateConfig(raw: unknown): GmrIkConfig {
   if (typeof raw !== 'object' || raw === null) throw new Error('Config must be a JSON object');
   const cfg = raw as Partial<GmrIkConfig>;

@@ -72,6 +72,9 @@ export const icons = {
   dragHandle: ph('dotsSix'),
   magicWand: ph('magicWand'),
   brandMark: ph('arrowsClockwiseBold'),
+  openExternal: ph('arrowSquareOut'),
+  gallery: ph('squaresFour'),
+  search: ph('magnifyingGlass'),
 } as const;
 
 /** Vuetify's internal icons, redrawn in Phosphor; anything unlisted keeps the MDI fallback. */
