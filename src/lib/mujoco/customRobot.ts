@@ -26,6 +26,10 @@ export interface CustomRobotBundle {
   files: Map<string, Uint8Array>;
   /** Root body name used in ik_config (detected or inferred). */
   baseBody: string;
+  /** Motion family the robot retargets from; uploads default to humanoid. */
+  kind?: 'humanoid' | 'quadruped';
+  /** Set when the robot was picked from Robot Description Gallery Online. */
+  gallery?: { id: string; variant: string | null };
 }
 
 const MODEL_EXT = /\.(urdf|xml)$/i;
@@ -90,9 +94,12 @@ function pickMainModel(paths: string[]): string {
 
 /** URDF root link = link that is never referenced as a joint child. */
 export function findUrdfRootLink(urdf: string): string {
-  const links = [...urdf.matchAll(/<link\s+name="([^"]+)"/gi)].map((m) => m[1]);
+  const text = urdf.replace(/<!--[\s\S]*?-->/g, '');
+  const links = [...text.matchAll(/<link\b[^>]*?\bname\s*=\s*["']([^"']+)["']/gi)].map((m) => m[1]);
   if (links.length === 0) throw new Error('URDF contains no <link> elements.');
-  const childLinks = new Set([...urdf.matchAll(/<child\s+link="([^"]+)"/gi)].map((m) => m[1]));
+  const childLinks = new Set(
+    [...text.matchAll(/<child\b[^>]*?\blink\s*=\s*["']([^"']+)["']/gi)].map((m) => m[1]),
+  );
   const roots = links.filter((l) => !childLinks.has(l));
   if (roots.length !== 1) {
     throw new Error(
@@ -132,16 +139,22 @@ function urdfInertialToMjcf(inertialXml: string): string {
   return `<inertial pos="${origin}" mass="${mass}" diaginertia="${ixx} ${iyy} ${izz}"/>`;
 }
 
-/** Compile URDF → MJCF and wrap the kinematic tree under a floating root body. */
+/**
+ * Compile URDF → MJCF and wrap the kinematic tree under a floating root body.
+ * `compilePath` is where the URDF sits in the VFS next to its meshes, so mesh
+ * paths relative to it resolve; without it the URDF is compiled from a scratch
+ * directory (fine for a URDF that references no files).
+ */
 export async function urdfToMjcfWithFloatingBase(
   mujoco: MujocoModule,
   urdfText: string,
   urdfRelPath: string,
   rootLink: string,
+  compilePath?: string,
 ): Promise<string> {
   removeVfsTree(mujoco, URDF_COMPILE_DIR);
   ensureDir(mujoco, URDF_COMPILE_DIR);
-  const urdfPath = `${URDF_COMPILE_DIR}/${urdfRelPath.split('/').pop() ?? 'robot.urdf'}`;
+  const urdfPath = compilePath ?? `${URDF_COMPILE_DIR}/${urdfRelPath.split('/').pop() ?? 'robot.urdf'}`;
   mujoco.FS.writeFile(urdfPath, urdfText);
 
   const model = mujoco.MjModel.loadFromXML(urdfPath);
@@ -289,8 +302,15 @@ async function loadCustomRobotImpl(
 
   if (isUrdf) {
     const urdfText = new TextDecoder().decode(bundle.files.get(bundle.rootModel)!);
-    const mjcf = await urdfToMjcfWithFloatingBase(mujoco, urdfText, bundle.rootModel, bundle.baseBody);
-    xmlPath = `${CUSTOM_VFS_DIR}/compiled.mjcf.xml`;
+    const mjcf = await urdfToMjcfWithFloatingBase(
+      mujoco,
+      urdfText,
+      bundle.rootModel,
+      bundle.baseBody,
+      rootPath,
+    );
+    // Beside the URDF, so the compiled model's mesh paths resolve the same way.
+    xmlPath = `${rootPath.slice(0, rootPath.lastIndexOf('/'))}/__compiled.mjcf.xml`;
     mujoco.FS.writeFile(xmlPath, mjcf);
   } else {
     const mjcfText = new TextDecoder().decode(bundle.files.get(bundle.rootModel)!);

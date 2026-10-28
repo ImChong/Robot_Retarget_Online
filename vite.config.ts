@@ -27,6 +27,10 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('node_modules') && !id.includes('mujoco-js')) {
             if (id.includes('plotly.js')) return 'vendor-plotly';
+            // three.js loaders / exporters are only used by the lazily loaded
+            // gallery mesh converters (src/lib/gallery/): keep them out of the
+            // first-paint three.js chunk.
+            if (/three\/examples\/jsm\/(loaders|exporters)\//.test(id)) return undefined;
             if (id.includes('three')) return 'vendor-three';
             if (id.includes('vuetify')) return 'vendor-vuetify';
             return 'vendor';

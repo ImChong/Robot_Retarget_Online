@@ -11,6 +11,8 @@ import {
   mdiDelete,
   mdiPlayCircle,
   mdiStopCircle,
+  mdiOpenInNew,
+  mdiViewGridOutline,
 } from '@mdi/js';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
@@ -30,6 +32,8 @@ import {
 import MappingTable from '@/components/MappingTable.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import CustomUrdfImportDialog from '@/components/CustomUrdfImportDialog.vue';
+import GalleryRobotDialog from '@/components/GalleryRobotDialog.vue';
+import { BUILTIN_GALLERY_LINKS, galleryRobotUrl } from '@/lib/gallery/registry';
 import EngineToggle from '@/components/EngineToggle.vue';
 import WorkflowNavBar from '@/components/WorkflowNavBar.vue';
 import { downloadBlob } from '@/lib/export/motion';
@@ -94,6 +98,7 @@ const showHuman = ref(true);
 const highlightBody = ref<string | null>(null);
 const importInput = ref<HTMLInputElement | null>(null);
 const urdfDialogOpen = ref(false);
+const galleryDialogOpen = ref(false);
 const activeTab = ref('stage1');
 const panelOpen = ref(false);
 
@@ -118,14 +123,25 @@ const robotItems = computed((): RobotSelectItem[] => {
       },
     }));
   if (store.customRobot) {
+    const tag = store.customRobot.gallery ? t('galleryRobotTag') : t('customRobot');
     items.unshift({
-      title: `${store.customRobot.label} (${t('customRobot')})`,
+      title: `${store.customRobot.label} (${tag})`,
       value: CUSTOM_ROBOT_ID,
       isCustom: true,
-      props: { disabled: kind === 'quadruped' || kind === 'smplx' },
+      props: { disabled: kind !== null && kind !== store.customRobotKind },
     });
   }
   return items;
+});
+
+/** The selected robot's page on Robot Description Gallery Online, when it has one. */
+const galleryPageUrl = computed((): string | null => {
+  if (store.robotId === CUSTOM_ROBOT_ID) {
+    const gallery = store.customRobot?.gallery;
+    return gallery ? galleryRobotUrl(gallery.id, gallery.variant) : null;
+  }
+  const link = BUILTIN_GALLERY_LINKS[store.robotId];
+  return link ? galleryRobotUrl(link.id, link.variant) : null;
 });
 
 function onRobotSelected(robotId: string) {
@@ -312,11 +328,11 @@ function onImportChosen(e: Event) {
   (e.target as HTMLInputElement).value = '';
 }
 
-async function onCustomUrdfImported() {
+async function onCustomUrdfImported(successKey = 'urdfImportSuccess') {
   showLoadingStrip('loading', t('loadingRobot'));
   try {
     await ensureRobotScene();
-    showLoadingStrip('success', t('urdfImportSuccess'));
+    showLoadingStrip('success', t(successKey));
     scheduleHideStrip();
   } catch (err) {
     showLoadingStrip('error', err instanceof Error ? err.message : String(err));
@@ -412,7 +428,8 @@ onUnmounted(() => {
   <div class="page-root d-flex">
     <input ref="importInput" type="file" accept=".json" class="d-none" @change="onImportChosen" />
 
-    <CustomUrdfImportDialog v-model="urdfDialogOpen" @imported="onCustomUrdfImported" />
+    <CustomUrdfImportDialog v-model="urdfDialogOpen" @imported="onCustomUrdfImported()" />
+    <GalleryRobotDialog v-model="galleryDialogOpen" @imported="onCustomUrdfImported('galleryImportSuccess')" />
 
     <MobileSidePanel v-model="panelOpen">
       <div class="sidebar-inner d-flex flex-column">
@@ -447,6 +464,28 @@ onUnmounted(() => {
           </v-list-item>
         </template>
       </v-select>
+
+      <v-btn
+        v-if="galleryPageUrl"
+        variant="text"
+        density="comfortable"
+        :prepend-icon="mdiOpenInNew"
+        :href="galleryPageUrl"
+        target="_blank"
+        rel="noopener"
+      >
+        {{ t('viewInGallery') }}
+      </v-btn>
+
+      <v-btn
+        variant="tonal"
+        color="secondary"
+        :prepend-icon="mdiViewGridOutline"
+        :disabled="motion.motionKind === 'smplx'"
+        @click="galleryDialogOpen = true"
+      >
+        {{ t('pickFromGallery') }}
+      </v-btn>
 
       <v-btn
         variant="tonal"
