@@ -49,18 +49,18 @@ export function preparePlannedQuadruped(
   const plan = planQuadrupedTargets({ frames, fps, robot, config, scale });
   if (!plan) return false;
   engine.usePlannedTargets(plan.targets);
+  // Start from the rest crouch when the model has one (keeps every knee on its
+  // natural side), with the base already at the first planned trunk pose.
   const rest = restKeyframe(robot);
-  if (rest) {
-    // Start from the rest crouch (keeps every knee on its natural side) at the first base target.
-    const qpos = robot.data.qpos as Float64Array;
-    qpos.set(rest);
-    const root = plan.targets[0].get(config.human_root_name);
-    if (root) {
-      qpos.set(root.pos, 0);
-      qpos.set(root.quat, 3);
-    }
-    robot.mujoco.mj_kinematics(robot.model, robot.data);
+  const qpos = robot.data.qpos as Float64Array;
+  if (rest) qpos.set(rest);
+  const root = plan.targets[0].get(config.human_root_name);
+  const free = (robot.model.jnt_type as Int32Array)[0] === 0; // qpos[0..7] is the free joint
+  if (root && free) {
+    qpos.set(root.pos, 0);
+    qpos.set(root.quat, 3);
   }
+  robot.mujoco.mj_kinematics(robot.model, robot.data);
   engine.setRegularization(QUADRUPED_REGULARIZATION.posture, QUADRUPED_REGULARIZATION.smooth, rest);
   return true;
 }
