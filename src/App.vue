@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, defineAsyncComponent, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useAppTheme } from '@/composables/useAppTheme';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore } from '@/stores/retarget';
-import { PhArrowsClockwise } from '@phosphor-icons/vue';
 import { icons } from '@/lib/icons';
-import SponsorDialog from '@/components/SponsorDialog.vue';
 
 const { t, toggleLocale, localeLabel, locale } = useI18n();
 const { isDark, toggleAppTheme } = useAppTheme();
@@ -45,7 +43,14 @@ const currentTab = computed({
   },
 });
 
+// Loaded on first open (it also pulls in the canvas-blur helper).
+const SponsorDialog = defineAsyncComponent(() => import('@/components/SponsorDialog.vue'));
 const sponsorOpen = ref(false);
+const sponsorUsed = ref(false);
+function openSponsor() {
+  sponsorUsed.value = true;
+  sponsorOpen.value = true;
+}
 
 // A `#main-content` href would be read as a route by the hash router, so the
 // skip link moves focus itself.
@@ -65,7 +70,7 @@ void locale.value;
     <v-app-bar :height="56" flat class="site-header">
       <div class="header-inner">
         <router-link :to="{ name: 'bvh' }" class="site-title" :aria-label="t('appTitleBilingual')">
-          <span class="site-title-mark" aria-hidden="true"><PhArrowsClockwise weight="bold" /></span>
+          <span class="site-title-mark" aria-hidden="true"><v-icon :icon="icons.brandMark" size="16" /></span>
           <span class="site-title-text">{{ t('appTitleBilingual') }}</span>
         </router-link>
 
@@ -102,7 +107,7 @@ void locale.value;
           <button
             type="button"
             class="header-btn lang-toggle"
-            :aria-label="t('switchLanguage')"
+            :aria-label="`${localeLabel} · ${t('switchLanguage')}`"
             :title="t('switchLanguage')"
             @click="toggleLocale"
           >
@@ -125,7 +130,7 @@ void locale.value;
             :aria-label="t('sponsorTitle')"
             :title="t('sponsorTitle')"
             aria-haspopup="dialog"
-            @click="sponsorOpen = true"
+            @click="openSponsor"
           >
             <v-icon :icon="icons.coffee" size="18" />
           </button>
@@ -150,7 +155,7 @@ void locale.value;
       </router-view>
     </v-main>
 
-    <SponsorDialog v-model="sponsorOpen" />
+    <SponsorDialog v-if="sponsorUsed" v-model="sponsorOpen" />
   </v-app>
 </template>
 

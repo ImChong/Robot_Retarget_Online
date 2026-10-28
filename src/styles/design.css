@@ -19,6 +19,8 @@
   --rro-text-muted: #9b9a97;
   --rro-accent: #669eea;
   --rro-sponsor: #e2566a;
+  /* = the three.js scene background (src/lib/viewport/SceneManager.ts). */
+  --rro-viewport-bg: #1f1f1f;
   /* One light source, straight above: shadows only ever fall downwards. */
   --rro-shadow-float: 0 4px 16px rgba(0, 0, 0, 0.32);
   --rro-shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -49,8 +51,10 @@
   --rro-hover-bg: #f7f6f3;
   --rro-border: #e8e8e4;
   --rro-text: #37352f;
-  --rro-text-muted: #787774;
+  /* #787774 measured 4.47:1 on white, just under WCAG AA. */
+  --rro-text-muted: #6f6e6a;
   --rro-accent: #2d74da;
+  --rro-viewport-bg: #eceae5;
   /* Tinted toward the warm ink instead of pure black. */
   --rro-shadow-float: 0 4px 16px rgba(55, 53, 47, 0.12);
   --rro-shadow-overlay: 0 8px 24px rgba(55, 53, 47, 0.16);
@@ -296,7 +300,8 @@ samp,
   line-height: 1rem;
   font-weight: 600;
   letter-spacing: 0.01em;
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  /* Above medium emphasis: Vuetify's light-theme 0.6 is ~3.6:1 on white. */
+  color: rgba(var(--v-theme-on-surface), 0.8);
 }
 
 /* ===== Skip link ===== */

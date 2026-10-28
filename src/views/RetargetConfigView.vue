@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
+import { computed, defineAsyncComponent, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import * as THREE from 'three';
 import { icons } from '@/lib/icons';
@@ -20,10 +20,10 @@ import {
 } from '@/lib/viewport/sceneAlignment';
 import MappingTable from '@/components/MappingTable.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
-import CustomUrdfImportDialog from '@/components/CustomUrdfImportDialog.vue';
 import EngineToggle from '@/components/EngineToggle.vue';
 import WorkflowNavBar from '@/components/WorkflowNavBar.vue';
 import { downloadBlob } from '@/lib/export/motion';
+import { prefetchPreviewStep } from '@/lib/prefetch';
 
 const { t } = useI18n();
 const { mdAndUp } = useDisplay();
@@ -84,7 +84,11 @@ const showLines = ref(true);
 const showHuman = ref(true);
 const highlightBody = ref<string | null>(null);
 const importInput = ref<HTMLInputElement | null>(null);
+// Loads on first open, then stays mounted.
+const CustomUrdfImportDialog = defineAsyncComponent(() => import('@/components/CustomUrdfImportDialog.vue'));
 const urdfDialogOpen = ref(false);
+const urdfDialogUsed = ref(false);
+watch(urdfDialogOpen, (open) => open && (urdfDialogUsed.value = true));
 const activeTab = ref('stage1');
 const panelOpen = ref(false);
 
@@ -171,6 +175,7 @@ async function ensureRobotScene() {
     }
     refreshLines();
     frameSmallScene();
+    prefetchPreviewStep();
     stripState.value = 'success';
     loadingText.value =
       loadTotal > 0 ? `${t('robotLoadComplete')} (${loadTotal}/${loadTotal})` : t('robotLoadComplete');
@@ -230,9 +235,11 @@ function rebuildSkeleton() {
   refreshLines();
 }
 
+/** Rebuild the correspondence lines. Every scene edit on this page ends here, so it also queues the redraw. */
 function refreshLines() {
   const sm = sceneManager.value;
   if (!sm) return;
+  sm.invalidate();
   if (lines.value) {
     lines.value.geometry.dispose();
     (lines.value.material as THREE.Material).dispose();
@@ -403,7 +410,7 @@ onUnmounted(() => {
   <div class="page-root d-flex">
     <input ref="importInput" type="file" accept=".json" class="d-none" @change="onImportChosen" />
 
-    <CustomUrdfImportDialog v-model="urdfDialogOpen" @imported="onCustomUrdfImported" />
+    <CustomUrdfImportDialog v-if="urdfDialogUsed" v-model="urdfDialogOpen" @imported="onCustomUrdfImported" />
 
     <MobileSidePanel v-model="panelOpen">
       <div class="sidebar-inner d-flex flex-column">

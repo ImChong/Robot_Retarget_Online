@@ -1,0 +1,57 @@
+// Vuetify SASS settings, compiled by vite-plugin-vuetify (see vite.config.ts).
+//
+// The prebuilt `vuetify/styles` ships every utility class at every breakpoint
+// (`ma-sm-2`, `d-lg-flex`, ...) — 336 KB of render-blocking CSS, almost all of
+// it unused: the templates only use the base classes. Breakpoint variants are
+// turned off and negative margins dropped; the base classes are unchanged.
+@use 'vuetify/settings' with (
+  $utilities: (
+    "display": (responsive: false),
+    "float": (responsive: false),
+    "flex": (responsive: false),
+    "flex-direction": (responsive: false),
+    "flex-grow": (responsive: false),
+    "flex-shrink": (responsive: false),
+    "flex-wrap": (responsive: false),
+    "justify-content": (responsive: false),
+    "justify-items": (responsive: false),
+    "align-items": (responsive: false),
+    "align-content": (responsive: false),
+    "align-self": (responsive: false),
+    "order": (responsive: false),
+    "gap": (responsive: false),
+    "gap-row": (responsive: false),
+    "gap-column": (responsive: false),
+    "margin": (responsive: false),
+    "margin-x": (responsive: false),
+    "margin-y": (responsive: false),
+    "margin-top": (responsive: false),
+    "margin-right": (responsive: false),
+    "margin-bottom": (responsive: false),
+    "margin-left": (responsive: false),
+    "margin-start": (responsive: false),
+    "margin-end": (responsive: false),
+    "padding": (responsive: false),
+    "padding-x": (responsive: false),
+    "padding-y": (responsive: false),
+    "padding-top": (responsive: false),
+    "padding-right": (responsive: false),
+    "padding-bottom": (responsive: false),
+    "padding-left": (responsive: false),
+    "padding-start": (responsive: false),
+    "padding-end": (responsive: false),
+    "text-align": (responsive: false),
+    "typography": (responsive: false),
+    "height": (responsive: false),
+    "width": (responsive: false),
+    "negative-margin": false,
+    "negative-margin-x": false,
+    "negative-margin-y": false,
+    "negative-margin-top": false,
+    "negative-margin-right": false,
+    "negative-margin-bottom": false,
+    "negative-margin-left": false,
+    "negative-margin-start": false,
+    "negative-margin-end": false,
+  )
+);

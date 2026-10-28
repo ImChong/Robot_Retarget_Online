@@ -1,22 +1,20 @@
 <script setup lang="ts">
-import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
-import * as THREE from 'three';
+import { computed, defineAsyncComponent, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
+import type { Vector3 } from 'three';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
 import { icons } from '@/lib/icons';
 import { usePlayback } from '@/composables/usePlayback';
-import { SceneManager } from '@/lib/viewport/SceneManager';
+import type { SceneManager } from '@/lib/viewport/SceneManager';
 import { QUADRUPED_ENABLED } from '@/lib/features';
-import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
-import { followOrbitCamera } from '@/lib/viewport/sceneAlignment';
+import { prefetchConfigStep, prefetchViewport } from '@/lib/prefetch';
+import type { SkeletonView } from '@/lib/viewport/skeletonView';
 import { resolveMotionRootJoint } from '@/lib/bvh/parse';
 import FileDropZone from '@/components/FileDropZone.vue';
 import PlaybackBar from '@/components/PlaybackBar.vue';
 import JointTreePanel from '@/components/JointTreePanel.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
-import VideoToBvhDialog from '@/components/VideoToBvhDialog.vue';
-import SmplxImportDialog from '@/components/SmplxImportDialog.vue';
 import WorkflowNavBar from '@/components/WorkflowNavBar.vue';
 
 const { t } = useI18n();
@@ -27,13 +25,23 @@ const playback = usePlayback();
 const viewportEl = ref<HTMLElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const sceneManager = shallowRef<SceneManager | null>(null);
+/** three.js + viewport helpers, loaded after the page's first paint (see onMounted). */
+let viewport: typeof import('@/lib/viewport/bvhViewport') | null = null;
 const skeleton = shallowRef<SkeletonView | null>(null);
 const hipsIndex = ref(-1);
 const selectedJoint = ref<number | null>(null);
 const loadErrorSnack = ref(false);
 const panelOpen = ref(false);
+// The import dialogs (and the MediaPipe / SMPL-X code behind them) load on
+// first open, not with the page; once loaded they stay mounted.
+const VideoToBvhDialog = defineAsyncComponent(() => import('@/components/VideoToBvhDialog.vue'));
+const SmplxImportDialog = defineAsyncComponent(() => import('@/components/SmplxImportDialog.vue'));
 const videoDialogOpen = ref(false);
 const smplxDialogOpen = ref(false);
+const videoDialogUsed = ref(false);
+const smplxDialogUsed = ref(false);
+watch(videoDialogOpen, (open) => open && (videoDialogUsed.value = true));
+watch(smplxDialogOpen, (open) => open && (smplxDialogUsed.value = true));
 const sampleMenuOpen = ref(false);
 
 const HUMANOID_SAMPLES = [
@@ -83,9 +91,9 @@ function loadText(text: string, name: string) {
   }
 }
 
-function onSmplxLoaded(model: Uint8Array, motionNpz: Uint8Array, name: string) {
+async function onSmplxLoaded(model: Uint8Array, motionNpz: Uint8Array, name: string) {
   try {
-    motion.loadSmplx(model, motionNpz, name);
+    await motion.loadSmplx(model, motionNpz, name);
   } catch {
     loadErrorSnack.value = true;
   }
@@ -107,12 +115,12 @@ async function loadSample(file: string) {
 
 function rebuildSkeleton() {
   const sm = sceneManager.value;
-  if (!sm) return;
+  if (!sm || !viewport) return;
   skeleton.value?.dispose();
   skeleton.value = null;
   selectedJoint.value = null;
   if (!motion.anim) return;
-  const sk = buildSkeletonView(motion.anim, motion.unitScale);
+  const sk = viewport.buildSkeletonView(motion.anim, motion.unitScale);
   sm.scene.add(sk.root);
   skeleton.value = sk;
   hipsIndex.value = resolveMotionRootJoint(motion.anim);
@@ -121,44 +129,102 @@ function rebuildSkeleton() {
   applyFrame(0);
 }
 
-const rootTrack = new THREE.Vector3();
+let rootTrack: Vector3 | null = null;
+let posedSkeleton: SkeletonView | null = null;
+let posedFrame = Number.NaN;
 
-function applyFrame(frame: number) {
+/** Pose the skeleton for `frame`; returns whether the pose changed (i.e. a redraw is due). */
+function applyFrame(frame: number): boolean {
   const sk = skeleton.value;
   const sm = sceneManager.value;
-  if (!sk || hipsIndex.value < 0) return;
+  if (!sk || hipsIndex.value < 0) return false;
   const playing = playback.state.playing;
   const poseFrame = playing
     ? frame
     : Math.max(0, Math.min(Math.floor(frame), motion.frameCount - 1));
-  if (playing) sk.setFrameBlend(poseFrame);
-  else sk.setFrame(poseFrame);
-  if (!sm) return;
+  // Paused on the same frame: the pose is already up to date.
+  const changed = playing || sk !== posedSkeleton || poseFrame !== posedFrame;
+  if (changed) {
+    if (playing) sk.setFrameBlend(poseFrame);
+    else sk.setFrame(poseFrame);
+    posedSkeleton = sk;
+    posedFrame = playing ? Number.NaN : poseFrame;
+  }
+  if (!sm || !viewport || !rootTrack) return changed;
   sk.getJointWorldPos(hipsIndex.value, rootTrack);
-  followOrbitCamera(sm, rootTrack, playing ? 1 : 0.08);
+  viewport.followOrbitCamera(sm, rootTrack, playing ? 1 : 0.08);
   sm.setDampingEnabled(!playing);
+  return changed;
 }
 
-watch(() => motion.anim, rebuildSkeleton);
-watch(selectedJoint, (j) => skeleton.value?.setSelected(j));
+watch(() => motion.anim, (anim) => {
+  rebuildSkeleton();
+  if (!anim) return;
+  void ensureViewport();
+  // With a motion loaded, the config page (and its 11 MB MuJoCo module) is next.
+  prefetchConfigStep();
+});
+watch(selectedJoint, (j) => {
+  skeleton.value?.setSelected(j);
+  sceneManager.value?.invalidate();
+});
 watch(mdAndUp, () => sceneManager.value?.resize());
 watch(panelOpen, () => nextTick(() => sceneManager.value?.resize()));
 
-onMounted(() => {
-  const el = viewportEl.value!;
-  const sm = new SceneManager(el, { cameraPos: [2.4, -2.6, 1.6], target: [0, 0, 0.9] });
+let isActive = true;
+let isUnmounted = false;
+
+/** Resolves once the browser has painted the current DOM. */
+function afterNextPaint(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+}
+
+let viewportReady: Promise<void> | null = null;
+
+/**
+ * Create the 3D viewport on demand: when a motion is loaded, or as soon as the
+ * pointer reaches the empty viewport (someone about to orbit or drop a file).
+ * The empty landing page has nothing to draw, and creating a WebGL context is
+ * the single most expensive thing this page does, so a visitor who only reads
+ * it never pays for one. three.js itself is prefetched at idle (see onMounted).
+ */
+function ensureViewport(): Promise<void> {
+  viewportReady ??= createViewport();
+  return viewportReady;
+}
+
+async function createViewport() {
+  // Let the page paint before the WebGL context + first-shader long task.
+  const [mod] = await Promise.all([import('@/lib/viewport/bvhViewport'), afterNextPaint()]);
+  const el = viewportEl.value;
+  if (isUnmounted || !el) return;
+  viewport = mod;
+  rootTrack = mod.createVector3();
+  const sm = new mod.SceneManager(el, { cameraPos: [2.4, -2.6, 1.6], target: [0, 0, 0.9] });
   sm.onTick((dt) => {
     playback.tick(dt);
-    applyFrame(playback.poseFrame.value);
+    return applyFrame(playback.poseFrame.value);
   });
-  sm.start();
+  if (isActive) sm.start();
   sceneManager.value = sm;
   rebuildSkeleton();
+}
+
+onMounted(() => {
+  if (motion.anim) void ensureViewport();
+  else prefetchViewport();
 });
 
-onActivated(() => sceneManager.value?.start());
-onDeactivated(() => sceneManager.value?.stop());
+onActivated(() => {
+  isActive = true;
+  sceneManager.value?.start();
+});
+onDeactivated(() => {
+  isActive = false;
+  sceneManager.value?.stop();
+});
 onUnmounted(() => {
+  isUnmounted = true;
   skeleton.value?.dispose();
   sceneManager.value?.dispose();
 });
@@ -259,7 +325,12 @@ onUnmounted(() => {
 
     <FileDropZone class="main-col flex-grow-1" @load="loadText">
       <div class="viewport-col d-flex flex-column">
-        <div class="viewport-wrap flex-grow-1">
+        <div
+          class="viewport-wrap flex-grow-1"
+          @pointerenter="ensureViewport"
+          @pointerdown="ensureViewport"
+          @dragenter="ensureViewport"
+        >
           <div ref="viewportEl" class="viewport" />
           <WorkflowNavBar />
           <Transition name="empty-fade">
@@ -302,8 +373,8 @@ onUnmounted(() => {
       @click="panelOpen = true"
     />
 
-    <VideoToBvhDialog v-model="videoDialogOpen" @generated="loadText" />
-    <SmplxImportDialog v-model="smplxDialogOpen" @loaded="onSmplxLoaded" />
+    <VideoToBvhDialog v-if="videoDialogUsed" v-model="videoDialogOpen" @generated="loadText" />
+    <SmplxImportDialog v-if="smplxDialogUsed" v-model="smplxDialogOpen" @loaded="onSmplxLoaded" />
 
     <v-snackbar v-model="loadErrorSnack" color="error" timeout="5000">
       {{ motion.loadError ?? t('loadFailed') }}
@@ -332,6 +403,16 @@ onUnmounted(() => {
 .viewport {
   position: absolute;
   inset: 0;
+  /* The scene's own background, shown until the viewport is created on demand. */
+  background: var(--rro-viewport-bg);
+}
+.viewport :deep(canvas) {
+  animation: viewport-in var(--rro-dur-color) var(--rro-ease);
+}
+@keyframes viewport-in {
+  from {
+    opacity: 0;
+  }
 }
 .empty-hint {
   position: absolute;
@@ -372,13 +453,15 @@ onUnmounted(() => {
 }
 .empty-hint__body {
   max-width: 26rem;
+  /* Stronger than medium emphasis: it sits on the light viewport grey, where
+     0.7 alpha fell to 3.4:1. */
+  color: rgba(var(--v-theme-on-surface), 0.8);
   /* Break CJK at punctuation rather than mid-phrase. */
   word-break: keep-all;
   overflow-wrap: anywhere;
   margin: 8px 0 0;
   font-size: 0.875rem;
   line-height: 1.25rem;
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 .empty-hint__actions {
   display: flex;
@@ -391,6 +474,7 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 .empty-hint__steps {
+  color: rgba(var(--v-theme-on-surface), 0.8);
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -400,7 +484,6 @@ onUnmounted(() => {
   list-style: none;
   font-size: 0.75rem;
   line-height: 1rem;
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 .empty-hint__steps li {
   display: inline-flex;

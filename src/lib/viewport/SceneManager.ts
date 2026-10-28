@@ -1,6 +1,13 @@
 /**
  * Shared three.js viewport: Z-up world (MuJoCo convention), checkerboard floor,
  * soft shadows, orbit controls, resize handling and a rAF render loop.
+ *
+ * The loop renders on demand: a frame is drawn only when something visible
+ * changed — a tick callback returned `true` (playback advanced), the camera
+ * moved (orbit, damping, follow-camera), objects were added to or removed from
+ * the scene, the canvas resized, the theme switched, or a caller invoked
+ * `invalidate()` after mutating the scene in place. An idle viewport therefore
+ * costs no GPU time instead of redrawing shadows at 60 fps.
  */
 
 import * as THREE from 'three';
@@ -39,7 +46,11 @@ export class SceneManager {
   private rafId = 0;
   private running = false;
   private clock = new THREE.Clock();
-  private tickCallbacks = new Set<(dt: number) => void>();
+  private tickCallbacks = new Set<(dt: number) => boolean | void>();
+  private needsRender = true;
+  private shadersReady = false;
+  private lastRenderAt = 0;
+  private readonly renderedCamera = new THREE.Matrix4();
   private floorMesh: THREE.Mesh | null = null;
   private themeListener: ((event: Event) => void) | null = null;
 
@@ -47,6 +58,8 @@ export class SceneManager {
     this.container = container;
 
     this.scene = new THREE.Scene();
+    this.scene.addEventListener('childadded', this.invalidate);
+    this.scene.addEventListener('childremoved', this.invalidate);
     this.applyTheme(appTheme.value);
 
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.01, 120);
@@ -77,6 +90,8 @@ export class SceneManager {
     this.controls.maxPolarAngle = Math.PI * 0.52;
     this.controls.minDistance = 0.4;
     this.controls.maxDistance = 30;
+    // Fired while the user orbits and while damping settles.
+    this.controls.addEventListener('change', this.invalidate);
 
     // Lights
     const hemi = new THREE.HemisphereLight(0xdfeaff, 0x30363f, 1.0);
@@ -110,12 +125,38 @@ export class SceneManager {
     this.resizeObserver = new ResizeObserver(() => this.onResize());
     this.resizeObserver.observe(container);
     this.onResize();
+
+    // Compiling the floor / shadow shaders is the bulk of the first frame.
+    // Where the driver can link programs in the background
+    // (KHR_parallel_shader_compile), compileAsync keeps that off the main
+    // thread; the loop keeps ticking and draws once they are ready. Elsewhere
+    // the first render compiles them as before (and three.js would only warn).
+    if (this.renderer.extensions.has('KHR_parallel_shader_compile')) {
+      this.renderer
+        .compileAsync(this.scene, this.camera)
+        .catch(() => undefined)
+        .then(() => {
+          this.shadersReady = true;
+          this.invalidate();
+        });
+    } else {
+      this.shadersReady = true;
+    }
   }
 
-  onTick(cb: (dt: number) => void): () => void {
+  /**
+   * Run `cb` every animation frame. Return `true` when it changed something
+   * visible (e.g. posed the robot for a new frame) so this frame gets drawn.
+   */
+  onTick(cb: (dt: number) => boolean | void): () => void {
     this.tickCallbacks.add(cb);
     return () => this.tickCallbacks.delete(cb);
   }
+
+  /** Draw the next frame: call after changing materials, visibility or poses in place. */
+  invalidate = () => {
+    this.needsRender = true;
+  };
 
   setDampingEnabled(enabled: boolean) {
     this.controls.enableDamping = enabled;
@@ -132,13 +173,25 @@ export class SceneManager {
     if (this.running) return;
     this.running = true;
     this.clock.start();
+    this.needsRender = true;
     const loop = () => {
       if (!this.running) return;
       this.rafId = requestAnimationFrame(loop);
       const dt = Math.min(this.clock.getDelta(), 0.1);
-      for (const cb of this.tickCallbacks) cb(dt);
+      for (const cb of this.tickCallbacks) if (cb(dt)) this.needsRender = true;
       this.controls.update();
+      // Follow-camera code moves the camera directly, without a controls event.
+      this.camera.updateMatrixWorld();
+      if (cameraMoved(this.camera.matrixWorld, this.renderedCamera)) this.needsRender = true;
+      const now = performance.now();
+      // The slow heartbeat is only a safety net for an in-place change nobody
+      // reported; every known mutation path invalidates explicitly.
+      if (!this.shadersReady) return;
+      if (!this.needsRender && now - this.lastRenderAt < IDLE_REDRAW_MS) return;
       this.renderer.render(this.scene, this.camera);
+      this.renderedCamera.copy(this.camera.matrixWorld);
+      this.lastRenderAt = now;
+      this.needsRender = false;
     };
     loop();
   }
@@ -158,7 +211,8 @@ export class SceneManager {
     const h = this.container.clientHeight || 1;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(w, h);
+    this.renderer.setSize(w, h); // clears the canvas
+    this.invalidate();
   }
 
   dispose() {
@@ -184,6 +238,7 @@ export class SceneManager {
     const palette = VIEWPORT_THEMES[theme];
     this.scene.background = new THREE.Color(palette.background);
     this.scene.fog = new THREE.Fog(palette.background, palette.fogNear, palette.fogFar);
+    this.invalidate();
 
     if (!this.floorMesh) return;
     const floorMat = this.floorMesh.material as THREE.MeshStandardMaterial;
@@ -192,6 +247,16 @@ export class SceneManager {
     floorMat.needsUpdate = true;
     oldMap?.dispose();
   }
+}
+
+const IDLE_REDRAW_MS = 1000;
+
+/** Camera moved since the last drawn frame (tolerant of follow-camera float creep). */
+function cameraMoved(current: THREE.Matrix4, rendered: THREE.Matrix4): boolean {
+  const a = current.elements;
+  const b = rendered.elements;
+  for (let i = 0; i < 16; i++) if (Math.abs(a[i] - b[i]) > 1e-6) return true;
+  return false;
 }
 
 function makeCheckerTexture(theme: AppTheme): THREE.CanvasTexture {

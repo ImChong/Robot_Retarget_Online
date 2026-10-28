@@ -41,7 +41,8 @@ watch(open, async (isOpen) => {
     clearCanvasBlurs = null;
     document.removeEventListener('keydown', onKeydown);
   }
-});
+  // Immediate: App mounts this lazily on first open, i.e. already open.
+}, { immediate: true });
 
 onBeforeUnmount(() => {
   setBodyScrollBlocked(false);

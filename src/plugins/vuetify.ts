@@ -1,18 +1,16 @@
 import 'vuetify/styles';
 import { createVuetify } from 'vuetify';
-import * as components from 'vuetify/components';
-import * as directives from 'vuetify/directives';
 import { mdi } from 'vuetify/iconsets/mdi-svg';
 import { resolveInitialTheme } from '@/composables/useAppTheme';
-import { vuetifyAliases } from '@/lib/icons';
+import { phosphor, vuetifyAliases } from '@/lib/icons';
 
+// Components and directives are imported per use (with their own CSS) by
+// vite-plugin-vuetify's autoImport — see vite.config.ts.
 export default createVuetify({
-  components,
-  directives,
   icons: {
     defaultSet: 'mdi',
     aliases: vuetifyAliases,
-    sets: { mdi },
+    sets: { mdi, ph: phosphor },
   },
   theme: {
     defaultTheme: resolveInitialTheme(),
