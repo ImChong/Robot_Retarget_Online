@@ -72,6 +72,16 @@ track** below (registered in `manifest.json` + `defaults.ts`, shown only for
 SMPL-X motion). `galaxea_r1pro` stays out: its `smplx_to_r1pro` config references
 bodies absent from the bundled MJCF.
 
+**Natural quadruped motion** / 四足自然化 ✅: dog clips are planned before
+solving — trunk frame from keypoints and hip-relative feet (motion_imitation),
+contact-phase foot locking with no ground penetration and a swing-clearance arc
+(STMR's spatial stage), rest-pose + previous-frame regularization in the IK
+(`src/lib/retarget/quadruped.ts`, `motionQuality.ts`). On Go2/A1 × walk/run/idle:
+foot slip −62…−78 %, penetration p95 ≤ 0.2 cm (was 2.4–4.9), joint jerk −77…−85 %,
+joint-jump frames 12–49 → 0–3. Next candidates: a dynamics-aware corrector
+(X-Morph-style) and source-paw sliding compensation on fast gaits (run still
+detects only ~13 % planted frames).
+
 ### Near-term, still Phase 1 · 近期（仍属 Phase 1）
 
 - [ ] **More GMR robots** · 接入更多 GMR 机器人.

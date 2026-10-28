@@ -52,6 +52,15 @@ export interface SolverOptions {
   meshWeight: number;
   /** Neighbors used to build the per-frame interaction mesh (k-nearest). */
   meshNeighbors: number;
+
+  /**
+   * Quadruped (dog mocap) clips only: plan the whole clip's targets before
+   * solving — trunk frame from keypoints, hip-relative feet, contact-phase foot
+   * locking, no ground penetration — and regularize the legs toward their rest
+   * pose and the previous frame (src/lib/retarget/quadruped.ts). Off ⇒ plain
+   * keypoint IK on the config's targets.
+   */
+  quadrupedPlanner: boolean;
 }
 
 export const DEFAULT_SOLVER_OPTIONS: SolverOptions = {
@@ -66,6 +75,7 @@ export const DEFAULT_SOLVER_OPTIONS: SolverOptions = {
   groundOffset: 0,
   meshWeight: 16,
   meshNeighbors: 4,
+  quadrupedPlanner: true,
 };
 
 export interface RetargetResult {

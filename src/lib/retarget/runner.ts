@@ -7,6 +7,7 @@ import type { HumanFrame } from '../bvh/lafan1';
 import type { RobotModel } from '../mujoco/runtime';
 import { GmrRetargetEngine } from './engine';
 import { OmniRetargetEngine } from './omniEngine';
+import { QUADRUPED_REGULARIZATION, planQuadrupedTargets, restKeyframe } from './quadruped';
 import type {
   GmrIkConfig,
   RetargetEngine,
@@ -33,6 +34,37 @@ export function createEngine(
     : new GmrRetargetEngine(robot, config, solver);
 }
 
+/**
+ * Swap a dog-mocap clip's per-frame keypoint targets for the contact-aware plan
+ * and start the solve from the robot's rest crouch. No-op for other motions.
+ */
+export function preparePlannedQuadruped(
+  engine: GmrRetargetEngine,
+  robot: RobotModel,
+  config: GmrIkConfig,
+  frames: HumanFrame[],
+  fps: number,
+): boolean {
+  const scale = engine.scaleTable.get(config.human_root_name) ?? 1;
+  const plan = planQuadrupedTargets({ frames, fps, robot, config, scale });
+  if (!plan) return false;
+  engine.usePlannedTargets(plan.targets);
+  const rest = restKeyframe(robot);
+  if (rest) {
+    // Start from the rest crouch (keeps every knee on its natural side) at the first base target.
+    const qpos = robot.data.qpos as Float64Array;
+    qpos.set(rest);
+    const root = plan.targets[0].get(config.human_root_name);
+    if (root) {
+      qpos.set(root.pos, 0);
+      qpos.set(root.quat, 3);
+    }
+    robot.mujoco.mj_kinematics(robot.model, robot.data);
+  }
+  engine.setRegularization(QUADRUPED_REGULARIZATION.posture, QUADRUPED_REGULARIZATION.smooth, rest);
+  return true;
+}
+
 export interface RunOptions {
   robot: RobotModel;
   config: GmrIkConfig;
@@ -49,6 +81,9 @@ export async function runRetarget(options: RunOptions): Promise<RetargetResult> 
   const engineId: RetargetEngineId = options.engine ?? 'gmr';
   const engine = createEngine(engineId, robot, config, solver);
   try {
+    if (solver.quadrupedPlanner && engine instanceof GmrRetargetEngine) {
+      preparePlannedQuadruped(engine, robot, config, frames, fps);
+    }
     const T = frames.length;
     const nq = robot.nq;
     const qpos = new Float64Array(T * nq);

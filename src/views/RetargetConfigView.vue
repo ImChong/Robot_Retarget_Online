@@ -497,6 +497,16 @@ onUnmounted(() => {
             density="compact"
             hide-details
           />
+          <template v-if="motion.motionKind === 'quadruped'">
+            <v-switch
+              v-model="store.solver.quadrupedPlanner"
+              :label="t('quadrupedPlanner')"
+              color="primary"
+              density="compact"
+              hide-details
+            />
+            <div class="text-caption text-medium-emphasis">{{ t('quadrupedPlannerHint') }}</div>
+          </template>
         </v-card-text>
       </v-card>
 

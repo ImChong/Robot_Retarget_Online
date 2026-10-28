@@ -58,6 +58,18 @@ export class GmrRetargetEngine implements RetargetEngine {
   /** human keypoints of the last processed frame (scaled + offset), for overlays */
   lastScaledHuman: Map<string, HumanFrameBody> = new Map();
 
+  /** Precomputed per-frame targets (quadruped planner); replaces preprocessHuman. */
+  private plannedTargets: Map<string, HumanFrameBody>[] | null = null;
+  private plannedIndex = 0;
+  private framesSolved = 0;
+  /** Hinge / slide joints: velocity index and qpos address (free joint excluded). */
+  private readonly jointDofs: { dof: number; qadr: number }[] = [];
+  /** Diagonal pulls toward a rest pose and toward the previous frame (0 = off, as in GMR). */
+  private postureWeight = 0;
+  private smoothWeight = 0;
+  private restQpos: Float64Array | null = null;
+  private prevQpos: Float64Array | null = null;
+
   constructor(robot: RobotModel, config: GmrIkConfig, opts: SolverOptions) {
     this.robot = robot;
     this.config = config;
@@ -109,7 +121,39 @@ export class GmrRetargetEngine implements RetargetEngine {
     this.L = new Float64Array(this.nv * this.nv);
     this.dq = new Array(this.nv).fill(0);
 
+    const { model } = robot;
+    const jntType = model.jnt_type as Int32Array;
+    const jntDofadr = model.jnt_dofadr as Int32Array;
+    const jntQposadr = model.jnt_qposadr as Int32Array;
+    for (let j = 0; j < model.njnt; j++) {
+      if (jntType[j] === MJ_JNT_HINGE || jntType[j] === MJ_JNT_SLIDE) {
+        this.jointDofs.push({ dof: jntDofadr[j], qadr: jntQposadr[j] });
+      }
+    }
+
     this.reset();
+  }
+
+  /**
+   * Solve against precomputed per-frame targets (keyed by human body name)
+   * instead of preprocessing each source frame; frame i of the next
+   * `retargetFrame` calls uses targets[i].
+   */
+  usePlannedTargets(targets: Map<string, HumanFrameBody>[]) {
+    this.plannedTargets = targets;
+    this.plannedIndex = 0;
+  }
+
+  /**
+   * Joint-space regularization added to every Gauss-Newton step:
+   * `posture`·‖q − q_rest‖² keeps legs in their natural bend where the tasks
+   * leave freedom (or cannot be met), `smooth`·‖q − q_prev‖² penalizes
+   * frame-to-frame jumps. Both default to 0, i.e. plain GMR.
+   */
+  setRegularization(posture: number, smooth: number, restQpos: Float64Array | null) {
+    this.postureWeight = posture;
+    this.smoothWeight = smooth;
+    this.restQpos = restQpos ? new Float64Array(restQpos) : null;
   }
 
   dispose() {
@@ -203,8 +247,16 @@ export class GmrRetargetEngine implements RetargetEngine {
 
   /** Retarget a single frame; returns a copy of qpos. */
   retargetFrame(frame: HumanFrame): Float64Array {
-    const human = this.preprocessHuman(frame, this.opts.offsetToGround);
+    const planned = this.plannedTargets?.[this.plannedIndex];
+    const human = planned ?? this.preprocessHuman(frame, this.opts.offsetToGround);
     this.lastScaledHuman = human;
+    // The pose we start from is the previous frame's solution (none on frame 0).
+    this.prevQpos =
+      this.smoothWeight > 0 && this.framesSolved > 0
+        ? new Float64Array(this.robot.data.qpos as Float64Array)
+        : null;
+    this.plannedIndex++;
+    this.framesSolved++;
 
     if (this.config.use_ik_match_table1) this.solveStage(this.tasks1, human);
     if (this.config.use_ik_match_table2) this.solveStage(this.tasks2, human);
@@ -352,6 +404,21 @@ export class GmrRetargetEngine implements RetargetEngine {
     // Engine-specific extra objectives (e.g. OmniRetarget interaction mesh).
     // Accumulates into the upper triangle of H and into g, returns its LM term.
     lmTerm += this.accumulateExtraTerms(tasks, human, H, g);
+
+    // Rest-pose / previous-frame pulls on the joints (identity Jacobian per DoF).
+    if (this.postureWeight > 0 || this.smoothWeight > 0) {
+      const q = data.qpos as Float64Array;
+      for (const { dof, qadr } of this.jointDofs) {
+        if (this.postureWeight > 0 && this.restQpos) {
+          H[dof * nv + dof] += this.postureWeight;
+          g[dof] += this.postureWeight * (this.restQpos[qadr] - q[qadr]);
+        }
+        if (this.smoothWeight > 0 && this.prevQpos) {
+          H[dof * nv + dof] += this.smoothWeight;
+          g[dof] += this.smoothWeight * (this.prevQpos[qadr] - q[qadr]);
+        }
+      }
+    }
 
     // Symmetrize lower triangle + regularize diagonal.
     const reg = this.opts.damping + lmTerm;
