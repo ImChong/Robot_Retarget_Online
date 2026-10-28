@@ -1,0 +1,323 @@
+/*
+ * Design tokens and Vuetify overrides.
+ *
+ * Imported in src/main.ts after Vuetify's stylesheet, so equal-specificity
+ * rules here win. Colours mirror the Vuetify themes in src/plugins/vuetify.ts;
+ * `data-theme` is set on <html> by src/composables/useAppTheme.ts.
+ *
+ * Scales (keep every value on them):
+ *   type     12/16 · 14/20 · 16/24 · 18/28 · 20/28 · 24/32 (size/line height, px)
+ *   spacing  2 · 4 · 8 · 12 · 16 · 24 · 32 · 40 · 48 px
+ *   radius   8 (controls) · 12 (floating surfaces, cards) · 16 (dialogs)
+ */
+
+:root {
+  --rro-header-bg: #1f1f1f;
+  --rro-hover-bg: #313131;
+  --rro-border: #3d3d3d;
+  --rro-text: #e8e8e4;
+  --rro-text-muted: #9b9a97;
+  --rro-accent: #669eea;
+  --rro-sponsor: #e2566a;
+  /* One light source, straight above: shadows only ever fall downwards. */
+  --rro-shadow-float: 0 4px 16px rgba(0, 0, 0, 0.32);
+  --rro-shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  --rro-radius: 8px;
+  --rro-radius-lg: 12px;
+  --rro-radius-xl: 16px;
+
+  --rro-font-sans: 'Geist Variable', 'Geist', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Noto Sans SC', system-ui, sans-serif;
+  --rro-font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --rro-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --rro-dur-color: 300ms;
+  --rro-dur-move: 500ms;
+
+  /* Above Vuetify's own overlays (2000+), below nothing. */
+  --rro-z-dialog: 2400;
+
+  --app-bar-height: 56px;
+  --app-bottom-nav-height: 0px;
+  /* Apple HIG minimum hit area; see the "Touch input" block in App.vue. */
+  --rro-tap-target: 44px;
+}
+
+:root[data-theme='light'] {
+  --rro-header-bg: #ffffff;
+  --rro-hover-bg: #f7f6f3;
+  --rro-border: #e8e8e4;
+  --rro-text: #37352f;
+  --rro-text-muted: #787774;
+  --rro-accent: #2d74da;
+  /* Tinted toward the warm ink instead of pure black. */
+  --rro-shadow-float: 0 4px 16px rgba(55, 53, 47, 0.12);
+  --rro-shadow-overlay: 0 8px 24px rgba(55, 53, 47, 0.16);
+}
+
+@media (max-width: 959.98px) {
+  :root {
+    --app-bottom-nav-height: 56px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Movement becomes instant; colour and opacity changes still fade. */
+  :root {
+    --rro-dur-move: 1ms;
+  }
+}
+
+/* ===== Typography ===== */
+
+html,
+.v-application {
+  font-family: var(--rro-font-sans);
+}
+
+/* Vuetify names Roboto on each typography helper; route them all to the app face. */
+:root .text-h1,
+:root .text-h2,
+:root .text-h3,
+:root .text-h4,
+:root .text-h5,
+:root .text-h6,
+:root .text-subtitle-1,
+:root .text-subtitle-2,
+:root .text-body-1,
+:root .text-body-2,
+:root .text-caption,
+:root .text-button,
+:root .text-overline,
+:root .v-badge,
+:root .v-kbd {
+  font-family: var(--rro-font-sans);
+}
+
+:root .text-h5 {
+  font-size: 1.5rem !important;
+  line-height: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.015em !important;
+}
+
+:root .text-h6 {
+  font-size: 1.25rem !important;
+  line-height: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.01em !important;
+}
+
+:root .text-subtitle-1 {
+  font-size: 1rem !important;
+  line-height: 1.5rem;
+  font-weight: 500;
+  letter-spacing: 0 !important;
+}
+
+:root .text-subtitle-2 {
+  font-size: 0.875rem !important;
+  line-height: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0 !important;
+}
+
+:root .text-body-1 {
+  font-size: 1rem !important;
+  line-height: 1.5rem;
+  letter-spacing: 0 !important;
+}
+
+:root .text-body-2 {
+  font-size: 0.875rem !important;
+  line-height: 1.25rem;
+  letter-spacing: 0 !important;
+}
+
+:root .text-caption {
+  font-size: 0.75rem !important;
+  line-height: 1rem;
+  letter-spacing: 0.01em !important;
+}
+
+:root .text-h5,
+:root .text-h6,
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+code,
+kbd,
+pre,
+samp,
+.mono {
+  font-family: var(--rro-font-mono);
+}
+
+/* Sentence-case labels: no forced capitals, no tracking, semibold. */
+:root .v-btn {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+
+:root .v-btn.v-btn--size-large {
+  font-size: 1rem;
+}
+
+:root .v-list-subheader {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+:root .v-field,
+:root .v-label {
+  font-family: var(--rro-font-sans);
+}
+
+/* Data reads in columns: keep digits on a fixed width. */
+.v-progress-linear,
+.v-slider,
+.v-table {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== States ===== */
+
+:root .v-btn {
+  transition-timing-function: var(--rro-ease);
+}
+
+/* Pressed feedback. Tabs and the bottom bar span their track, so they skip it. */
+:root .v-btn:not(.v-btn--disabled):not(.v-tab):active {
+  transform: scale(0.98);
+}
+
+:root .v-bottom-navigation .v-btn:active {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root .v-btn:active {
+    transform: none !important;
+  }
+}
+
+/* A visible keyboard focus ring on everything clickable. */
+:root .v-btn:focus-visible,
+:root .v-list-item:focus-visible,
+:root a:focus-visible,
+:root button:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+}
+
+/* Tabs sit inside a clipped slide group: draw their ring inside the box. */
+:root .v-tab.v-btn:focus-visible,
+:root .v-bottom-navigation .v-btn:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ===== Surfaces ===== */
+
+:root .v-card {
+  border-radius: var(--rro-radius-lg);
+}
+
+:root .v-overlay__content > .v-card {
+  border-radius: var(--rro-radius-xl);
+}
+
+:root .v-menu > .v-overlay__content,
+:root .v-menu > .v-overlay__content > .v-list,
+:root .v-select__content,
+:root .v-select__content > .v-list {
+  border-radius: var(--rro-radius-lg);
+}
+
+:root .v-menu > .v-overlay__content,
+:root .v-select__content {
+  box-shadow: var(--rro-shadow-overlay);
+}
+
+:root .v-tooltip > .v-overlay__content {
+  border-radius: var(--rro-radius);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  padding: 8px 12px;
+}
+
+/* ===== Label / value lists (motion info, retarget stats) ===== */
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
+.info-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.info-line dt {
+  flex-shrink: 0;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
+.info-line dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Section labels inside the side panels ===== */
+
+.panel-label {
+  margin: 4px 0 -4px;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
+/* ===== Skip link ===== */
+
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: var(--rro-z-dialog);
+  padding: 8px 12px;
+  border-radius: var(--rro-radius);
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform var(--rro-dur-move) var(--rro-ease);
+}
+
+.skip-link:focus-visible {
+  transform: none;
+}

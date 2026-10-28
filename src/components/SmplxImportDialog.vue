@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { mdiClose, mdiCubeOutline, mdiRun, mdiUpload } from '@mdi/js';
+import { icons } from '@/lib/icons';
 import { useI18n } from '@/i18n';
 
 const open = defineModel<boolean>({ required: true });
@@ -76,10 +76,10 @@ async function load() {
     <v-card>
       <v-card-title class="d-flex align-center justify-space-between py-3">
         <span class="d-flex align-center ga-2">
-          <v-icon :icon="mdiCubeOutline" size="small" />
+          <v-icon :icon="icons.cube" size="small" />
           {{ t('smplxTitle') }}
         </span>
-        <v-btn :icon="mdiClose" variant="text" size="small" @click="close" />
+        <v-btn :icon="icons.close" variant="text" size="small" @click="close" />
       </v-card-title>
 
       <v-card-text class="pb-2">
@@ -88,7 +88,7 @@ async function load() {
         <!-- SMPL-X model .npz -->
         <div class="pick-row" :class="{ 'pick-row--set': modelFile }">
           <input ref="modelInput" type="file" accept=".npz" class="d-none" @change="(e) => onChosen('model', e)" />
-          <v-icon :icon="mdiCubeOutline" size="22" class="text-medium-emphasis" />
+          <v-icon :icon="icons.cube" size="22" class="text-medium-emphasis" />
           <div class="pick-text">
             <div class="text-body-2 font-weight-medium">{{ t('smplxModelLabel') }}</div>
             <div class="text-caption text-truncate" :class="modelFile ? 'text-high-emphasis' : 'text-disabled'">
@@ -103,7 +103,7 @@ async function load() {
         <!-- AMASS motion .npz -->
         <div class="pick-row mt-2" :class="{ 'pick-row--set': motionFile }">
           <input ref="motionInput" type="file" accept=".npz" class="d-none" @change="(e) => onChosen('motion', e)" />
-          <v-icon :icon="mdiRun" size="22" class="text-medium-emphasis" />
+          <v-icon :icon="icons.walk" size="22" class="text-medium-emphasis" />
           <div class="pick-text">
             <div class="text-body-2 font-weight-medium">{{ t('smplxMotionLabel') }}</div>
             <div class="text-caption text-truncate" :class="motionFile ? 'text-high-emphasis' : 'text-disabled'">
@@ -126,7 +126,7 @@ async function load() {
       <v-card-actions class="px-4 pb-3">
         <v-spacer />
         <v-btn variant="text" @click="close">{{ t('cancel') }}</v-btn>
-        <v-btn color="primary" :prepend-icon="mdiUpload" :disabled="!canLoad" :loading="busy" @click="load">
+        <v-btn color="primary" :prepend-icon="icons.upload" :disabled="!canLoad" :loading="busy" @click="load">
           {{ t('smplxLoad') }}
         </v-btn>
       </v-card-actions>
@@ -138,11 +138,13 @@ async function load() {
 .pick-row {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem;
+  gap: 12px;
+  padding: 12px;
   border: 1px solid rgba(128, 128, 128, 0.3);
   border-radius: 8px;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition:
+    border-color var(--rro-dur-color) var(--rro-ease),
+    background-color var(--rro-dur-color) var(--rro-ease);
 }
 .pick-row--set {
   border-color: rgba(var(--v-theme-primary), 0.7);

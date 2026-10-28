@@ -23,6 +23,11 @@ const router = createRouter({
       name: 'preview',
       component: () => import('@/views/RetargetPreviewView.vue'),
     },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'notFound',
+      component: () => import('@/views/NotFoundView.vue'),
+    },
   ],
 });
 

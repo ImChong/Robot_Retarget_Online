@@ -61,7 +61,7 @@ onBeforeUnmount(() => {
       :aria-labelledby="'sponsor-dialog-title'"
     >
       <div ref="canvasBlurHost" class="sponsor-canvas-blur-host" aria-hidden="true" />
-      <button type="button" class="sponsor-dialog-backdrop" aria-label="Close" @click="close" />
+      <button type="button" class="sponsor-dialog-backdrop" :aria-label="t('close')" @click="close" />
       <div class="sponsor-dialog-card">
         <div class="sponsor-dialog-header">
           <h2 id="sponsor-dialog-title" class="sponsor-dialog-title">{{ t('sponsorTitle') }}</h2>
@@ -86,7 +86,7 @@ body.sponsor-dialog-open {
 .sponsor-dialog {
   position: fixed;
   inset: 0;
-  z-index: 2400;
+  z-index: var(--rro-z-dialog);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -137,32 +137,36 @@ body.sponsor-dialog-open {
   background: rgb(var(--v-theme-surface));
   color: rgb(var(--v-theme-on-surface));
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  border-radius: 16px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  border-radius: var(--rro-radius-xl);
+  box-shadow: var(--rro-shadow-overlay);
   overflow: hidden;
 }
 
 .sponsor-dialog-header {
-  padding: 20px 20px 8px;
+  padding: 24px 24px 8px;
   text-align: center;
 }
 
 .sponsor-dialog-title {
   margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
 }
 
 .sponsor-dialog-hint {
-  margin: 6px 0 0;
-  font-size: 0.9rem;
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
   color: rgba(var(--v-theme-on-surface), 0.68);
 }
 
 .sponsor-dialog-body {
   display: flex;
   justify-content: center;
-  padding: 8px 20px 4px;
+  padding: 8px 24px 4px;
 }
 
 .sponsor-qr {
@@ -170,29 +174,48 @@ body.sponsor-dialog-open {
   width: 100%;
   max-width: 260px;
   height: auto;
-  border-radius: 12px;
+  border-radius: var(--rro-radius-lg);
 }
 
 .sponsor-dialog-actions {
   display: flex;
   justify-content: center;
-  padding: 12px 20px 20px;
+  padding: 16px 24px 24px;
 }
 
 .sponsor-dialog-close {
   appearance: none;
   border: 0;
-  border-radius: 999px;
-  padding: 8px 20px;
+  border-radius: var(--rro-radius);
+  padding: 8px 24px;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
   font-weight: 600;
   cursor: pointer;
   color: rgb(var(--v-theme-primary));
   background: rgba(var(--v-theme-primary), 0.12);
+  transition:
+    background-color var(--rro-dur-color) var(--rro-ease),
+    transform var(--rro-dur-color) var(--rro-ease);
 }
 
 .sponsor-dialog-close:hover {
   background: rgba(var(--v-theme-primary), 0.2);
+}
+
+.sponsor-dialog-close:active {
+  transform: scale(0.98);
+}
+
+.sponsor-dialog-card {
+  animation: sponsor-card-in var(--rro-dur-move) var(--rro-ease);
+}
+
+@keyframes sponsor-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
 }
 </style>

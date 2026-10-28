@@ -2,60 +2,58 @@ import 'vuetify/styles';
 import { createVuetify } from 'vuetify';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
-import { aliases, mdi } from 'vuetify/iconsets/mdi-svg';
-
-const THEME_STORAGE_KEY = 'rro-theme';
-const stored =
-  typeof localStorage !== 'undefined'
-    ? (localStorage.getItem(THEME_STORAGE_KEY) as 'dark' | 'light' | null)
-    : null;
-const initialTheme = stored === 'light' ? 'light' : 'dark';
+import { mdi } from 'vuetify/iconsets/mdi-svg';
+import { resolveInitialTheme } from '@/composables/useAppTheme';
+import { vuetifyAliases } from '@/lib/icons';
 
 export default createVuetify({
   components,
   directives,
   icons: {
     defaultSet: 'mdi',
-    aliases,
+    aliases: vuetifyAliases,
     sets: { mdi },
   },
   theme: {
-    defaultTheme: initialTheme,
+    defaultTheme: resolveInitialTheme(),
     themes: {
-      // Palette mirrors the Notion-inspired tokens of imchong.github.io
-      // (`css/style.css` :root / [data-theme='light']).
+      // Notion-style neutrals from imchong.github.io, with the dark surfaces
+      // snapped to the redesign palette (#181818 / #1F1F1F / #272727 / #313131)
+      // and a single accent kept under 80% saturation. Mirrored as CSS tokens
+      // in src/styles/design.css.
       dark: {
         dark: true,
         colors: {
-          background: '#191919', // --bg
-          surface: '#222222', // --bg-alt
-          'surface-light': '#2f2f2f', // --surface
-          'surface-bright': '#2f2f2f',
-          'surface-variant': '#3d3d3d', // --border
-          'on-background': '#e8e8e4', // --text
+          background: '#181818',
+          surface: '#1f1f1f',
+          'surface-light': '#272727',
+          'surface-bright': '#313131',
+          'surface-variant': '#3d3d3d', // --rro-border; also the tooltip fill
+          'on-background': '#e8e8e4',
           'on-surface': '#e8e8e4',
-          primary: '#5b9cf6', // --accent
-          'on-primary': '#191919', // dark ink reads better on the light-blue accent
-          secondary: '#a78bfa',
-          'on-secondary': '#191919',
+          primary: '#669eea',
+          'on-primary': '#181818', // dark ink reads better on the light-blue accent
+          // No second accent: secondary is a neutral so nothing renders purple.
+          secondary: '#9b9a97',
+          'on-secondary': '#181818',
           success: '#5cb885',
           warning: '#e0a33f',
           error: '#e2686a',
-          info: '#5b9cf6',
+          info: '#669eea',
         },
       },
       light: {
         dark: false,
         colors: {
-          background: '#f7f6f3', // --bg-alt (page canvas)
-          surface: '#ffffff', // --surface
+          background: '#f7f6f3',
+          surface: '#ffffff',
           'surface-light': '#f7f6f3',
           'surface-bright': '#ffffff',
-          'surface-variant': '#e8e8e4', // --border
-          'on-background': '#37352f', // --text
+          'surface-variant': '#e8e8e4',
+          'on-background': '#37352f',
           'on-surface': '#37352f',
-          primary: '#2d74da', // --accent
-          secondary: '#6d5bd0',
+          primary: '#2d74da',
+          secondary: '#787774',
           success: '#2f855a',
           warning: '#b9761f',
           error: '#c9453f',
@@ -65,9 +63,12 @@ export default createVuetify({
     },
   },
   defaults: {
-    VBtn: { density: 'comfortable' },
-    VTextField: { density: 'compact', variant: 'outlined', hideDetails: true },
-    VSelect: { density: 'compact', variant: 'outlined', hideDetails: true },
+    VBtn: { density: 'comfortable', rounded: 'lg' },
+    VBtnToggle: { rounded: 'lg' },
+    VTextField: { density: 'compact', variant: 'outlined', hideDetails: true, rounded: 'lg' },
+    VSelect: { density: 'compact', variant: 'outlined', hideDetails: true, rounded: 'lg' },
     VSlider: { density: 'compact', hideDetails: true },
+    // Tabs keep square corners so their underline slider isn't clipped.
+    VTab: { rounded: 0 },
   },
 });

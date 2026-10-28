@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue';
-import { mdiPlay, mdiPause, mdiSkipPrevious, mdiSkipNext, mdiRestart } from '@mdi/js';
+import { icons } from '@/lib/icons';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
-import { useAppTheme } from '@/composables/useAppTheme';
 import type { PlaybackController } from '@/composables/usePlayback';
 import {
   isPlaybackKeyCode,
@@ -14,7 +13,6 @@ import {
 
 const props = defineProps<{ controller: PlaybackController }>();
 const { t } = useI18n();
-const { isDark } = useAppTheme();
 const { smAndDown } = useDisplay();
 
 const state = props.controller.state;
@@ -102,25 +100,25 @@ onUnmounted(() => {
 <template>
   <div
     class="playback-bar"
-    :class="{ 'playback-bar--compact': smAndDown, 'playback-bar--light': !isDark }"
+    :class="{ 'playback-bar--compact': smAndDown }"
   >
     <div class="playback-row playback-row--transport d-flex align-center ga-1">
       <v-btn
-        :icon="mdiSkipPrevious"
+        :icon="icons.skipBack"
         size="small"
         variant="text"
         :title="t('prevFrame')"
         @click="step(-1)"
       />
       <v-btn
-        :icon="state.playing ? mdiPause : mdiPlay"
+        :icon="state.playing ? icons.pause : icons.play"
         color="primary"
         size="small"
         variant="tonal"
         :title="state.playing ? t('pause') : t('play')"
         @click="togglePlayback"
       />
-      <v-btn :icon="mdiSkipNext" size="small" variant="text" :title="t('nextFrame')" @click="step(1)" />
+      <v-btn :icon="icons.skipForward" size="small" variant="text" :title="t('nextFrame')" @click="step(1)" />
 
       <v-slider
         v-model="sliderValue"
@@ -135,7 +133,7 @@ onUnmounted(() => {
       />
 
       <v-btn
-        :icon="mdiRestart"
+        :icon="icons.loop"
         size="small"
         variant="text"
         :color="state.loop ? 'primary' : undefined"
@@ -171,17 +169,14 @@ onUnmounted(() => {
 
 <style scoped>
 .playback-bar {
-  background: rgba(34, 34, 34, 0.92);
+  background: var(--rro-header-bg);
   border-top: 1px solid var(--rro-border);
-  padding: 4px 8px 6px;
+  /* A touch more below than above: optically centred over the bar's edge. */
+  padding: 4px 8px 8px;
   flex-shrink: 0;
   position: relative;
   z-index: 4;
   touch-action: manipulation;
-}
-.playback-bar--light {
-  background: rgba(255, 255, 255, 0.94);
-  border-top: 1px solid var(--rro-border);
 }
 .playback-row--transport {
   min-width: 0;
@@ -200,6 +195,7 @@ onUnmounted(() => {
   margin-top: 2px;
 }
 .frame-label {
+  font-family: var(--rro-font-mono);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   overflow: hidden;

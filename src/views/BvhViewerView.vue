@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
 import * as THREE from 'three';
-import { mdiCubeOutline, mdiFolderOpen, mdiRun, mdiTune, mdiVideoOutline } from '@mdi/js';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
+import { icons } from '@/lib/icons';
 import { usePlayback } from '@/composables/usePlayback';
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { QUADRUPED_ENABLED } from '@/lib/features';
@@ -169,7 +169,7 @@ onUnmounted(() => {
     <input ref="fileInput" type="file" accept=".bvh" class="d-none" @change="onFileChosen" />
 
     <MobileSidePanel v-model="panelOpen">
-      <v-btn color="primary" :prepend-icon="mdiFolderOpen" block @click="openFilePicker">
+      <v-btn color="primary" variant="flat" :prepend-icon="icons.folderOpen" block @click="openFilePicker">
         {{ t('openBvh') }}
       </v-btn>
 
@@ -180,7 +180,7 @@ onUnmounted(() => {
         content-class="sample-menu-panel"
       >
         <template #activator="{ props: mProps }">
-          <v-btn v-bind="mProps" variant="tonal" :prepend-icon="mdiRun" block :loading="sampleLoading">
+          <v-btn v-bind="mProps" variant="tonal" :prepend-icon="icons.walk" block :loading="sampleLoading">
             {{ t('loadSample') }}
           </v-btn>
         </template>
@@ -212,28 +212,32 @@ onUnmounted(() => {
         </v-list>
       </v-menu>
 
-      <v-btn variant="tonal" :prepend-icon="mdiVideoOutline" block @click="videoDialogOpen = true">
-        {{ t('videoToBvh') }}
-      </v-btn>
-
-      <v-btn variant="tonal" :prepend-icon="mdiCubeOutline" block @click="smplxDialogOpen = true">
-        {{ t('smplxImport') }}
-      </v-btn>
+      <div class="panel-label">{{ t('otherSources') }}</div>
+      <div class="source-links d-flex flex-column">
+        <v-btn variant="text" :prepend-icon="icons.video" block class="source-link" @click="videoDialogOpen = true">
+          {{ t('videoToBvh') }}
+        </v-btn>
+        <v-btn variant="text" :prepend-icon="icons.cube" block class="source-link" @click="smplxDialogOpen = true">
+          {{ t('smplxImport') }}
+        </v-btn>
+      </div>
 
       <v-card v-if="motion.hasMotion" variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('motionInfo') }}</v-card-title>
         <v-card-text class="text-body-2">
-          <div class="info-line"><span>{{ t('fileName') }}</span><b class="text-truncate">{{ motion.fileName }}</b></div>
-          <div class="info-line"><span>{{ t('frames') }}</span><b>{{ motion.frameCount }} @ {{ motion.fps.toFixed(0) }} fps</b></div>
-          <div class="info-line"><span>{{ t('duration') }}</span><b>{{ motion.duration.toFixed(2) }} s</b></div>
-          <div class="info-line"><span>{{ t('joints') }}</span><b>{{ motion.jointNames.length }}</b></div>
-          <div class="info-line"><span>{{ t('estHeight') }}</span><b>{{ motion.estHeightMeters.toFixed(2) }} m</b></div>
-          <div class="info-line"><span>{{ t('units') }}</span><b>{{ motion.unitScale === 0.01 ? 'cm' : 'm' }}</b></div>
+          <dl class="info-list">
+            <div class="info-line"><dt>{{ t('fileName') }}</dt><dd>{{ motion.fileName }}</dd></div>
+            <div class="info-line"><dt>{{ t('frames') }}</dt><dd>{{ motion.frameCount }} @ {{ motion.fps.toFixed(0) }} fps</dd></div>
+            <div class="info-line"><dt>{{ t('duration') }}</dt><dd>{{ motion.duration.toFixed(2) }} s</dd></div>
+            <div class="info-line"><dt>{{ t('joints') }}</dt><dd>{{ motion.jointNames.length }}</dd></div>
+            <div class="info-line"><dt>{{ t('estHeight') }}</dt><dd>{{ motion.estHeightMeters.toFixed(2) }} m</dd></div>
+            <div class="info-line"><dt>{{ t('units') }}</dt><dd>{{ motion.unitScale === 0.01 ? 'cm' : 'm' }}</dd></div>
+          </dl>
         </v-card-text>
       </v-card>
 
       <template v-if="motion.anim">
-        <div class="text-subtitle-2 mt-1">{{ t('jointTree') }}</div>
+        <div class="panel-label">{{ t('jointTree') }}</div>
         <JointTreePanel
           class="joint-tree-grow"
           :anim="motion.anim"
@@ -242,10 +246,12 @@ onUnmounted(() => {
         />
         <v-card v-if="selectedInfo" variant="outlined" density="compact">
           <v-card-text class="text-caption">
-            <div class="info-line"><span>Joint</span><b>{{ selectedInfo.name }}</b></div>
-            <div class="info-line"><span>Parent</span><b>{{ selectedInfo.parent }}</b></div>
-            <div class="info-line"><span>Offset</span><b>{{ selectedInfo.offset }}</b></div>
-            <div class="info-line"><span>Channels</span><b class="text-truncate">{{ selectedInfo.channels }}</b></div>
+            <dl class="info-list">
+              <div class="info-line"><dt>{{ t('jointName') }}</dt><dd>{{ selectedInfo.name }}</dd></div>
+              <div class="info-line"><dt>{{ t('jointParent') }}</dt><dd>{{ selectedInfo.parent }}</dd></div>
+              <div class="info-line"><dt>{{ t('jointOffset') }}</dt><dd class="mono">{{ selectedInfo.offset }}</dd></div>
+              <div class="info-line"><dt>{{ t('jointChannels') }}</dt><dd>{{ selectedInfo.channels }}</dd></div>
+            </dl>
           </v-card-text>
         </v-card>
       </template>
@@ -256,13 +262,30 @@ onUnmounted(() => {
         <div class="viewport-wrap flex-grow-1">
           <div ref="viewportEl" class="viewport" />
           <WorkflowNavBar />
-          <div v-if="!motion.hasMotion" class="empty-hint d-flex flex-column align-center justify-center">
-            <div class="text-h6 text-medium-emphasis mb-1">{{ t('noMotion') }}</div>
-            <div class="text-body-2 text-disabled px-4 text-center">{{ t('dropHint') }}</div>
-            <v-btn class="mt-4 mobile-open-btn" color="primary" variant="tonal" :prepend-icon="mdiFolderOpen" @click="openFilePicker">
-              {{ t('openBvh') }}
-            </v-btn>
-          </div>
+          <Transition name="empty-fade">
+            <section v-if="!motion.hasMotion" class="empty-hint" aria-labelledby="empty-hint-title">
+              <div class="empty-hint__inner">
+                <span class="empty-hint__mark" aria-hidden="true">
+                  <v-icon :icon="icons.walk" size="24" />
+                </span>
+                <h2 id="empty-hint-title" class="empty-hint__title">{{ t('noMotion') }}</h2>
+                <p class="empty-hint__body">{{ t('dropHint') }}</p>
+                <div class="empty-hint__actions">
+                  <v-btn class="mobile-open-btn" color="primary" variant="flat" :prepend-icon="icons.folderOpen" @click="openFilePicker">
+                    {{ t('openBvh') }}
+                  </v-btn>
+                  <v-btn variant="tonal" :prepend-icon="icons.walk" :loading="sampleLoading" @click="loadSample('walk.bvh')">
+                    {{ t('trySample') }}
+                  </v-btn>
+                </div>
+                <ol class="empty-hint__steps">
+                  <li class="is-current"><span class="empty-hint__step">1</span>{{ t('navBvh') }}</li>
+                  <li><span class="empty-hint__step">2</span>{{ t('navConfig') }}</li>
+                  <li><span class="empty-hint__step">3</span>{{ t('navPreview') }}</li>
+                </ol>
+              </div>
+            </section>
+          </Transition>
         </div>
         <PlaybackBar v-if="motion.hasMotion" :controller="playback" />
       </div>
@@ -272,7 +295,7 @@ onUnmounted(() => {
       v-if="!mdAndUp"
       class="panel-fab"
       color="primary"
-      :icon="mdiTune"
+      :icon="icons.sliders"
       size="small"
       elevation="4"
       :title="t('openPanel')"
@@ -283,7 +306,7 @@ onUnmounted(() => {
     <SmplxImportDialog v-model="smplxDialogOpen" @loaded="onSmplxLoaded" />
 
     <v-snackbar v-model="loadErrorSnack" color="error" timeout="5000">
-      {{ motion.loadError ?? 'Failed to load BVH' }}
+      {{ motion.loadError ?? t('loadFailed') }}
     </v-snackbar>
   </div>
 </template>
@@ -313,16 +336,120 @@ onUnmounted(() => {
 .empty-hint {
   position: absolute;
   inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px 32px;
+  /* Click-through, so the empty floor still orbits; only the buttons take taps. */
   pointer-events: none;
   z-index: 1;
 }
-.empty-hint .mobile-open-btn {
+.empty-hint__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 400px;
+  text-align: center;
+}
+.empty-hint__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+  border-radius: var(--rro-radius-lg);
+  background: rgba(var(--v-theme-primary), 0.14);
+  color: rgb(var(--v-theme-primary));
+}
+.empty-hint__title {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgb(var(--v-theme-on-surface));
+}
+.empty-hint__body {
+  max-width: 26rem;
+  /* Break CJK at punctuation rather than mid-phrase. */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+.empty-hint__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+.empty-hint__actions .v-btn {
   pointer-events: auto;
 }
+.empty-hint__steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 16px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+.empty-hint__steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.empty-hint__steps li.is-current {
+  color: rgb(var(--v-theme-on-surface));
+}
+.empty-hint__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--rro-border);
+  font-size: 0.75rem;
+  line-height: 1;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.empty-hint__steps li.is-current .empty-hint__step {
+  border-color: transparent;
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+}
+.empty-fade-enter-active,
+.empty-fade-leave-active {
+  transition:
+    opacity var(--rro-dur-color) var(--rro-ease),
+    transform var(--rro-dur-move) var(--rro-ease);
+}
+.empty-fade-enter-from,
+.empty-fade-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+/* The side panel carries the same button on wide screens. */
 @media (min-width: 960px) {
   .mobile-open-btn {
     display: none;
   }
+}
+.source-links {
+  gap: 2px;
+}
+.source-link.v-btn {
+  justify-content: flex-start;
 }
 .joint-tree-grow {
   flex: 1 1 auto;
@@ -333,15 +460,6 @@ onUnmounted(() => {
   .joint-tree-grow {
     max-height: none;
   }
-}
-.info-line {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-.info-line b {
-  max-width: 60%;
-  text-align: right;
 }
 .panel-fab {
   position: absolute;
@@ -354,14 +472,14 @@ onUnmounted(() => {
 <style>
 .sample-menu-panel {
   border: 1px solid var(--rro-border);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--rro-shadow-overlay);
 }
 .sample-menu-list {
   min-width: 260px;
 }
 .sample-group-header {
   font-size: 0.75rem;
-  line-height: 1.2;
+  line-height: 1rem;
   min-height: 32px;
 }
 </style>

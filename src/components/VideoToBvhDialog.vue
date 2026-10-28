@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { mdiClose, mdiVideoOutline, mdiAutoFix } from '@mdi/js';
+import { icons } from '@/lib/icons';
 import { useI18n } from '@/i18n';
 import { videoToBvh } from '@/lib/mocap';
 
@@ -114,10 +114,10 @@ function cancel() {
     <v-card>
       <v-card-title class="d-flex align-center justify-space-between py-3">
         <span class="d-flex align-center ga-2">
-          <v-icon :icon="mdiVideoOutline" size="small" />
+          <v-icon :icon="icons.video" size="small" />
           {{ t('videoToBvhTitle') }}
         </span>
-        <v-btn :icon="mdiClose" variant="text" size="small" :disabled="phase === 'processing'" @click="close" />
+        <v-btn :icon="icons.close" variant="text" size="small" :disabled="phase === 'processing'" @click="close" />
       </v-card-title>
 
       <v-card-text class="pb-2">
@@ -143,7 +143,7 @@ function cancel() {
             @change="onFileChosen"
           />
           <template v-if="file">
-            <v-icon :icon="mdiVideoOutline" size="32" class="mb-1 text-medium-emphasis" />
+            <v-icon :icon="icons.video" size="32" class="mb-1 text-medium-emphasis" />
             <div class="text-body-2 font-weight-medium text-truncate file-name">{{ file.name }}</div>
             <v-btn
               v-if="phase !== 'processing'"
@@ -158,7 +158,7 @@ function cancel() {
           <template v-else>
             <div class="text-body-1 font-weight-medium mb-1">{{ t('videoDropTitle') }}</div>
             <div class="text-body-2 text-medium-emphasis text-center px-4">{{ t('videoDropHint') }}</div>
-            <v-btn class="mt-3" variant="tonal" size="small" :prepend-icon="mdiVideoOutline" @click="fileInput?.click()">
+            <v-btn class="mt-3" variant="tonal" size="small" :prepend-icon="icons.video" @click="fileInput?.click()">
               {{ t('selectVideo') }}
             </v-btn>
           </template>
@@ -196,7 +196,7 @@ function cancel() {
         </template>
         <template v-else>
           <v-btn variant="text" @click="close">{{ t('cancel') }}</v-btn>
-          <v-btn color="primary" :prepend-icon="mdiAutoFix" :disabled="!file" @click="generate">
+          <v-btn color="primary" :prepend-icon="icons.magicWand" :disabled="!file" @click="generate">
             {{ t('generateBvh') }}
           </v-btn>
         </template>
@@ -214,8 +214,10 @@ function cancel() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  padding: 16px;
+  transition:
+    border-color var(--rro-dur-color) var(--rro-ease),
+    background-color var(--rro-dur-color) var(--rro-ease);
 }
 .drop-zone--active {
   border-color: rgba(var(--v-theme-primary), 0.95);

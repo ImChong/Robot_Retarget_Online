@@ -6,7 +6,8 @@ import { useI18n } from '@/i18n';
 import { useAppTheme } from '@/composables/useAppTheme';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore } from '@/stores/retarget';
-import { mdiWeatherSunny, mdiWeatherNight, mdiCoffee } from '@mdi/js';
+import { PhArrowsClockwise } from '@phosphor-icons/vue';
+import { icons } from '@/lib/icons';
 import SponsorDialog from '@/components/SponsorDialog.vue';
 
 const { t, toggleLocale, localeLabel, locale } = useI18n();
@@ -46,16 +47,25 @@ const currentTab = computed({
 
 const sponsorOpen = ref(false);
 
+// A `#main-content` href would be read as a route by the hash router, so the
+// skip link moves focus itself.
+const mainEl = ref<{ $el: HTMLElement } | null>(null);
+function skipToContent() {
+  mainEl.value?.$el.focus();
+}
+
 // re-render tab labels on locale change
 void locale.value;
 </script>
 
 <template>
   <v-app>
+    <a class="skip-link" href="#main-content" @click.prevent="skipToContent">{{ t('skipToContent') }}</a>
+
     <v-app-bar :height="56" flat class="site-header">
       <div class="header-inner">
         <router-link :to="{ name: 'bvh' }" class="site-title" :aria-label="t('appTitleBilingual')">
-          <span class="site-title-icon" aria-hidden="true">🔄</span>
+          <span class="site-title-mark" aria-hidden="true"><PhArrowsClockwise weight="bold" /></span>
           <span class="site-title-text">{{ t('appTitleBilingual') }}</span>
         </router-link>
 
@@ -105,7 +115,9 @@ void locale.value;
             :title="isDark ? t('themeDark') : t('themeLight')"
             @click="toggleAppTheme"
           >
-            <v-icon :icon="isDark ? mdiWeatherSunny : mdiWeatherNight" size="17" />
+            <Transition name="icon-swap" mode="out-in">
+              <v-icon :key="isDark ? 'sun' : 'moon'" :icon="isDark ? icons.sun : icons.moon" size="18" />
+            </Transition>
           </button>
           <button
             type="button"
@@ -115,7 +127,7 @@ void locale.value;
             aria-haspopup="dialog"
             @click="sponsorOpen = true"
           >
-            <v-icon :icon="mdiCoffee" size="17" />
+            <v-icon :icon="icons.coffee" size="18" />
           </button>
         </div>
       </div>
@@ -130,7 +142,7 @@ void locale.value;
       </v-btn>
     </v-bottom-navigation>
 
-    <v-main class="app-main">
+    <v-main id="main-content" ref="mainEl" class="app-main" tabindex="-1">
       <router-view v-slot="{ Component }">
         <keep-alive>
           <component :is="Component" />
@@ -144,45 +156,12 @@ void locale.value;
 
 <style>
 /*
- * Site palette — mirrors the Notion-inspired tokens of imchong.github.io
- * (`css/style.css`); `data-theme` is set on <html> by useAppTheme.
- * Header chrome follows Humanoid_Robot_Learning_Paper_Notebooks'
- * `.site-header` (bold sans title, GitHub text link, 36×30 pill toggles).
+ * Header chrome follows Humanoid_Robot_Learning_Paper_Notebooks' `.site-header`
+ * (bold sans title, GitHub text link, compact toggles). Tokens (colours, radii,
+ * motion, fonts) live in src/styles/design.css; `data-theme` is set on <html>
+ * by useAppTheme.
  */
-:root {
-  --rro-header-bg: #222222;
-  --rro-border: #3d3d3d;
-  --rro-text: #e8e8e4;
-  --rro-text-muted: #9b9a97;
-  --rro-accent: #5b9cf6;
-  --rro-accent-hover: #7ab3ff;
-  --rro-hover-bg: #2f2f2f;
-  --rro-sponsor: #e2566a;
-  --rro-radius: 6px;
-  --rro-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial,
-    'Noto Sans SC', sans-serif;
-
-  --app-bar-height: 56px;
-  --app-bottom-nav-height: 0px;
-  /* Apple HIG minimum hit area; see the "Touch input" block at the end. */
-  --rro-tap-target: 44px;
-}
-
-:root[data-theme='light'] {
-  --rro-header-bg: #ffffff;
-  --rro-border: #e8e8e4;
-  --rro-text: #37352f;
-  --rro-text-muted: #787774;
-  --rro-accent: #2d74da;
-  --rro-accent-hover: #1a5bb8;
-  --rro-hover-bg: #f7f6f3;
-}
-
 @media (max-width: 959.98px) {
-  :root {
-    --app-bottom-nav-height: 56px;
-  }
-
   html {
     overflow-y: auto !important;
   }
@@ -197,6 +176,10 @@ void locale.value;
 .app-main {
   height: calc(100dvh - var(--app-bar-height) - var(--app-bottom-nav-height));
   overflow: hidden;
+}
+
+.app-main:focus {
+  outline: none;
 }
 
 /*
@@ -220,7 +203,7 @@ void locale.value;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 12px;
   width: 100%;
   min-width: 0;
   height: 100%;
@@ -230,24 +213,38 @@ void locale.value;
 .site-title {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 8px;
   min-width: 0;
   font-family: var(--rro-font-sans);
-  font-size: 1.05rem;
-  font-weight: 700;
-  line-height: 1.25;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+  letter-spacing: -0.01em;
   color: var(--rro-text);
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: color var(--rro-dur-color) var(--rro-ease);
 }
 
 .site-title:hover {
   color: var(--rro-accent);
 }
 
-.site-title-icon {
+.site-title-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  font-size: 1rem;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+  font-size: 16px;
+  transition: transform var(--rro-dur-move) var(--rro-ease);
+}
+
+.site-title:hover .site-title-mark {
+  transform: rotate(180deg);
 }
 
 .site-title-text {
@@ -260,23 +257,26 @@ void locale.value;
 .header-right {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 8px;
   flex: 0 0 auto;
 }
 
 .site-header .github-link {
   display: inline-flex;
   align-items: center;
-  height: 30px;
+  height: 32px;
+  padding-inline: 4px;
+  border-radius: var(--rro-radius);
   font-family: var(--rro-font-sans);
-  font-size: 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 500;
   color: var(--rro-text-muted);
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: color var(--rro-dur-color) var(--rro-ease);
 }
 
 .site-header .github-link:hover {
-  color: var(--rro-accent);
+  color: var(--rro-text);
 }
 
 .site-header .header-btn {
@@ -284,46 +284,64 @@ void locale.value;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  min-width: 36px;
-  height: 30px;
-  padding: 0 0.6rem;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
   background: none;
   border: 1px solid var(--rro-border);
   border-radius: var(--rro-radius);
   color: var(--rro-text-muted);
   font-family: var(--rro-font-sans);
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.875rem;
+  font-weight: 600;
   line-height: 1;
   cursor: pointer;
   user-select: none;
-  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  transition:
+    color var(--rro-dur-color) var(--rro-ease),
+    background-color var(--rro-dur-color) var(--rro-ease),
+    border-color var(--rro-dur-color) var(--rro-ease),
+    transform var(--rro-dur-color) var(--rro-ease);
 }
 
 .site-header .header-btn:hover {
-  border-color: var(--rro-accent);
+  background: var(--rro-hover-bg);
   color: var(--rro-text);
 }
 
-.site-header .header-btn:focus-visible {
+.site-header .header-btn:active {
+  transform: translateY(1px);
+}
+
+.site-header .header-btn:focus-visible,
+.site-header .github-link:focus-visible,
+.site-header .site-title:focus-visible {
   outline: 2px solid var(--rro-accent);
   outline-offset: 2px;
 }
 
-.site-header .lang-toggle:hover {
-  background: var(--rro-accent);
-  border-color: var(--rro-accent);
-  color: #fff;
-}
-
-.site-header .sponsor-toggle {
-  color: var(--rro-sponsor);
-}
-
+/* One accent: the sponsor cup only takes its own colour while it is pointed at. */
 .site-header .sponsor-toggle:hover {
   border-color: var(--rro-sponsor);
   background: rgba(226, 86, 106, 0.12);
   color: var(--rro-sponsor);
+}
+
+.icon-swap-enter-active,
+.icon-swap-leave-active {
+  transition:
+    opacity var(--rro-dur-color) var(--rro-ease),
+    transform var(--rro-dur-move) var(--rro-ease);
+}
+
+.icon-swap-enter-from {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.6);
+}
+
+.icon-swap-leave-to {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.6);
 }
 
 /* ===== Header nav (workflow steps) ===== */
@@ -333,9 +351,9 @@ void locale.value;
 
 .header-nav .v-tab.v-btn {
   min-width: 0;
-  padding-inline: 14px;
+  padding-inline: 16px;
   font-family: var(--rro-font-sans);
-  font-size: 0.82rem;
+  font-size: 0.875rem;
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
@@ -351,31 +369,32 @@ void locale.value;
 }
 
 .header-nav .v-tab.v-tab--selected {
-  color: var(--rro-accent);
+  color: var(--rro-text);
 }
 
 @media (max-width: 959.98px) {
   .header-inner {
-    gap: 0.5rem;
+    gap: 8px;
     padding-inline: 12px;
   }
 
   .site-title {
     flex: 1 1 0;
-    font-size: 0.96rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
   }
 
   .header-right {
-    gap: 0.35rem;
+    gap: 4px;
   }
 
   .site-header .github-link {
-    font-size: 0.78rem;
+    font-size: 0.75rem;
   }
 
   .site-header .header-btn {
     min-width: 32px;
-    padding: 0 0.45rem;
+    padding: 0 8px;
   }
 }
 
@@ -410,8 +429,9 @@ void locale.value;
 }
 
 .bottom-nav .v-btn {
+  border-radius: 0 !important;
   font-family: var(--rro-font-sans);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
@@ -419,39 +439,43 @@ void locale.value;
 }
 
 .bottom-nav .v-btn--selected {
-  color: var(--rro-accent);
+  color: var(--rro-text);
 }
 
 .tab-with-step {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
 }
 
 .tab-with-step--compact {
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .tab-step {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  font-size: 11px;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  font-size: 0.75rem;
   font-weight: 600;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
   background: var(--rro-hover-bg);
   color: var(--rro-text-muted);
   border: 1px solid var(--rro-border);
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  transition:
+    background-color var(--rro-dur-color) var(--rro-ease),
+    color var(--rro-dur-color) var(--rro-ease),
+    border-color var(--rro-dur-color) var(--rro-ease);
 }
 
 .tab-label {
-  line-height: 1.2;
+  line-height: 1.25rem;
 }
 
 .tab-tooltip-wrap {

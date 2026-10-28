@@ -3,6 +3,10 @@ import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
 import vuetify from './plugins/vuetify';
+// After Vuetify's stylesheet so the design tokens and overrides win ties.
+import '@fontsource-variable/geist';
+import '@fontsource-variable/geist-mono';
+import './styles/design.css';
 import { installTouchDebug } from './lib/touchDebug';
 import { installTapFallback } from './lib/tapFallback';
 

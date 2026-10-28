@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { THEME_CHANGE_EVENT, type AppTheme } from '@/composables/useAppTheme';
+import { appTheme, THEME_CHANGE_EVENT, type AppTheme } from '@/composables/useAppTheme';
 
 export interface SceneManagerOptions {
   cameraPos?: [number, number, number];
@@ -16,10 +16,10 @@ export interface SceneManagerOptions {
 /** Neutral greys tuned to the site palette (see src/plugins/vuetify.ts). */
 const VIEWPORT_THEMES = {
   dark: {
-    background: 0x1c1c1c,
+    background: 0x1f1f1f,
     fogNear: 14,
     fogFar: 34,
-    floor: ['#262626', '#2f2f2f'] as const,
+    floor: ['#272727', '#313131'] as const,
   },
   light: {
     background: 0xeceae5,
@@ -28,14 +28,6 @@ const VIEWPORT_THEMES = {
     floor: ['#e8e8e4', '#dcdbd5'] as const,
   },
 } as const;
-
-function readStoredTheme(): AppTheme {
-  try {
-    return localStorage.getItem('rro-theme') === 'light' ? 'light' : 'dark';
-  } catch {
-    return 'dark';
-  }
-}
 
 export class SceneManager {
   readonly scene: THREE.Scene;
@@ -55,7 +47,7 @@ export class SceneManager {
     this.container = container;
 
     this.scene = new THREE.Scene();
-    this.applyTheme(readStoredTheme());
+    this.applyTheme(appTheme.value);
 
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.01, 120);
     this.camera.up.set(0, 0, 1); // Z-up
@@ -105,7 +97,7 @@ export class SceneManager {
     this.scene.add(dir);
 
     if (options.floor !== false) {
-      this.floorMesh = makeCheckerFloor(readStoredTheme());
+      this.floorMesh = makeCheckerFloor(appTheme.value);
       this.scene.add(this.floorMesh);
     }
 
