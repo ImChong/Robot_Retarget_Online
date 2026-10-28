@@ -6,13 +6,42 @@ export type AppTheme = 'dark' | 'light';
 const STORAGE_KEY = 'rro-theme';
 export const THEME_CHANGE_EVENT = 'rro-theme-change';
 
-const stored =
-  typeof localStorage !== 'undefined' ? (localStorage.getItem(STORAGE_KEY) as AppTheme | null) : null;
-export const appTheme = ref<AppTheme>(stored === 'light' ? 'light' : 'dark');
+function readStoredTheme(): AppTheme | null {
+  try {
+    const v = localStorage.getItem(STORAGE_KEY);
+    return v === 'light' || v === 'dark' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+const lightQuery =
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-color-scheme: light)')
+    : null;
+
+function systemTheme(): AppTheme {
+  return lightQuery?.matches ? 'light' : 'dark';
+}
+
+/**
+ * The theme to start in: an explicit choice saved by the header toggle wins,
+ * otherwise follow the OS. Keep in sync with the pre-paint script in index.html.
+ */
+export function resolveInitialTheme(): AppTheme {
+  return readStoredTheme() ?? systemTheme();
+}
+
+export const appTheme = ref<AppTheme>(resolveInitialTheme());
+
+// Track the OS setting live until the user picks a theme themselves.
+lightQuery?.addEventListener?.('change', () => {
+  if (readStoredTheme() === null) appTheme.value = systemTheme();
+});
 
 /** Page backgrounds — mirrors the Vuetify theme `background` colors (and the pre-paint script in index.html). */
 const PAGE_BACKGROUND: Record<AppTheme, string> = {
-  dark: '#191919',
+  dark: '#181818',
   light: '#f7f6f3',
 };
 

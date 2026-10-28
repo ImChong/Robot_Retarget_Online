@@ -5,17 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Robot Retarget Online — browser-based humanoid motion retargeting (GMR) with BVH preview / 在线人形机器人动作重定向"
+      content="Retarget BVH, video or SMPL-X human motion onto humanoid and quadruped robots in the browser with GMR and MuJoCo WebAssembly, then export NPZ / CSV / JSON. 在线人形机器人动作重定向。"
     />
+    <meta name="theme-color" content="#1f1f1f" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <title>Robot Retarget Online | 在线机器人动作重定向</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13'%3E%F0%9F%94%84%3C/text%3E%3C/svg%3E" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Robot Retarget Online" />
+    <meta property="og:title" content="Robot Retarget Online | 在线机器人动作重定向" />
+    <meta
+      property="og:description"
+      content="Retarget human motion onto humanoid and quadruped robots in the browser. No install, no upload: GMR and MuJoCo run locally as WebAssembly."
+    />
+    <meta property="og:url" content="https://imchong.github.io/Robot_Retarget_Online/" />
+    <meta property="og:image" content="https://imchong.github.io/Robot_Retarget_Online/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <script>
       (function () {
         try {
-          // Keep these in sync with the theme backgrounds in src/composables/useAppTheme.ts
-          var theme = localStorage.getItem('rro-theme') === 'light' ? 'light' : 'dark';
+          // Keep in sync with resolveInitialTheme() and the page backgrounds in
+          // src/composables/useAppTheme.ts: a saved choice wins, else follow the OS.
+          var stored = localStorage.getItem('rro-theme');
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+                ? 'light'
+                : 'dark';
           document.documentElement.dataset.theme = theme;
-          document.documentElement.style.background = theme === 'light' ? '#f7f6f3' : '#191919';
+          document.documentElement.style.background = theme === 'light' ? '#f7f6f3' : '#181818';
         } catch (e) {}
       })();
     </script>
@@ -60,7 +81,7 @@
       body {
         margin: 0;
         padding: 0;
-        background: #191919;
+        background: #181818;
       }
     </style>
   </head>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { mdiChevronLeft, mdiChevronRight, mdiPlayCircle, mdiStopCircle } from '@mdi/js';
+import { icons } from '@/lib/icons';
 import { useI18n } from '@/i18n';
 import { useWorkflowNav } from '@/composables/useWorkflowNav';
 import { useRetargetStore } from '@/stores/retarget';
@@ -43,7 +43,7 @@ const runRetargetTooltip = computed(() => {
               color="primary"
               variant="flat"
               size="small"
-              :append-icon="mdiChevronRight"
+              :append-icon="icons.caretRight"
               :disabled="!canGoConfig"
               @click="goToConfig"
             >
@@ -60,7 +60,7 @@ const runRetargetTooltip = computed(() => {
           <v-tooltip :text="t('workflowPrevHint')" location="bottom">
             <template #activator="{ props: tipProps }">
               <span v-bind="tipProps" class="workflow-nav__activator">
-                <v-btn variant="tonal" size="small" :prepend-icon="mdiChevronLeft" @click="goToBvh">
+                <v-btn variant="tonal" size="small" :prepend-icon="icons.caretLeft" @click="goToBvh">
                   {{ t('workflowPrev') }}
                 </v-btn>
               </span>
@@ -74,7 +74,7 @@ const runRetargetTooltip = computed(() => {
                   color="primary"
                   variant="flat"
                   size="small"
-                  :prepend-icon="mdiPlayCircle"
+                  :prepend-icon="icons.play"
                   :disabled="!canGoConfig || isLoadingRobot"
                   :class="{ 'workflow-nav__run-btn--hidden': isRetargetRunning }"
                   @click="runRetarget"
@@ -85,7 +85,7 @@ const runRetargetTooltip = computed(() => {
                   color="error"
                   variant="tonal"
                   size="small"
-                  :prepend-icon="mdiStopCircle"
+                  :prepend-icon="icons.stop"
                   :class="{ 'workflow-nav__run-btn--hidden': !isRetargetRunning }"
                   @click="cancelRetarget"
                 >
@@ -115,7 +115,7 @@ const runRetargetTooltip = computed(() => {
       <v-tooltip :text="t('workflowPrevHint')" location="bottom">
         <template #activator="{ props: tipProps }">
           <span v-bind="tipProps" class="workflow-nav__activator">
-            <v-btn variant="tonal" size="small" :prepend-icon="mdiChevronLeft" @click="goToBvh">
+            <v-btn variant="tonal" size="small" :prepend-icon="icons.caretLeft" @click="goToBvh">
               {{ t('workflowBackBvh') }}
             </v-btn>
           </span>
@@ -128,7 +128,7 @@ const runRetargetTooltip = computed(() => {
             <v-btn
               variant="tonal"
               size="small"
-              :prepend-icon="mdiChevronLeft"
+              :prepend-icon="icons.caretLeft"
               :disabled="!canGoConfig"
               @click="goToConfig"
             >
@@ -150,9 +150,10 @@ const runRetargetTooltip = computed(() => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  padding: 4px 6px;
-  border-radius: 10px;
+  gap: 4px;
+  /* Concentric corners: 12px outside, 4px gap, so the 8px buttons inside line up. */
+  padding: 4px;
+  border-radius: var(--rro-radius-lg);
   /* Opaque pill, so it takes its own taps rather than passing them through.
      It used to be pointer-events: none with the children opting back in, which
      left every button here under a pointer-events: none ancestor — a pattern
@@ -164,7 +165,7 @@ const runRetargetTooltip = computed(() => {
      only cost a compositing layer. Raise the tint to stay legible without it. */
   background: rgba(var(--v-theme-surface), 0.9);
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--rro-shadow-float);
 }
 
 .workflow-nav__activator {
@@ -175,13 +176,13 @@ const runRetargetTooltip = computed(() => {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
+  gap: 4px;
 }
 
 .workflow-nav__actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .workflow-nav__run-slot {

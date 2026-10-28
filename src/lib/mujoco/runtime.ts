@@ -63,6 +63,11 @@ export interface RobotManifestEntry {
   xml: string;
   /** files relative to robots/<id>/ */
   files: string[];
+  /**
+   * Production builds only: the subset of `files` shipped as `<file>.gz`
+   * (see scripts/compressRobotMeshes.ts). Absent in dev, where files are raw.
+   */
+  gzFiles?: string[];
   baseBody: string;
   /** Body whose local +X defines viewport facing; defaults to baseBody when omitted. */
   alignBody?: string;
@@ -177,6 +182,45 @@ export async function prepareRobotSlot(
   return null;
 }
 
+const FETCH_CONCURRENCY = 8;
+
+async function runPool<T>(items: readonly T[], limit: number, fn: (item: T) => Promise<void>) {
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) await fn(items[next++]);
+  });
+  await Promise.all(workers);
+}
+
+/**
+ * Fetch one robot asset; `gz` files are fetched as `<url>.gz` and inflated here.
+ * A 404 retries the other form, so a manifest cached from before/after a
+ * deploy (Pages caches it for 10 minutes) still finds the meshes.
+ */
+async function fetchRobotFile(url: string, gz: boolean): Promise<Uint8Array> {
+  let target = gz ? `${url}.gz` : url;
+  let res = await fetch(target);
+  if (res.status === 404 && /\.(stl|obj)$/i.test(url)) {
+    gz = !gz;
+    target = gz ? `${url}.gz` : url;
+    res = await fetch(target);
+  }
+  if (!res.ok) throw new Error(`Failed to fetch ${target}: ${res.status}`);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  // A host that labels .gz with Content-Encoding has already inflated it.
+  if (!gz || bytes[0] !== 0x1f || bytes[1] !== 0x8b) return bytes;
+  return gunzip(bytes);
+}
+
+async function gunzip(bytes: Uint8Array<ArrayBuffer>): Promise<Uint8Array> {
+  if (typeof DecompressionStream === 'function') {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+  const { gunzipSync } = await import('fflate');
+  return gunzipSync(bytes);
+}
+
 export async function loadRobot(
   robotId: string,
   onProgress?: (loaded: number, total: number, file: string) => void,
@@ -200,24 +244,18 @@ async function loadRobotImpl(
 
   let done = 0;
   const total = entry.files.length;
-  // Fetch sequentially-ish in small batches to keep memory in check.
-  const BATCH = 6;
-  for (let i = 0; i < entry.files.length; i += BATCH) {
-    const batch = entry.files.slice(i, i + BATCH);
-    await Promise.all(
-      batch.map(async (rel) => {
-        const url = `${import.meta.env.BASE_URL}robots/${robotId}/${rel}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
-        const buf = new Uint8Array(await res.arrayBuffer());
-        const path = `${dir}/${rel}`;
-        ensureDir(mujoco, path.substring(0, path.lastIndexOf('/')));
-        mujoco.FS.writeFile(path, buf);
-        done++;
-        onProgress?.(done, total, rel);
-      }),
-    );
-  }
+  const gzFiles = new Set(entry.gzFiles ?? []);
+  // A fixed number of requests in flight: a new one starts as soon as any
+  // finishes, rather than each batch waiting on its slowest file.
+  await runPool(entry.files, FETCH_CONCURRENCY, async (rel) => {
+    const url = `${import.meta.env.BASE_URL}robots/${robotId}/${rel}`;
+    const buf = await fetchRobotFile(url, gzFiles.has(rel));
+    const path = `${dir}/${rel}`;
+    ensureDir(mujoco, path.substring(0, path.lastIndexOf('/')));
+    mujoco.FS.writeFile(path, buf);
+    done++;
+    onProgress?.(done, total, rel);
+  });
 
   const model = mujoco.MjModel.loadFromXML(`${dir}/${entry.xml}`);
   const data = new mujoco.MjData(model);

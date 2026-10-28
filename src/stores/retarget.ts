@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia';
 import { markRaw, toRaw } from 'vue';
-import { createBlankConfig, getDefaultConfig, validateConfig } from '@/lib/retarget/defaults';
+import {
+  createBlankConfig,
+  createBlankQuadrupedConfig,
+  getDefaultConfig,
+  matchPresetConfig,
+  validateConfig,
+} from '@/lib/retarget/defaults';
 import {
   DEFAULT_SOLVER_OPTIONS,
   type GmrIkConfig,
@@ -17,16 +23,42 @@ import {
   parseCustomRobotImport,
   type CustomRobotBundle,
 } from '@/lib/mujoco/customRobot';
-import { runRetarget } from '@/lib/retarget/runner';
+import { BUILTIN_GALLERY_LINKS, type GalleryRobot } from '@/lib/gallery/registry';
 import { findMissingBodies } from '@/lib/bvh/lafan1';
 import {
   defaultRobotIdForKind,
   motionMatchesRobot,
+  type MotionKind,
 } from '@/lib/motionKind';
 import type { RobotManifestEntry } from '@/lib/mujoco/runtime';
 import { useMotionStore } from './motion';
 
 export type RetargetStatus = 'idle' | 'loading-robot' | 'running' | 'done' | 'error';
+
+/** Motion family an imported robot retargets from (uploads are humanoid). */
+function bundleKind(bundle: CustomRobotBundle | null): MotionKind {
+  return bundle?.kind ?? 'humanoid';
+}
+
+/**
+ * Starting ik_config for an imported robot: a bundled GMR preset when every
+ * body it names exists on the robot (the gallery's G1 / Go2 / A1 match the
+ * built-in ones), else a name-heuristic template for its motion family.
+ */
+function initialCustomConfig(bundle: CustomRobotBundle, bodyNames: string[]): GmrIkConfig {
+  const quadruped = bundleKind(bundle) === 'quadruped';
+  const gallery = bundle.gallery;
+  const preferred = gallery
+    ? Object.entries(BUILTIN_GALLERY_LINKS)
+        .filter(([, link]) => link.id === gallery.id && (!link.variant || link.variant === gallery.variant))
+        .map(([robotId]) => robotId)
+    : [];
+  const preset = matchPresetConfig(quadruped ? 'b_Hips' : 'Hips', bodyNames, preferred);
+  if (preset) return preset;
+  return quadruped
+    ? createBlankQuadrupedConfig(bundle.baseBody, bodyNames)
+    : createBlankConfig(bundle.baseBody, bodyNames);
+}
 
 interface RetargetState {
   robotId: string;
@@ -66,6 +98,7 @@ export const useRetargetStore = defineStore('retarget', {
     isLoadingRobot: (s) => s.status === 'loading-robot',
     isRetargetRunning: (s) => s.status === 'running',
     isCustomRobot: (s) => s.robotId === CUSTOM_ROBOT_ID,
+    customRobotKind: (s): MotionKind => bundleKind(s.customRobot),
     robotDisplayLabel: (s) =>
       s.robotId === CUSTOM_ROBOT_ID && s.customRobot
         ? `${s.customRobot.label} (custom)`
@@ -106,11 +139,9 @@ export const useRetargetStore = defineStore('retarget', {
       if (!kind) return false;
 
       if (this.robotId === CUSTOM_ROBOT_ID) {
-        if (kind === 'quadruped') {
-          this.setRobot(defaultRobotIdForKind(kind));
-          return true;
-        }
-        return false;
+        if (kind === bundleKind(this.customRobot)) return false;
+        this.setRobot(defaultRobotIdForKind(kind));
+        return true;
       }
 
       const entry = manifest.find((m) => m.id === this.robotId);
@@ -124,17 +155,32 @@ export const useRetargetStore = defineStore('retarget', {
       return true;
     },
     async importCustomRobot(file: File) {
-      const bundle = await parseCustomRobotImport(file);
+      await this.adoptCustomRobot(await parseCustomRobotImport(file));
+    },
+    /** Download a robot from Robot Description Gallery Online and select it. */
+    async importGalleryRobot(
+      robot: GalleryRobot,
+      variantId: string | null,
+      onProgress?: (done: number, total: number) => void,
+    ) {
+      // Loaded on demand: pulls in the mesh converters (three.js STL / Collada).
+      const { fetchGalleryRobotBundle } = await import('@/lib/gallery/urdfBundle');
+      await this.adoptCustomRobot(await fetchGalleryRobotBundle(robot, variantId, { onProgress }));
+    },
+    async adoptCustomRobot(bundle: CustomRobotBundle) {
       clearCustomRobotCache();
-      this.customRobot = bundle;
+      // Mesh bytes can run to tens of MB: keep them out of Vue's reactivity.
+      this.customRobot = markRaw(bundle);
       this.robotId = CUSTOM_ROBOT_ID;
       this.status = 'idle';
       this.errorMessage = null;
 
       const robot = await this.ensureRobot();
-      this.config = createBlankConfig(bundle.baseBody, robot.bodyNames);
+      this.config = initialCustomConfig(bundle, robot.bodyNames);
     },
-    removeCustomRobot(fallbackRobotId = 'unitree_g1') {
+    removeCustomRobot(
+      fallbackRobotId = defaultRobotIdForKind(useMotionStore().motionKind ?? 'humanoid'),
+    ) {
       if (!this.customRobot) return false;
       const wasSelected = this.robotId === CUSTOM_ROBOT_ID;
       clearCustomRobotCache();
@@ -151,7 +197,7 @@ export const useRetargetStore = defineStore('retarget', {
       if (this.robotId === CUSTOM_ROBOT_ID && this.customRobot) {
         // Re-load body list if robot already cached.
         this.ensureRobot().then((robot) => {
-          this.config = createBlankConfig(this.customRobot!.baseBody, robot.bodyNames);
+          this.config = initialCustomConfig(this.customRobot!, robot.bodyNames);
         });
         return;
       }
@@ -203,8 +249,9 @@ export const useRetargetStore = defineStore('retarget', {
     },
     async loadRobotForHistory(entry: RetargetHistoryEntry): Promise<RobotModel> {
       if (entry.robotId === CUSTOM_ROBOT_ID) {
-        if (!this.customRobot) throw new Error('Custom robot no longer available');
-        return loadCustomRobot(this.customRobot);
+        const bundle = entry.customRobot ?? this.customRobot;
+        if (!bundle) throw new Error('Custom robot no longer available');
+        return loadCustomRobot(bundle);
       }
       return loadRobot(entry.robotId);
     },
@@ -216,6 +263,9 @@ export const useRetargetStore = defineStore('retarget', {
         return;
       }
       try {
+        // The solver code is fetched on first run, alongside the robot load.
+        const runner = import('@/lib/retarget/runner');
+        runner.catch(() => undefined); // surfaced by the `await` below, not as an unhandled rejection
         const robot = await this.ensureRobot();
         const config = structuredClone(toRaw(this.config)) as GmrIkConfig;
 
@@ -233,6 +283,7 @@ export const useRetargetStore = defineStore('retarget', {
         this.runProgress = { done: 0, total: motion.lafan.frames.length };
         this.abortController = new AbortController();
 
+        const { runRetarget } = await runner;
         const result = await runRetarget({
           robot,
           config,
@@ -254,6 +305,7 @@ export const useRetargetStore = defineStore('retarget', {
           engine: this.engine,
           createdAt: Date.now(),
           result: markRaw(result),
+          customRobot: this.robotId === CUSTOM_ROBOT_ID ? (this.customRobot ?? undefined) : undefined,
         };
         this.resultHistory.unshift(entry);
         this.activeHistoryId = entry.id;

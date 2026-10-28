@@ -44,12 +44,17 @@ const tmpLeft = new THREE.Vector3();
 const tmpRight = new THREE.Vector3();
 
 /** Smoothly move orbit target and camera together so the view tracks a world point. */
+const FOLLOW_SNAP_SQ = 1e-4 * 1e-4;
+
 export function followOrbitCamera(sm: SceneManager, worldPos: THREE.Vector3, smooth = 0.08): void {
   const tgt = sm.controls.target;
   const cam = sm.camera;
-  const dx = (worldPos.x - tgt.x) * smooth;
-  const dy = (worldPos.y - tgt.y) * smooth;
-  const dz = (worldPos.z - tgt.z) * smooth;
+  // Within 0.1 mm, land on the target: an exponential ease otherwise creeps
+  // for hundreds of frames, and every one of them is a redraw.
+  const k = tgt.distanceToSquared(worldPos) < FOLLOW_SNAP_SQ ? 1 : smooth;
+  const dx = (worldPos.x - tgt.x) * k;
+  const dy = (worldPos.y - tgt.y) * k;
+  const dz = (worldPos.z - tgt.z) * k;
   tgt.x += dx;
   tgt.y += dy;
   tgt.z += dz;

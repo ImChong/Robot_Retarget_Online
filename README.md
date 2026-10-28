@@ -35,7 +35,7 @@ The GIF is recorded from the built site by `node scripts/record_site_demo.mjs`
 | Page | 功能 |
 | --- | --- |
 | **BVH Viewer** | BVHView 风格的动捕预览：拖拽打开 `.bvh`、胶囊体骨架渲染、播放/拖动时间轴/变速、关节层级树与关节信息；示例动作含 LAFAN1 人形与 Labrador 狗四足动捕；**视频生成 BVH（浏览器内 MediaPipe 姿态估计，实验性）** |
-| **Retarget Config** | 引擎选择（GMR / OmniRetarget）、机器人选择（人形 Unitree G1 / Booster T1 等，四足 Unitree Go2 / A1）、IK 关键点映射表（两阶段权重/偏移）、人体缩放表、求解器参数；配置 JSON 与 GMR `ik_config` 双向兼容 |
+| **Retarget Config** | 引擎选择（GMR / OmniRetarget）、机器人选择（人形 Unitree G1 / Booster T1 等，四足 Unitree Go2 / A1；**或从 [Robot Description Gallery](https://imchong.github.io/Robot_Description_Gallery_Online/web/) 挑选人形 / 四足 URDF**，并可一键跳转 Gallery 查看对应模型）、IK 关键点映射表（两阶段权重/偏移）、人体缩放表、求解器参数；配置 JSON 与 GMR `ik_config` 双向兼容 |
 | **Retarget Preview** | 引擎切换、一键重定向（带进度）、机器人动作回放、人体关键点叠加对比、逐帧误差曲线、导出 NPZ / CSV / JSON |
 
 ## How it works · 技术要点
@@ -113,6 +113,37 @@ the app.
 are trimmed Labrador retriever mocap clips from Tencent's *Lifelike Agility and
 Play* dataset (MIT) for the quadruped workflow below; regenerate via
 `python3 scripts/prepare_dog_samples.py`.
+
+## Robots from the Gallery · 从 Gallery 挑选机器人
+
+Retarget Config → **从 Gallery 选择 URDF / Pick URDF from Gallery** lists the
+humanoid and quadruped URDFs of
+[Robot Description Gallery Online](https://github.com/ImChong/Robot_Description_Gallery_Online)
+(its `data/robots.json` + `data/visibility.md`, read live from the gallery site;
+versions such as G1's 21 URDFs are selectable). Only the category matching the
+loaded motion can be picked (humanoid ↔ LAFAN1 BVH, quadruped ↔ dog mocap).
+**在 Gallery 中查看 / View in Gallery** opens the selected robot — gallery or
+built-in — on the gallery's own viewer page.
+
+在重定向设置页点「从 Gallery 选择 URDF」，即可从 Robot Description Gallery 的人形 / 四足 URDF
+中挑选机器人（含多版本选择）；「在 Gallery 中查看」跳转到该机器人在 Gallery 网站上的页面。
+
+- The URDF and its meshes stream from the pinned upstream commit (jsDelivr /
+  GitHub LFS), exactly as the gallery loads them, and never leave the browser.
+  Collada (`.dae`) and ASCII-STL meshes are re-encoded to binary STL in the
+  browser (MuJoCo reads only STL / OBJ / MSH). 模型与网格从上游仓库下载，仅在浏览器内处理。
+- `src/lib/gallery/urdfBundle.ts` normalises what MuJoCo's URDF importer
+  rejects (a `world` root link, several `<material>`s per visual, singular
+  inertias), drops collision geometry (not drawn, irrelevant to IK) and keeps
+  fixed-joint links such as a quadruped's `FL_foot` as bodies.
+- The starting ik_config is a bundled GMR preset when every body it names
+  exists on the robot (the gallery's G1 / H1-2 / Go2 / A1 / PM01 / Fourier
+  robots match), otherwise a name-based template — root + four feet for
+  quadrupeds (`FL_foot`, `LF_FOOT`, `toe_fl`, `foot_front_left` …). Review the
+  mapping tables before trusting the result.
+- Out of scope: MJCF-only gallery cards and xacro-only upstreams; SMPL-X motion.
+- `node scripts/e2e_gallery.mjs --url http://localhost:3000` drives the flow
+  (G1 → walk, Go2 → dog walk) in headless Chromium; it needs network access.
 
 ## Quadruped retargeting · 四足机器人重定向
 
@@ -237,6 +268,7 @@ Full plan of record in **[`ROADMAP.md`](ROADMAP.md)**. Headlines:
 - [x] Phase 2 — pluggable engines: **OmniRetarget** (in-browser interaction-mesh) selectable alongside GMR
 - [x] Video → BVH input (experimental, in-browser MediaPipe pose capture)
 - [x] **Quadruped retargeting** — dog mocap (BVH) → Unitree Go2 / A1 via keypoint IK ([motion_imitation](https://github.com/erwincoumans/motion_imitation)-style)
+- [x] **Robots from [Robot Description Gallery Online](https://github.com/ImChong/Robot_Description_Gallery_Online)** — pick any humanoid / quadruped URDF in the browser, with a link back to the gallery
 - [ ] More GMR robots (assets are drop-in: `public/robots/` + manifest entry)
 - [ ] [holosoma](https://github.com/amazon-far/holosoma) as a third, trajectory-level engine (heavier; backend TBD)
 - [x] **SMPL-X / AMASS input** (user-supplied body model `.npz`, in-browser) — unlocks 10 more GMR robots (H1, H1-2, Kuavo, …); GMR parity pending
@@ -265,6 +297,9 @@ Full plan of record in **[`ROADMAP.md`](ROADMAP.md)**. Headlines:
   & WASM bindings (`mujoco-js`).
 - [MediaPipe Tasks Vision](https://github.com/google-ai-edge/mediapipe)
   (Apache-2.0) — in-browser pose estimation for the experimental video → BVH feature.
+- [Robot Description Gallery Online](https://github.com/ImChong/Robot_Description_Gallery_Online)
+  (MIT) — robot registry for the gallery picker; each model keeps its upstream
+  licence (shown in the picker), some of them non-commercial.
 - [BVHView](https://github.com/orangeduck/BVHView) — UI/rendering inspiration.
 - Site layout inspired by
   [RL_Sim2Sim_Demo_Website](https://github.com/ImChong/RL_Sim2Sim_Demo_Website).

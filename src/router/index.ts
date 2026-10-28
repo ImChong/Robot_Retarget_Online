@@ -2,6 +2,9 @@ import { createRouter, createWebHashHistory } from 'vue-router';
 import { isPageReload, workflowRouteRedirect } from '@/lib/navigation';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore } from '@/stores/retarget';
+// Every visit (and every reload) lands on the BVH page, so it ships with the
+// entry and is modulepreloaded instead of fetched after the router resolves.
+import BvhViewerView from '@/views/BvhViewerView.vue';
 
 const router = createRouter({
   // Hash history avoids 404s on GitHub Pages refresh/deep-link.
@@ -11,7 +14,7 @@ const router = createRouter({
     {
       path: '/bvh',
       name: 'bvh',
-      component: () => import('@/views/BvhViewerView.vue'),
+      component: BvhViewerView,
     },
     {
       path: '/config',
@@ -22,6 +25,11 @@ const router = createRouter({
       path: '/preview',
       name: 'preview',
       component: () => import('@/views/RetargetPreviewView.vue'),
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'notFound',
+      component: () => import('@/views/NotFoundView.vue'),
     },
   ],
 });

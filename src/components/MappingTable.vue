@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { mdiChevronDown, mdiChevronUp } from '@mdi/js';
+import { icons } from '@/lib/icons';
 import { useI18n } from '@/i18n';
 import type { IkMatchEntry } from '@/lib/retarget/types';
 
@@ -87,7 +87,7 @@ function num(v: string | number): number {
           >
             <td @click.stop>
               <v-btn
-                :icon="expanded.has(body) ? mdiChevronUp : mdiChevronDown"
+                :icon="expanded.has(body) ? icons.caretUp : icons.caretDown"
                 size="x-small"
                 variant="text"
                 @click="toggleExpand(body)"
@@ -179,12 +179,12 @@ function num(v: string | number): number {
   background: rgba(var(--v-theme-on-surface), 0.06);
 }
 .mono {
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 0.82rem;
+  font-family: var(--rro-font-mono);
+  font-size: 0.75rem;
 }
 .mono-select :deep(.v-field__input) {
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 0.82rem;
+  font-family: var(--rro-font-mono);
+  font-size: 0.75rem;
 }
 .detail-row td {
   background: rgba(var(--v-theme-on-surface), 0.04);

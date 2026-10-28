@@ -51,12 +51,12 @@ function toggle(index: number) {
 <style scoped>
 .joint-tree {
   overflow-y: auto;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-family: var(--rro-font-mono);
 }
 .joint-row {
   cursor: pointer;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -82,6 +82,18 @@ joint-jump frames 12–49 → 0–3. Next candidates: a dynamics-aware corrector
 (X-Morph-style) and source-paw sliding compensation on fast gaits (run still
 detects only ~13 % planted frames).
 
+**Robots from Robot Description Gallery Online** / 从 Gallery 挑选机器人 ✅:
+Retarget Config can load any humanoid / quadruped URDF listed by
+[Robot Description Gallery Online](https://github.com/ImChong/Robot_Description_Gallery_Online)
+(registry read live, meshes streamed from the pinned upstream commit, Collada →
+STL in the browser) and links the selected robot back to the gallery page.
+Files: `src/lib/gallery/` (registry, URDF normalisation + bundle, mesh
+conversion), `src/components/GalleryRobotDialog.vue`, `tests/gallery.test.ts`,
+`scripts/e2e_gallery.mjs`. All 66 visible humanoid / quadruped URDF cards (112
+URDF versions) compile in MuJoCo (checked with placeholder meshes; G1, H1, Go2 and ANYmal C also end to end in the browser); the ik_config starts from a matching GMR preset
+or a name-based template (root + four feet for quadrupeds). Not covered:
+MJCF-only cards, xacro-only upstreams, SMPL-X motion.
+
 ### Near-term, still Phase 1 · 近期（仍属 Phase 1）
 
 - [ ] **More GMR robots** · 接入更多 GMR 机器人.
