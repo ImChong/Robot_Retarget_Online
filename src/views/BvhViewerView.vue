@@ -1,22 +1,20 @@
 <script setup lang="ts">
-import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
-import * as THREE from 'three';
-import { mdiCubeOutline, mdiFolderOpen, mdiRun, mdiTune, mdiVideoOutline } from '@mdi/js';
+import { computed, defineAsyncComponent, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
+import type { Vector3 } from 'three';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
+import { icons } from '@/lib/icons';
 import { usePlayback } from '@/composables/usePlayback';
-import { SceneManager } from '@/lib/viewport/SceneManager';
+import type { SceneManager } from '@/lib/viewport/SceneManager';
 import { QUADRUPED_ENABLED } from '@/lib/features';
-import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
-import { followOrbitCamera } from '@/lib/viewport/sceneAlignment';
+import { prefetchConfigStep, prefetchViewport } from '@/lib/prefetch';
+import type { SkeletonView } from '@/lib/viewport/skeletonView';
 import { resolveMotionRootJoint } from '@/lib/bvh/parse';
 import FileDropZone from '@/components/FileDropZone.vue';
 import PlaybackBar from '@/components/PlaybackBar.vue';
 import JointTreePanel from '@/components/JointTreePanel.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
-import VideoToBvhDialog from '@/components/VideoToBvhDialog.vue';
-import SmplxImportDialog from '@/components/SmplxImportDialog.vue';
 import WorkflowNavBar from '@/components/WorkflowNavBar.vue';
 
 const { t } = useI18n();
@@ -27,13 +25,23 @@ const playback = usePlayback();
 const viewportEl = ref<HTMLElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const sceneManager = shallowRef<SceneManager | null>(null);
+/** three.js + viewport helpers, loaded after the page's first paint (see onMounted). */
+let viewport: typeof import('@/lib/viewport/bvhViewport') | null = null;
 const skeleton = shallowRef<SkeletonView | null>(null);
 const hipsIndex = ref(-1);
 const selectedJoint = ref<number | null>(null);
 const loadErrorSnack = ref(false);
 const panelOpen = ref(false);
+// The import dialogs (and the MediaPipe / SMPL-X code behind them) load on
+// first open, not with the page; once loaded they stay mounted.
+const VideoToBvhDialog = defineAsyncComponent(() => import('@/components/VideoToBvhDialog.vue'));
+const SmplxImportDialog = defineAsyncComponent(() => import('@/components/SmplxImportDialog.vue'));
 const videoDialogOpen = ref(false);
 const smplxDialogOpen = ref(false);
+const videoDialogUsed = ref(false);
+const smplxDialogUsed = ref(false);
+watch(videoDialogOpen, (open) => open && (videoDialogUsed.value = true));
+watch(smplxDialogOpen, (open) => open && (smplxDialogUsed.value = true));
 const sampleMenuOpen = ref(false);
 
 const HUMANOID_SAMPLES = [
@@ -83,9 +91,9 @@ function loadText(text: string, name: string) {
   }
 }
 
-function onSmplxLoaded(model: Uint8Array, motionNpz: Uint8Array, name: string) {
+async function onSmplxLoaded(model: Uint8Array, motionNpz: Uint8Array, name: string) {
   try {
-    motion.loadSmplx(model, motionNpz, name);
+    await motion.loadSmplx(model, motionNpz, name);
   } catch {
     loadErrorSnack.value = true;
   }
@@ -107,12 +115,12 @@ async function loadSample(file: string) {
 
 function rebuildSkeleton() {
   const sm = sceneManager.value;
-  if (!sm) return;
+  if (!sm || !viewport) return;
   skeleton.value?.dispose();
   skeleton.value = null;
   selectedJoint.value = null;
   if (!motion.anim) return;
-  const sk = buildSkeletonView(motion.anim, motion.unitScale);
+  const sk = viewport.buildSkeletonView(motion.anim, motion.unitScale);
   sm.scene.add(sk.root);
   skeleton.value = sk;
   hipsIndex.value = resolveMotionRootJoint(motion.anim);
@@ -121,44 +129,102 @@ function rebuildSkeleton() {
   applyFrame(0);
 }
 
-const rootTrack = new THREE.Vector3();
+let rootTrack: Vector3 | null = null;
+let posedSkeleton: SkeletonView | null = null;
+let posedFrame = Number.NaN;
 
-function applyFrame(frame: number) {
+/** Pose the skeleton for `frame`; returns whether the pose changed (i.e. a redraw is due). */
+function applyFrame(frame: number): boolean {
   const sk = skeleton.value;
   const sm = sceneManager.value;
-  if (!sk || hipsIndex.value < 0) return;
+  if (!sk || hipsIndex.value < 0) return false;
   const playing = playback.state.playing;
   const poseFrame = playing
     ? frame
     : Math.max(0, Math.min(Math.floor(frame), motion.frameCount - 1));
-  if (playing) sk.setFrameBlend(poseFrame);
-  else sk.setFrame(poseFrame);
-  if (!sm) return;
+  // Paused on the same frame: the pose is already up to date.
+  const changed = playing || sk !== posedSkeleton || poseFrame !== posedFrame;
+  if (changed) {
+    if (playing) sk.setFrameBlend(poseFrame);
+    else sk.setFrame(poseFrame);
+    posedSkeleton = sk;
+    posedFrame = playing ? Number.NaN : poseFrame;
+  }
+  if (!sm || !viewport || !rootTrack) return changed;
   sk.getJointWorldPos(hipsIndex.value, rootTrack);
-  followOrbitCamera(sm, rootTrack, playing ? 1 : 0.08);
+  viewport.followOrbitCamera(sm, rootTrack, playing ? 1 : 0.08);
   sm.setDampingEnabled(!playing);
+  return changed;
 }
 
-watch(() => motion.anim, rebuildSkeleton);
-watch(selectedJoint, (j) => skeleton.value?.setSelected(j));
+watch(() => motion.anim, (anim) => {
+  rebuildSkeleton();
+  if (!anim) return;
+  void ensureViewport();
+  // With a motion loaded, the config page (and its 11 MB MuJoCo module) is next.
+  prefetchConfigStep();
+});
+watch(selectedJoint, (j) => {
+  skeleton.value?.setSelected(j);
+  sceneManager.value?.invalidate();
+});
 watch(mdAndUp, () => sceneManager.value?.resize());
 watch(panelOpen, () => nextTick(() => sceneManager.value?.resize()));
 
-onMounted(() => {
-  const el = viewportEl.value!;
-  const sm = new SceneManager(el, { cameraPos: [2.4, -2.6, 1.6], target: [0, 0, 0.9] });
+let isActive = true;
+let isUnmounted = false;
+
+/** Resolves once the browser has painted the current DOM. */
+function afterNextPaint(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+}
+
+let viewportReady: Promise<void> | null = null;
+
+/**
+ * Create the 3D viewport on demand: when a motion is loaded, or as soon as the
+ * pointer reaches the empty viewport (someone about to orbit or drop a file).
+ * The empty landing page has nothing to draw, and creating a WebGL context is
+ * the single most expensive thing this page does, so a visitor who only reads
+ * it never pays for one. three.js itself is prefetched at idle (see onMounted).
+ */
+function ensureViewport(): Promise<void> {
+  viewportReady ??= createViewport();
+  return viewportReady;
+}
+
+async function createViewport() {
+  // Let the page paint before the WebGL context + first-shader long task.
+  const [mod] = await Promise.all([import('@/lib/viewport/bvhViewport'), afterNextPaint()]);
+  const el = viewportEl.value;
+  if (isUnmounted || !el) return;
+  viewport = mod;
+  rootTrack = mod.createVector3();
+  const sm = new mod.SceneManager(el, { cameraPos: [2.4, -2.6, 1.6], target: [0, 0, 0.9] });
   sm.onTick((dt) => {
     playback.tick(dt);
-    applyFrame(playback.poseFrame.value);
+    return applyFrame(playback.poseFrame.value);
   });
-  sm.start();
+  if (isActive) sm.start();
   sceneManager.value = sm;
   rebuildSkeleton();
+}
+
+onMounted(() => {
+  if (motion.anim) void ensureViewport();
+  else prefetchViewport();
 });
 
-onActivated(() => sceneManager.value?.start());
-onDeactivated(() => sceneManager.value?.stop());
+onActivated(() => {
+  isActive = true;
+  sceneManager.value?.start();
+});
+onDeactivated(() => {
+  isActive = false;
+  sceneManager.value?.stop();
+});
 onUnmounted(() => {
+  isUnmounted = true;
   skeleton.value?.dispose();
   sceneManager.value?.dispose();
 });
@@ -169,7 +235,7 @@ onUnmounted(() => {
     <input ref="fileInput" type="file" accept=".bvh" class="d-none" @change="onFileChosen" />
 
     <MobileSidePanel v-model="panelOpen">
-      <v-btn color="primary" :prepend-icon="mdiFolderOpen" block @click="openFilePicker">
+      <v-btn color="primary" variant="flat" :prepend-icon="icons.folderOpen" block @click="openFilePicker">
         {{ t('openBvh') }}
       </v-btn>
 
@@ -180,7 +246,7 @@ onUnmounted(() => {
         content-class="sample-menu-panel"
       >
         <template #activator="{ props: mProps }">
-          <v-btn v-bind="mProps" variant="tonal" :prepend-icon="mdiRun" block :loading="sampleLoading">
+          <v-btn v-bind="mProps" variant="tonal" :prepend-icon="icons.walk" block :loading="sampleLoading">
             {{ t('loadSample') }}
           </v-btn>
         </template>
@@ -212,28 +278,32 @@ onUnmounted(() => {
         </v-list>
       </v-menu>
 
-      <v-btn variant="tonal" :prepend-icon="mdiVideoOutline" block @click="videoDialogOpen = true">
-        {{ t('videoToBvh') }}
-      </v-btn>
-
-      <v-btn variant="tonal" :prepend-icon="mdiCubeOutline" block @click="smplxDialogOpen = true">
-        {{ t('smplxImport') }}
-      </v-btn>
+      <div class="panel-label">{{ t('otherSources') }}</div>
+      <div class="source-links d-flex flex-column">
+        <v-btn variant="text" :prepend-icon="icons.video" block class="source-link" @click="videoDialogOpen = true">
+          {{ t('videoToBvh') }}
+        </v-btn>
+        <v-btn variant="text" :prepend-icon="icons.cube" block class="source-link" @click="smplxDialogOpen = true">
+          {{ t('smplxImport') }}
+        </v-btn>
+      </div>
 
       <v-card v-if="motion.hasMotion" variant="tonal" density="compact">
         <v-card-title class="text-subtitle-2">{{ t('motionInfo') }}</v-card-title>
         <v-card-text class="text-body-2">
-          <div class="info-line"><span>{{ t('fileName') }}</span><b class="text-truncate">{{ motion.fileName }}</b></div>
-          <div class="info-line"><span>{{ t('frames') }}</span><b>{{ motion.frameCount }} @ {{ motion.fps.toFixed(0) }} fps</b></div>
-          <div class="info-line"><span>{{ t('duration') }}</span><b>{{ motion.duration.toFixed(2) }} s</b></div>
-          <div class="info-line"><span>{{ t('joints') }}</span><b>{{ motion.jointNames.length }}</b></div>
-          <div class="info-line"><span>{{ t('estHeight') }}</span><b>{{ motion.estHeightMeters.toFixed(2) }} m</b></div>
-          <div class="info-line"><span>{{ t('units') }}</span><b>{{ motion.unitScale === 0.01 ? 'cm' : 'm' }}</b></div>
+          <dl class="info-list">
+            <div class="info-line"><dt>{{ t('fileName') }}</dt><dd>{{ motion.fileName }}</dd></div>
+            <div class="info-line"><dt>{{ t('frames') }}</dt><dd>{{ motion.frameCount }} @ {{ motion.fps.toFixed(0) }} fps</dd></div>
+            <div class="info-line"><dt>{{ t('duration') }}</dt><dd>{{ motion.duration.toFixed(2) }} s</dd></div>
+            <div class="info-line"><dt>{{ t('joints') }}</dt><dd>{{ motion.jointNames.length }}</dd></div>
+            <div class="info-line"><dt>{{ t('estHeight') }}</dt><dd>{{ motion.estHeightMeters.toFixed(2) }} m</dd></div>
+            <div class="info-line"><dt>{{ t('units') }}</dt><dd>{{ motion.unitScale === 0.01 ? 'cm' : 'm' }}</dd></div>
+          </dl>
         </v-card-text>
       </v-card>
 
       <template v-if="motion.anim">
-        <div class="text-subtitle-2 mt-1">{{ t('jointTree') }}</div>
+        <div class="panel-label">{{ t('jointTree') }}</div>
         <JointTreePanel
           class="joint-tree-grow"
           :anim="motion.anim"
@@ -242,10 +312,12 @@ onUnmounted(() => {
         />
         <v-card v-if="selectedInfo" variant="outlined" density="compact">
           <v-card-text class="text-caption">
-            <div class="info-line"><span>Joint</span><b>{{ selectedInfo.name }}</b></div>
-            <div class="info-line"><span>Parent</span><b>{{ selectedInfo.parent }}</b></div>
-            <div class="info-line"><span>Offset</span><b>{{ selectedInfo.offset }}</b></div>
-            <div class="info-line"><span>Channels</span><b class="text-truncate">{{ selectedInfo.channels }}</b></div>
+            <dl class="info-list">
+              <div class="info-line"><dt>{{ t('jointName') }}</dt><dd>{{ selectedInfo.name }}</dd></div>
+              <div class="info-line"><dt>{{ t('jointParent') }}</dt><dd>{{ selectedInfo.parent }}</dd></div>
+              <div class="info-line"><dt>{{ t('jointOffset') }}</dt><dd class="mono">{{ selectedInfo.offset }}</dd></div>
+              <div class="info-line"><dt>{{ t('jointChannels') }}</dt><dd>{{ selectedInfo.channels }}</dd></div>
+            </dl>
           </v-card-text>
         </v-card>
       </template>
@@ -253,16 +325,38 @@ onUnmounted(() => {
 
     <FileDropZone class="main-col flex-grow-1" @load="loadText">
       <div class="viewport-col d-flex flex-column">
-        <div class="viewport-wrap flex-grow-1">
+        <div
+          class="viewport-wrap flex-grow-1"
+          @pointerenter="ensureViewport"
+          @pointerdown="ensureViewport"
+          @dragenter="ensureViewport"
+        >
           <div ref="viewportEl" class="viewport" />
           <WorkflowNavBar />
-          <div v-if="!motion.hasMotion" class="empty-hint d-flex flex-column align-center justify-center">
-            <div class="text-h6 text-medium-emphasis mb-1">{{ t('noMotion') }}</div>
-            <div class="text-body-2 text-disabled px-4 text-center">{{ t('dropHint') }}</div>
-            <v-btn class="mt-4 mobile-open-btn" color="primary" variant="tonal" :prepend-icon="mdiFolderOpen" @click="openFilePicker">
-              {{ t('openBvh') }}
-            </v-btn>
-          </div>
+          <Transition name="empty-fade">
+            <section v-if="!motion.hasMotion" class="empty-hint" aria-labelledby="empty-hint-title">
+              <div class="empty-hint__inner">
+                <span class="empty-hint__mark" aria-hidden="true">
+                  <v-icon :icon="icons.walk" size="24" />
+                </span>
+                <h2 id="empty-hint-title" class="empty-hint__title">{{ t('noMotion') }}</h2>
+                <p class="empty-hint__body">{{ t('dropHint') }}</p>
+                <div class="empty-hint__actions">
+                  <v-btn class="mobile-open-btn" color="primary" variant="flat" :prepend-icon="icons.folderOpen" @click="openFilePicker">
+                    {{ t('openBvh') }}
+                  </v-btn>
+                  <v-btn variant="tonal" :prepend-icon="icons.walk" :loading="sampleLoading" @click="loadSample('walk.bvh')">
+                    {{ t('trySample') }}
+                  </v-btn>
+                </div>
+                <ol class="empty-hint__steps">
+                  <li class="is-current"><span class="empty-hint__step">1</span>{{ t('navBvh') }}</li>
+                  <li><span class="empty-hint__step">2</span>{{ t('navConfig') }}</li>
+                  <li><span class="empty-hint__step">3</span>{{ t('navPreview') }}</li>
+                </ol>
+              </div>
+            </section>
+          </Transition>
         </div>
         <PlaybackBar v-if="motion.hasMotion" :controller="playback" />
       </div>
@@ -272,18 +366,18 @@ onUnmounted(() => {
       v-if="!mdAndUp"
       class="panel-fab"
       color="primary"
-      :icon="mdiTune"
+      :icon="icons.sliders"
       size="small"
       elevation="4"
       :title="t('openPanel')"
       @click="panelOpen = true"
     />
 
-    <VideoToBvhDialog v-model="videoDialogOpen" @generated="loadText" />
-    <SmplxImportDialog v-model="smplxDialogOpen" @loaded="onSmplxLoaded" />
+    <VideoToBvhDialog v-if="videoDialogUsed" v-model="videoDialogOpen" @generated="loadText" />
+    <SmplxImportDialog v-if="smplxDialogUsed" v-model="smplxDialogOpen" @loaded="onSmplxLoaded" />
 
     <v-snackbar v-model="loadErrorSnack" color="error" timeout="5000">
-      {{ motion.loadError ?? 'Failed to load BVH' }}
+      {{ motion.loadError ?? t('loadFailed') }}
     </v-snackbar>
   </div>
 </template>
@@ -309,20 +403,136 @@ onUnmounted(() => {
 .viewport {
   position: absolute;
   inset: 0;
+  /* The scene's own background, shown until the viewport is created on demand. */
+  background: var(--rro-viewport-bg);
+}
+.viewport :deep(canvas) {
+  animation: viewport-in var(--rro-dur-color) var(--rro-ease);
+}
+@keyframes viewport-in {
+  from {
+    opacity: 0;
+  }
 }
 .empty-hint {
   position: absolute;
   inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px 32px;
+  /* Click-through, so the empty floor still orbits; only the buttons take taps. */
   pointer-events: none;
   z-index: 1;
 }
-.empty-hint .mobile-open-btn {
+.empty-hint__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 400px;
+  text-align: center;
+}
+.empty-hint__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+  border-radius: var(--rro-radius-lg);
+  background: rgba(var(--v-theme-primary), 0.14);
+  color: rgb(var(--v-theme-primary));
+}
+.empty-hint__title {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgb(var(--v-theme-on-surface));
+}
+.empty-hint__body {
+  max-width: 26rem;
+  /* Stronger than medium emphasis: it sits on the light viewport grey, where
+     0.7 alpha fell to 3.4:1. */
+  color: rgba(var(--v-theme-on-surface), 0.8);
+  /* Break CJK at punctuation rather than mid-phrase. */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+.empty-hint__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+.empty-hint__actions .v-btn {
   pointer-events: auto;
 }
+.empty-hint__steps {
+  color: rgba(var(--v-theme-on-surface), 0.8);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 16px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+.empty-hint__steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.empty-hint__steps li.is-current {
+  color: rgb(var(--v-theme-on-surface));
+}
+.empty-hint__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--rro-border);
+  font-size: 0.75rem;
+  line-height: 1;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.empty-hint__steps li.is-current .empty-hint__step {
+  border-color: transparent;
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+}
+.empty-fade-enter-active,
+.empty-fade-leave-active {
+  transition:
+    opacity var(--rro-dur-color) var(--rro-ease),
+    transform var(--rro-dur-move) var(--rro-ease);
+}
+.empty-fade-enter-from,
+.empty-fade-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+/* The side panel carries the same button on wide screens. */
 @media (min-width: 960px) {
   .mobile-open-btn {
     display: none;
   }
+}
+.source-links {
+  gap: 2px;
+}
+.source-link.v-btn {
+  justify-content: flex-start;
 }
 .joint-tree-grow {
   flex: 1 1 auto;
@@ -333,15 +543,6 @@ onUnmounted(() => {
   .joint-tree-grow {
     max-height: none;
   }
-}
-.info-line {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-.info-line b {
-  max-width: 60%;
-  text-align: right;
 }
 .panel-fab {
   position: absolute;
@@ -354,14 +555,14 @@ onUnmounted(() => {
 <style>
 .sample-menu-panel {
   border: 1px solid var(--rro-border);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--rro-shadow-overlay);
 }
 .sample-menu-list {
   min-width: 260px;
 }
 .sample-group-header {
   font-size: 0.75rem;
-  line-height: 1.2;
+  line-height: 1rem;
   min-height: 32px;
 }
 </style>

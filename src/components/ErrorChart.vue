@@ -125,7 +125,7 @@ defineExpose({ resetZoom, isZoomed, resize });
   flex: 1 1 0;
   width: 100%;
   min-height: 120px;
-  border-radius: 6px;
+  border-radius: var(--rro-radius);
   overflow: hidden;
 }
 </style>

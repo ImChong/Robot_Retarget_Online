@@ -91,7 +91,8 @@ try {
 
   // ---- Page 3: run retargeting ----
   await page.goto(`http://localhost:${PORT}/#/preview`);
-  await page.getByText('开始重定向').click();
+  // Scoped: the label also appears on the side-panel button and in tooltips.
+  await page.locator('.workflow-nav__run-slot').getByRole('button', { name: /开始重定向/ }).click();
   await page.waitForSelector('text=导出 NPZ', { timeout: 300000 });
   await page.waitForTimeout(2000);
   await page.screenshot({ path: `${OUT_DIR}/3_preview.png` });

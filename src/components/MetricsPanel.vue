@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
-import { mdiChevronDown, mdiChevronUp, mdiMagnifyRemoveOutline, mdiDragHorizontalVariant } from '@mdi/js';
+import { icons } from '@/lib/icons';
 import { useI18n } from '@/i18n';
 import type { RetargetResult } from '@/lib/retarget/types';
 import ErrorChart from '@/components/ErrorChart.vue';
@@ -242,7 +242,7 @@ watch(activeTab, () => {
       @pointercancel="onResizeDragEnd"
       @lostpointercapture="onResizeDragEnd"
     >
-      <v-icon :icon="mdiDragHorizontalVariant" size="small" class="resize-icon" />
+      <v-icon :icon="icons.dragHandle" size="small" class="resize-icon" />
     </div>
 
     <div class="metrics-header d-flex align-center">
@@ -256,7 +256,7 @@ watch(activeTab, () => {
         variant="text"
         size="small"
         density="compact"
-        :icon="mdiMagnifyRemoveOutline"
+        :icon="icons.zoomOut"
         :title="t('resetChartZoom')"
         @click="resetActiveChartZoom"
       />
@@ -264,7 +264,7 @@ watch(activeTab, () => {
         variant="text"
         size="small"
         density="compact"
-        :icon="expanded ? mdiChevronDown : mdiChevronUp"
+        :icon="expanded ? icons.caretDown : icons.caretUp"
         :title="expanded ? t('collapseMetrics') : t('expandMetrics')"
         @click="expanded = !expanded"
       />
@@ -386,9 +386,9 @@ watch(activeTab, () => {
   padding-right: 4px;
 }
 .metrics-header :deep(.v-tab) {
-  font-size: 0.78rem;
+  font-size: 0.875rem;
   min-width: 0;
-  padding: 0 10px;
+  padding: 0 12px;
   letter-spacing: 0;
   text-transform: none;
 }

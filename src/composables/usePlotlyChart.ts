@@ -4,12 +4,17 @@ import { buildChartLayout, frameCursorShape } from '@/lib/plotlyTheme';
 import { appTheme } from '@/composables/useAppTheme';
 import { isCoarsePointerDevice } from '@/lib/plotlyTouch';
 
-type PlotlyModule = typeof import('plotly.js-dist-min');
+type PlotlyModule = typeof import('plotly.js-basic-dist-min');
 
 let plotlyLoad: Promise<PlotlyModule> | null = null;
 
-function loadPlotly(): Promise<PlotlyModule> {
-  if (!plotlyLoad) plotlyLoad = import('plotly.js-dist-min');
+/**
+ * The charts only draw `scatter` traces, so the basic bundle (scatter / bar /
+ * pie, ~1.1 MB) replaces the full one (~4.8 MB). Exported so the preview can
+ * start the download while the retarget is still solving.
+ */
+export function loadPlotly(): Promise<PlotlyModule> {
+  if (!plotlyLoad) plotlyLoad = import('plotly.js-basic-dist-min');
   return plotlyLoad;
 }
 

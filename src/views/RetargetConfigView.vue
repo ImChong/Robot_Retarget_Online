@@ -1,17 +1,8 @@
 <script setup lang="ts">
-import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
+import { computed, defineAsyncComponent, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import * as THREE from 'three';
-import {
-  mdiDownload,
-  mdiUpload,
-  mdiBackupRestore,
-  mdiTune,
-  mdiRobotOutline,
-  mdiDelete,
-  mdiPlayCircle,
-  mdiStopCircle,
-} from '@mdi/js';
+import { icons } from '@/lib/icons';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
@@ -29,10 +20,10 @@ import {
 } from '@/lib/viewport/sceneAlignment';
 import MappingTable from '@/components/MappingTable.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
-import CustomUrdfImportDialog from '@/components/CustomUrdfImportDialog.vue';
 import EngineToggle from '@/components/EngineToggle.vue';
 import WorkflowNavBar from '@/components/WorkflowNavBar.vue';
 import { downloadBlob } from '@/lib/export/motion';
+import { prefetchPreviewStep } from '@/lib/prefetch';
 
 const { t } = useI18n();
 const { mdAndUp } = useDisplay();
@@ -93,7 +84,11 @@ const showLines = ref(true);
 const showHuman = ref(true);
 const highlightBody = ref<string | null>(null);
 const importInput = ref<HTMLInputElement | null>(null);
+// Loads on first open, then stays mounted.
+const CustomUrdfImportDialog = defineAsyncComponent(() => import('@/components/CustomUrdfImportDialog.vue'));
 const urdfDialogOpen = ref(false);
+const urdfDialogUsed = ref(false);
+watch(urdfDialogOpen, (open) => open && (urdfDialogUsed.value = true));
 const activeTab = ref('stage1');
 const panelOpen = ref(false);
 
@@ -180,6 +175,7 @@ async function ensureRobotScene() {
     }
     refreshLines();
     frameSmallScene();
+    prefetchPreviewStep();
     stripState.value = 'success';
     loadingText.value =
       loadTotal > 0 ? `${t('robotLoadComplete')} (${loadTotal}/${loadTotal})` : t('robotLoadComplete');
@@ -239,9 +235,11 @@ function rebuildSkeleton() {
   refreshLines();
 }
 
+/** Rebuild the correspondence lines. Every scene edit on this page ends here, so it also queues the redraw. */
 function refreshLines() {
   const sm = sceneManager.value;
   if (!sm) return;
+  sm.invalidate();
   if (lines.value) {
     lines.value.geometry.dispose();
     (lines.value.material as THREE.Material).dispose();
@@ -412,7 +410,7 @@ onUnmounted(() => {
   <div class="page-root d-flex">
     <input ref="importInput" type="file" accept=".json" class="d-none" @change="onImportChosen" />
 
-    <CustomUrdfImportDialog v-model="urdfDialogOpen" @imported="onCustomUrdfImported" />
+    <CustomUrdfImportDialog v-if="urdfDialogUsed" v-model="urdfDialogOpen" @imported="onCustomUrdfImported" />
 
     <MobileSidePanel v-model="panelOpen">
       <div class="sidebar-inner d-flex flex-column">
@@ -434,7 +432,7 @@ onUnmounted(() => {
           <v-list-item v-bind="itemProps" :title="item.title" :disabled="item.props?.disabled">
             <template v-if="item.raw.isCustom" #append>
               <v-btn
-                :icon="mdiDelete"
+                :icon="icons.trash"
                 variant="text"
                 size="x-small"
                 density="compact"
@@ -450,8 +448,7 @@ onUnmounted(() => {
 
       <v-btn
         variant="tonal"
-        color="secondary"
-        :prepend-icon="mdiRobotOutline"
+        :prepend-icon="icons.robot"
         :disabled="motion.motionKind === 'quadruped'"
         @click="urdfDialogOpen = true"
       >
@@ -520,14 +517,15 @@ onUnmounted(() => {
         </v-card-text>
       </v-card>
 
-      <div class="d-flex flex-column ga-2">
-        <v-btn variant="tonal" :prepend-icon="mdiUpload" @click="importInput?.click()">
+      <div class="panel-label">{{ t('configFile') }}</div>
+      <div class="config-file-actions">
+        <v-btn variant="tonal" :prepend-icon="icons.upload" @click="importInput?.click()">
           {{ t('importConfig') }}
         </v-btn>
-        <v-btn variant="tonal" :prepend-icon="mdiDownload" @click="onExportConfig">
+        <v-btn variant="tonal" :prepend-icon="icons.download" @click="onExportConfig">
           {{ t('exportConfig') }}
         </v-btn>
-        <v-btn variant="text" color="warning" :prepend-icon="mdiBackupRestore" @click="store.resetConfig()">
+        <v-btn variant="text" color="warning" :prepend-icon="icons.reset" class="config-file-actions__reset" @click="store.resetConfig()">
           {{ t('resetConfig') }}
         </v-btn>
       </div>
@@ -543,14 +541,14 @@ onUnmounted(() => {
             v-if="store.status !== 'running'"
             color="primary"
             size="large"
-            :prepend-icon="mdiPlayCircle"
+            :prepend-icon="icons.play"
             :disabled="!motion.hasMotion || store.isLoadingRobot"
             block
             @click="run"
           >
             {{ t('runRetarget') }}
           </v-btn>
-          <v-btn v-else color="error" variant="tonal" :prepend-icon="mdiStopCircle" block @click="store.cancel()">
+          <v-btn v-else color="error" variant="tonal" :prepend-icon="icons.stop" block @click="store.cancel()">
             {{ t('cancel') }}
           </v-btn>
 
@@ -577,20 +575,22 @@ onUnmounted(() => {
       <div class="viewport-wrap">
         <div ref="viewportEl" class="viewport" />
         <WorkflowNavBar />
+        <!-- Floats over the viewport instead of pushing it, so the canvas never resizes for it. -->
+        <Transition name="loading-strip-slide" @after-leave="onLoadingStripAfterLeave">
+          <div
+            v-if="stripVisible && loadingText"
+            class="loading-strip text-caption"
+            :class="{
+              'loading-strip--success': stripState === 'success',
+              'loading-strip--error': stripState === 'error',
+            }"
+            role="status"
+          >
+            <v-progress-circular v-if="stripState === 'loading'" indeterminate size="12" width="2" class="mr-2" />
+            {{ loadingText }}
+          </div>
+        </Transition>
       </div>
-      <Transition name="loading-strip-slide" @after-leave="onLoadingStripAfterLeave">
-        <div
-          v-if="stripVisible && loadingText"
-          class="loading-strip text-caption px-3 py-1"
-          :class="{
-            'loading-strip--success': stripState === 'success',
-            'loading-strip--error': stripState === 'error',
-          }"
-        >
-          <v-progress-circular v-if="stripState === 'loading'" indeterminate size="12" width="2" class="mr-2" />
-          {{ loadingText }}
-        </div>
-      </Transition>
 
       <div class="tables-panel">
         <v-tabs v-model="activeTab" density="compact" color="primary" show-arrows>
@@ -618,7 +618,7 @@ onUnmounted(() => {
               <thead>
                 <tr>
                   <th>{{ t('humanJoint') }}</th>
-                  <th style="width: 140px">Scale</th>
+                  <th class="scale-col">{{ t('scale') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -644,7 +644,7 @@ onUnmounted(() => {
       v-if="!mdAndUp"
       class="panel-fab"
       color="primary"
-      :icon="mdiTune"
+      :icon="icons.sliders"
       size="small"
       elevation="4"
       :title="t('openPanel')"
@@ -697,42 +697,57 @@ onUnmounted(() => {
 .loading-strip-slide-enter-active,
 .loading-strip-slide-leave-active {
   transition:
-    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-    max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-    padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
+    transform var(--rro-dur-move) var(--rro-ease),
+    opacity var(--rro-dur-color) var(--rro-ease);
 }
-.loading-strip-slide-enter-from {
-  transform: translateY(-100%);
-  opacity: 0;
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-}
+.loading-strip-slide-enter-from,
 .loading-strip-slide-leave-to {
-  transform: translateY(100%);
+  transform: translateY(8px);
   opacity: 0;
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
 }
 .loading-strip {
-  background: rgba(var(--v-theme-primary), 0.08);
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  max-width: calc(100% - 24px);
+  padding: 8px 12px;
+  border-radius: var(--rro-radius);
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background: rgb(var(--v-theme-surface));
   color: rgb(var(--v-theme-on-surface));
-  transition: background-color 0.25s ease, color 0.25s ease;
+  box-shadow: var(--rro-shadow-float);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  transition:
+    background-color var(--rro-dur-color) var(--rro-ease),
+    color var(--rro-dur-color) var(--rro-ease),
+    border-color var(--rro-dur-color) var(--rro-ease);
 }
 .loading-strip--success {
-  background: rgba(76, 175, 80, 0.22);
-  color: rgb(129, 199, 132);
+  border-color: rgba(var(--v-theme-success), 0.5);
+  color: rgb(var(--v-theme-success));
 }
 .loading-strip--error {
-  background: rgba(244, 67, 54, 0.12);
-  color: rgb(239, 154, 154);
+  border-color: rgba(var(--v-theme-error), 0.5);
+  color: rgb(var(--v-theme-error));
 }
 .mono {
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 0.82rem;
+  font-size: 0.75rem;
+}
+.scale-col {
+  width: 140px;
+}
+.config-file-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.config-file-actions__reset {
+  grid-column: 1 / -1;
+  justify-self: start;
 }
 .panel-fab {
   position: absolute;

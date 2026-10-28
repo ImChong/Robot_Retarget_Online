@@ -3,7 +3,6 @@ import { markRaw } from 'vue';
 import { parseBvh, estimateSkeletonSize, type BvhAnim } from '@/lib/bvh/parse';
 import { bvhToLafan1Frames, type Lafan1Motion } from '@/lib/bvh/lafan1';
 import { detectMotionKind, type MotionKind } from '@/lib/motionKind';
-import { smplxNpzToBvh } from '@/lib/smplx';
 
 export interface MotionState {
   fileName: string | null;
@@ -64,8 +63,10 @@ export const useMotionStore = defineStore('motion', {
      * pipeline are reused unchanged, then forces the `smplx` motion kind so the
      * robot dropdown surfaces the SMPL-X robots.
      */
-    loadSmplx(modelNpz: Uint8Array, motionNpz: Uint8Array, fileName: string) {
+    async loadSmplx(modelNpz: Uint8Array, motionNpz: Uint8Array, fileName: string) {
       try {
+        // SMPL-X conversion code only ships to people who import SMPL-X.
+        const { smplxNpzToBvh } = await import('@/lib/smplx');
         const { bvh } = smplxNpzToBvh(modelNpz, motionNpz);
         this.loadBvhText(bvh, fileName);
         this.motionKind = 'smplx';
