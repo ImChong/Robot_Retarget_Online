@@ -297,6 +297,8 @@ let unbindTap: (() => void) | null = null;
 // move: the solver reads the motion frames and the MuJoCo model, never the
 // viewport, so nothing has to be taken back out before retargeting, and the
 // exported config is unchanged. Untouched, both stand where they always have.
+// Session-only on purpose: kept while the app is open (the page is kept alive
+// across steps), never stored, so a reload starts from the default layout.
 
 const arranging = ref(false);
 const arrangeTarget = ref<StageMember>('robot');
