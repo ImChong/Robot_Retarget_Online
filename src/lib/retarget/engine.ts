@@ -69,6 +69,15 @@ export class GmrRetargetEngine implements RetargetEngine {
   private smoothWeight = 0;
   private restQpos: Float64Array | null = null;
   private prevQpos: Float64Array | null = null;
+  /**
+   * Length unit the solve runs in (1 = metres, as in GMR). GMR's LM damping
+   * grows with the squared metric error, so a robot ten times human size
+   * converges a hundred times slower per frame; for such robots positions are
+   * solved in body lengths instead (`setLengthScale`).
+   */
+  private lengthScale = 1;
+  /** Velocity indices of the free joint's translation (empty without one). */
+  private readonly freeTransDofs: number[] = [];
 
   constructor(robot: RobotModel, config: GmrIkConfig, opts: SolverOptions) {
     this.robot = robot;
@@ -128,6 +137,8 @@ export class GmrRetargetEngine implements RetargetEngine {
     for (let j = 0; j < model.njnt; j++) {
       if (jntType[j] === MJ_JNT_HINGE || jntType[j] === MJ_JNT_SLIDE) {
         this.jointDofs.push({ dof: jntDofadr[j], qadr: jntQposadr[j] });
+      } else if (jntType[j] === MJ_JNT_FREE && !this.freeTransDofs.length) {
+        this.freeTransDofs.push(jntDofadr[j], jntDofadr[j] + 1, jntDofadr[j] + 2);
       }
     }
 
@@ -156,6 +167,14 @@ export class GmrRetargetEngine implements RetargetEngine {
     this.restQpos = restQpos ? new Float64Array(restQpos) : null;
   }
 
+  /**
+   * Solve positions in units of `scale` metres (≥ 1). 1 reproduces GMR exactly;
+   * the runner raises it only for robots taller than 2 m (`autoLengthScale`).
+   */
+  setLengthScale(scale: number) {
+    this.lengthScale = Number.isFinite(scale) && scale > 1 ? scale : 1;
+  }
+
   dispose() {
     this.jacp?.delete?.();
     this.jacr?.delete?.();
@@ -167,6 +186,44 @@ export class GmrRetargetEngine implements RetargetEngine {
     (data.qpos as Float64Array).set(model.qpos0 as Float64Array);
     mujoco.mj_kinematics(model, data);
     mujoco.mj_comPos(model, data);
+  }
+
+  /**
+   * Put the floating base where the first frame wants the human root's body
+   * (position + orientation), keeping the joints at rest. Clips rarely start at
+   * the origin and GMR's LM damping grows with the squared error, so without
+   * this the first frames lag metres behind and the limbs flail. Returns false
+   * when the model has no free joint or the root task is missing.
+   */
+  seedRoot(frame: HumanFrame): boolean {
+    const { model, data, mujoco } = this.robot;
+    const jntType = model.jnt_type as Int32Array;
+    if (!model.njnt || jntType[0] !== MJ_JNT_FREE) return false;
+    const rootTask = this.tasks2.find((t) => t.humanBody === this.config.human_root_name)
+      ?? this.tasks1.find((t) => t.humanBody === this.config.human_root_name);
+    if (!rootTask) return false;
+    const target = this.preprocessHuman(frame, this.opts.offsetToGround).get(this.config.human_root_name);
+    if (!target) return false;
+    const qpos = data.qpos as Float64Array;
+    const free = (model.jnt_bodyid as Int32Array)[0];
+    // Pose of the free body relative to the root-task body at the current (rest) pose.
+    mujoco.mj_kinematics(model, data);
+    const xpos = data.xpos as Float64Array;
+    const xquat = data.xquat as Float64Array;
+    const b = rootTask.bodyId;
+    const qb: Quat = [xquat[b * 4], xquat[b * 4 + 1], xquat[b * 4 + 2], xquat[b * 4 + 3]];
+    const qr: Quat = [xquat[free * 4], xquat[free * 4 + 1], xquat[free * 4 + 2], xquat[free * 4 + 3]];
+    const offset = quatRotate(quatConj(qb), [
+      xpos[free * 3] - xpos[b * 3],
+      xpos[free * 3 + 1] - xpos[b * 3 + 1],
+      xpos[free * 3 + 2] - xpos[b * 3 + 2],
+    ]);
+    const quat = quatMul(target.quat, quatMul(quatConj(qb), qr));
+    const d = quatRotate(target.quat, offset);
+    qpos.set([target.pos[0] + d[0], target.pos[1] + d[1], target.pos[2] + d[2]], 0);
+    qpos.set(quat, 3);
+    this.updateKinematics();
+    return true;
   }
 
   /** Human bodies required by the active config. */
@@ -308,7 +365,8 @@ export class GmrRetargetEngine implements RetargetEngine {
       ];
       const bodyQuat: Quat = [xquat[b4], xquat[b4 + 1], xquat[b4 + 2], xquat[b4 + 3]];
       const er = quatToRotVec(quatMul(target.quat, quatConj(bodyQuat)));
-      sum += ep[0] * ep[0] + ep[1] * ep[1] + ep[2] * ep[2];
+      const inv2 = 1 / (this.lengthScale * this.lengthScale);
+      sum += (ep[0] * ep[0] + ep[1] * ep[1] + ep[2] * ep[2]) * inv2;
       sum += er[0] * er[0] + er[1] * er[1] + er[2] * er[2];
     }
     return Math.sqrt(sum);
@@ -348,6 +406,11 @@ export class GmrRetargetEngine implements RetargetEngine {
     const xquat = data.xquat as Float64Array;
 
     let lmTerm = 0;
+    // Body-length units (lengthScale L): position rows and errors ÷ L, and the
+    // free joint's translation solved as Δt / L, so its columns stay as they are.
+    const L = this.lengthScale;
+    const scaled = L !== 1;
+    const colScale = this.colScale(L);
 
     for (const task of tasks) {
       const target = human.get(task.humanBody);
@@ -356,9 +419,9 @@ export class GmrRetargetEngine implements RetargetEngine {
       const b4 = task.bodyId * 4;
 
       const ep: Vec3 = [
-        target.pos[0] - xpos[b3],
-        target.pos[1] - xpos[b3 + 1],
-        target.pos[2] - xpos[b3 + 2],
+        (target.pos[0] - xpos[b3]) / L,
+        (target.pos[1] - xpos[b3 + 1]) / L,
+        (target.pos[2] - xpos[b3 + 2]) / L,
       ];
       const bodyQuat: Quat = [xquat[b4], xquat[b4 + 1], xquat[b4 + 2], xquat[b4 + 3]];
       const er = quatToRotVec(quatMul(target.quat, quatConj(bodyQuat)));
@@ -366,6 +429,14 @@ export class GmrRetargetEngine implements RetargetEngine {
       mujoco.mj_jacBody(model, data, this.jacp, this.jacr, task.bodyId);
       const jp = this.jacpView;
       const jr = this.jacrView;
+      if (scaled) {
+        for (let row = 0; row < 3; row++) {
+          for (let i = 0; i < nv; i++) {
+            jp[row * nv + i] *= colScale[i] / L;
+            jr[row * nv + i] *= colScale[i];
+          }
+        }
+      }
 
       const wp = task.posWeight * task.posWeight;
       const wr = task.rotWeight * task.rotWeight;
@@ -403,7 +474,18 @@ export class GmrRetargetEngine implements RetargetEngine {
 
     // Engine-specific extra objectives (e.g. OmniRetarget interaction mesh).
     // Accumulates into the upper triangle of H and into g, returns its LM term.
-    lmTerm += this.accumulateExtraTerms(tasks, human, H, g);
+    if (!scaled) {
+      lmTerm += this.accumulateExtraTerms(tasks, human, H, g);
+    } else {
+      // Positional terms in metres → the same body-length units as the tasks.
+      const H2 = new Float64Array(nv * nv);
+      const g2 = new Float64Array(nv);
+      lmTerm += this.accumulateExtraTerms(tasks, human, H2, g2) / (L * L);
+      for (let i = 0; i < nv; i++) {
+        g[i] += (g2[i] * colScale[i]) / L;
+        for (let k = i; k < nv; k++) H[i * nv + k] += (H2[i * nv + k] * colScale[i] * colScale[k]) / (L * L);
+      }
+    }
 
     // Rest-pose / previous-frame pulls on the joints (identity Jacobian per DoF).
     if (this.postureWeight > 0 || this.smoothWeight > 0) {
@@ -429,6 +511,7 @@ export class GmrRetargetEngine implements RetargetEngine {
     }
 
     if (!this.choleskySolve(H, g, this.dq)) return;
+    if (scaled) for (const i of this.freeTransDofs) this.dq[i] *= L;
 
     // Optional mink-style velocity limit: |v| <= vmax  =>  |Δq| <= vmax * dt.
     if (this.opts.useVelocityLimit) {
@@ -451,6 +534,13 @@ export class GmrRetargetEngine implements RetargetEngine {
    * `w·Jᵀe` into `g`, mirroring the task accumulation, and return their
    * Levenberg-Marquardt contribution. The base GMR engine adds nothing.
    */
+  /** Per-velocity column factor of the body-length change of variables. */
+  private colScale(L: number): Float64Array {
+    const c = new Float64Array(this.nv).fill(1);
+    for (const i of this.freeTransDofs) c[i] = L;
+    return c;
+  }
+
   protected accumulateExtraTerms(
     _tasks: IkTask[],
     _human: Map<string, HumanFrameBody>,

@@ -77,14 +77,15 @@ export function buildRobotScene(robot: RobotModel): RobotSceneObject {
       case GEOM_SPHERE:
         geometry = new THREE.SphereGeometry(sx, 24, 16);
         break;
+      // Capsule / cylinder sizes are (radius, half-length): MuJoCo's geom_size[1].
       case GEOM_CAPSULE: {
-        const capsule = new THREE.CapsuleGeometry(sx, sz * 2, 8, 20);
+        const capsule = new THREE.CapsuleGeometry(sx, sy * 2, 8, 20);
         capsule.rotateX(Math.PI / 2); // three capsules are Y-aligned; MuJoCo wants Z
         geometry = capsule;
         break;
       }
       case GEOM_CYLINDER: {
-        const cyl = new THREE.CylinderGeometry(sx, sx, sz * 2, 24);
+        const cyl = new THREE.CylinderGeometry(sx, sx, sy * 2, 24);
         cyl.rotateX(Math.PI / 2);
         geometry = cyl;
         break;

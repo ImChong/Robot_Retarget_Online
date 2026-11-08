@@ -185,13 +185,19 @@ export function matchPresetConfig(
   bodyNames: string[],
   preferred: string[] = [],
 ): GmrIkConfig | null {
+  const id = matchPresetId(humanRoot, bodyNames, preferred);
+  return id ? getDefaultConfig(id) : null;
+}
+
+/** The robot id of the preset `matchPresetConfig` would pick, or null. */
+export function matchPresetId(humanRoot: string, bodyNames: string[], preferred: string[] = []): string | null {
   const have = new Set(bodyNames);
   const ids = [...new Set([...preferred, ...Object.keys(DEFAULT_CONFIGS)])];
   for (const id of ids) {
     const cfg = DEFAULT_CONFIGS[id];
     if (!cfg || cfg.human_root_name !== humanRoot) continue;
     const needed = [cfg.robot_root_name, ...Object.keys(cfg.ik_match_table1), ...Object.keys(cfg.ik_match_table2)];
-    if (needed.every((b) => have.has(b))) return structuredClone(cfg);
+    if (needed.every((b) => have.has(b))) return id;
   }
   return null;
 }

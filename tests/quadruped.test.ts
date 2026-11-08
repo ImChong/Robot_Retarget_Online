@@ -97,7 +97,10 @@ describe('contact-aware quadruped planner (default) vs plain keypoint IK', () =>
           const res = await runRetarget({
             robot,
             config: getDefaultConfig(robotId),
-            solver: { ...DEFAULT_SOLVER_OPTIONS, quadrupedPlanner },
+            // Baseline = plain GMR keypoint IK: no planner, no root seed, no ground lift.
+            solver: quadrupedPlanner
+              ? { ...DEFAULT_SOLVER_OPTIONS }
+              : { ...DEFAULT_SOLVER_OPTIONS, quadrupedPlanner, seedRoot: false, liftAboveGround: false },
             frames: m.frames,
             fps: m.fps,
           });
