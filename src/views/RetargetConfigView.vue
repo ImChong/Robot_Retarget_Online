@@ -25,6 +25,24 @@ import EngineToggle from '@/components/EngineToggle.vue';
 import WorkflowNavBar from '@/components/WorkflowNavBar.vue';
 import { downloadBlob } from '@/lib/export/motion';
 import { prefetchPreviewStep } from '@/lib/prefetch';
+import { onViewportTap, type ViewportTap } from '@/lib/viewport/viewportTap';
+import { nearestScreenAnchor, type ScreenAnchor } from '@/lib/viewport/scenePick';
+import {
+  focusedMatch,
+  focusStage,
+  isMappingStage,
+  MAPPING_STAGES,
+  refreshSelection,
+  sameSelection,
+  selectSource,
+  skeletonJointName,
+  stageTable,
+  stepSelection,
+  type MappingMatch,
+  type MappingSelection,
+  type MappingStage,
+  type SelectionSource,
+} from '@/lib/retarget/mappingSelection';
 
 const { t } = useI18n();
 const { mdAndUp } = useDisplay();
@@ -83,7 +101,6 @@ function onLoadingStripAfterLeave() {
 }
 const showLines = ref(true);
 const showHuman = ref(true);
-const highlightBody = ref<string | null>(null);
 const importInput = ref<HTMLInputElement | null>(null);
 // Loads on first open, then stays mounted.
 const CustomUrdfImportDialog = defineAsyncComponent(() => import('@/components/CustomUrdfImportDialog.vue'));
@@ -96,6 +113,158 @@ const galleryDialogUsed = ref(false);
 watch(galleryDialogOpen, (open) => open && (galleryDialogUsed.value = true));
 const activeTab = ref('stage1');
 const panelOpen = ref(false);
+const tableScrollEl = ref<HTMLElement | null>(null);
+
+// ---- Mapping selection (3D pick ⇄ correspondence lines ⇄ table rows) ----
+
+/** Picked robot body / BVH joint / table row, resolved to its mapping rows. */
+const selection = shallowRef<MappingSelection | null>(null);
+/** Row under the mouse in the open stage table: previewed over the selection. */
+const hoverBody = ref<string | null>(null);
+const focused = computed(() => focusedMatch(selection.value));
+
+/** The mapping the 3D view highlights: a hovered row, else the focused match. */
+const shownMapping = computed((): MappingMatch | null => {
+  const stage = activeTab.value;
+  if (hoverBody.value && isMappingStage(stage)) {
+    const entry = stageTable(store.config, stage)[hoverBody.value];
+    if (entry) return { stage, robotBody: hoverBody.value, humanJoint: entry[0] };
+  }
+  return focused.value;
+});
+
+/** Selected row of the open stage table. */
+const selectedRow = computed(() =>
+  focused.value && focused.value.stage === activeTab.value ? focused.value.robotBody : null,
+);
+
+const selectionLabel = computed(() => {
+  const sel = selection.value;
+  if (!sel) return null;
+  const match = focused.value;
+  if (match) {
+    return {
+      mapped: true as const,
+      robotBody: match.robotBody,
+      humanJoint: match.humanJoint,
+      stage: match.stage,
+      position: sel.matches.length > 1 ? `${sel.index + 1}/${sel.matches.length}` : '',
+    };
+  }
+  const name = sel.source.kind === 'human' ? sel.source.joint : sel.source.kind === 'robot' ? sel.source.body : '';
+  return { mapped: false as const, name };
+});
+
+function clearSelection() {
+  selection.value = null;
+}
+
+/** Open the focused row's stage tab and scroll the row into view. */
+function revealFocused() {
+  const match = focused.value;
+  if (!match) return;
+  if (activeTab.value !== match.stage) activeTab.value = match.stage;
+  void nextTick(() => scrollRowIntoView(match.robotBody));
+}
+
+/** Scroll only the table panel: `scrollIntoView` would also scroll the page around it. */
+function scrollRowIntoView(robotBody: string) {
+  const box = tableScrollEl.value;
+  if (!box) return;
+  const row = [...box.querySelectorAll<HTMLElement>('tr[data-robot-body]')].find(
+    (el) => el.dataset.robotBody === robotBody,
+  );
+  if (!row) return;
+  const boxRect = box.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+  if (rowRect.top >= boxRect.top && rowRect.bottom <= boxRect.bottom) return;
+  const top = box.scrollTop + rowRect.top - boxRect.top - (box.clientHeight - rowRect.height) / 2;
+  const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  box.scrollTo({ top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' });
+}
+
+function selectFromView(source: SelectionSource) {
+  hoverBody.value = null;
+  selection.value = selectSource(store.config, source, activeTab.value, selection.value);
+  revealFocused();
+}
+
+function stepMatch(delta: number) {
+  if (!selection.value) return;
+  selection.value = stepSelection(selection.value, delta);
+  revealFocused();
+}
+
+function onRowSelect(stage: MappingStage, robotBody: string | null) {
+  selection.value =
+    robotBody === null ? null : selectSource(store.config, { kind: 'row', stage, robotBody }, stage, null);
+}
+
+const raycaster = new THREE.Raycaster();
+const pointerNdc = new THREE.Vector2();
+
+/** What lies under a canvas pixel: a robot body, a BVH joint, or nothing. */
+function pickAt(x: number, y: number, width: number, height: number, pointerType: string): SelectionSource | null {
+  const sm = sceneManager.value;
+  const robot = robotModel.value;
+  const scene = robotScene.value;
+  const sk = skeleton.value;
+  const anim = motion.anim;
+  if (!sm) return null;
+  pointerNdc.set((x / width) * 2 - 1, -(y / height) * 2 + 1);
+  raycaster.setFromCamera(pointerNdc, sm.camera);
+  const robotHit = robot && scene ? scene.pickBody(raycaster) : null;
+  const jointHit = sk && anim ? sk.pickJoint(raycaster) : null;
+  if (robot && robotHit && (!jointHit || robotHit.distance <= jointHit.distance)) {
+    return { kind: 'robot', body: robot.bodyNames[robotHit.bodyId] };
+  }
+  if (anim && jointHit) return { kind: 'human', joint: anim.joints[jointHit.joint].name };
+
+  // Nothing under the pointer: take a mapped body origin (some carry no visual
+  // geometry) or a joint drawn within a fingertip of it.
+  const anchors: ScreenAnchor<SelectionSource>[] = [];
+  if (robot && scene) {
+    const mapped = new Set(MAPPING_STAGES.flatMap((stage) => Object.keys(stageTable(store.config, stage))));
+    for (const body of mapped) {
+      const id = robot.bodyIds.get(body);
+      const group = id === undefined ? undefined : scene.bodyGroups.get(id);
+      if (group) anchors.push({ id: { kind: 'robot', body }, world: group.getWorldPosition(new THREE.Vector3()) });
+    }
+  }
+  if (sk && anim) {
+    anim.joints.forEach((joint, j) => {
+      if (sk.isJointShown(j)) {
+        anchors.push({ id: { kind: 'human', joint: joint.name }, world: sk.getJointWorldPos(j, new THREE.Vector3()) });
+      }
+    });
+  }
+  return nearestScreenAnchor(anchors, sm.camera, width, height, x, y, pointerType === 'mouse' ? 12 : 24);
+}
+
+function onSceneTap(tap: ViewportTap) {
+  const canvas = sceneManager.value?.renderer.domElement;
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const source = pickAt(tap.clientX - rect.left, tap.clientY - rect.top, rect.width, rect.height, tap.pointerType);
+  if (source) selectFromView(source);
+  else clearSelection();
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape' || !selection.value) return;
+  const el = e.target as HTMLElement | null;
+  if (el?.closest('input, textarea, select, [contenteditable="true"], .v-overlay')) return;
+  clearSelection();
+}
+
+/** Selection pins: one at the robot body, one at the BVH joint (drawn through meshes). */
+const markerGeo = new THREE.SphereGeometry(0.02, 16, 12);
+const markerMat = new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, transparent: true, opacity: 0.95 });
+const robotMarker = new THREE.Mesh(markerGeo, markerMat);
+const humanMarker = new THREE.Mesh(markerGeo, markerMat);
+robotMarker.renderOrder = humanMarker.renderOrder = 12;
+robotMarker.visible = humanMarker.visible = false;
+let unbindTap: (() => void) | null = null;
 
 type RobotSelectItem = {
   title: string;
@@ -162,6 +331,7 @@ async function ensureRobotScene() {
   const sm = sceneManager.value;
   if (!sm) return;
   robotModel.value = null;
+  clearSelection();
   showLoadingStrip('loading', t('loadingMujoco'));
   let loadTotal = 0;
   try {
@@ -251,7 +421,10 @@ function rebuildSkeleton() {
   refreshLines();
 }
 
-/** Rebuild the correspondence lines. Every scene edit on this page ends here, so it also queues the redraw. */
+/**
+ * Rebuild the correspondence lines and the selection highlight. Every scene
+ * edit on this page ends here, so it also queues the redraw.
+ */
 function refreshLines() {
   const sm = sceneManager.value;
   if (!sm) return;
@@ -262,6 +435,7 @@ function refreshLines() {
     lines.value.removeFromParent();
     lines.value = null;
   }
+  applySelectionHighlight();
   if (!showLines.value || !robotScene.value || !skeleton.value || !robotModel.value || !motion.anim) return;
 
   const robot = robotModel.value;
@@ -283,7 +457,9 @@ function refreshLines() {
   const active = activeTab.value === 'stage2' ? 1 : 0;
   const [table, stage] = tables[active];
   const color = stageColor[stage];
-  const hl = highlightBody.value;
+  const shown = shownMapping.value;
+  const hl = shown && shown.stage === stage ? shown.robotBody : null;
+  const white = new THREE.Color(0xffffff);
   for (const [robotBody, entry] of Object.entries(table)) {
     const humanJoint = entry[0];
     const bodyId = robot.bodyIds.get(robotBody);
@@ -295,17 +471,43 @@ function refreshLines() {
     positions.push(tmp.x, tmp.y, tmp.z);
     skeleton.value.getJointWorldPos(jIdx, tmp);
     positions.push(tmp.x, tmp.y, tmp.z);
-    const c = robotBody === hl ? new THREE.Color(0xffffff) : color;
-    colors.push(c.r, c.g, c.b, c.r, c.g, c.b);
+    // With a mapping highlighted, the others fade back.
+    const c = robotBody === hl ? white : color;
+    const a = robotBody === hl ? 1 : hl ? 0.2 : 0.85;
+    colors.push(c.r, c.g, c.b, a, c.r, c.g, c.b, a);
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  const mat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 });
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
+  const mat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false });
   const seg = new THREE.LineSegments(geo, mat);
   seg.renderOrder = 10;
   sm.scene.add(seg);
   lines.value = seg;
+}
+
+/** Tint the selected robot body, mark the selected BVH joint and pin both ends of the shown mapping. */
+function applySelectionHighlight() {
+  const robot = robotModel.value;
+  const scene = robotScene.value;
+  const sk = skeleton.value;
+  const anim = motion.anim;
+  const shown = shownMapping.value;
+  const source = selection.value?.source;
+  // An unmapped pick still shows what was picked.
+  const robotBody = shown?.robotBody ?? (source?.kind === 'robot' ? source.body : null);
+  const humanJoint = shown ? skeletonJointName(shown.humanJoint) : source?.kind === 'human' ? source.joint : null;
+
+  const bodyId = robot && robotBody !== null ? robot.bodyIds.get(robotBody) : undefined;
+  const group = bodyId === undefined ? undefined : scene?.bodyGroups.get(bodyId);
+  scene?.setHighlightedBody(group ? bodyId! : null);
+  const jointIndex = anim && humanJoint !== null ? anim.joints.findIndex((j) => j.name === humanJoint) : -1;
+  sk?.setSelected(jointIndex >= 0 ? jointIndex : null);
+
+  robotMarker.visible = !!(shown && group);
+  if (robotMarker.visible) group!.getWorldPosition(robotMarker.position);
+  humanMarker.visible = !!(shown && sk && jointIndex >= 0);
+  if (humanMarker.visible) sk!.getJointWorldPos(jointIndex, humanMarker.position);
 }
 
 function onExportConfig() {
@@ -358,15 +560,34 @@ watch(
   },
   { deep: true },
 );
-watch(() => motion.anim, rebuildSkeleton);
-watch([showLines, showHuman, activeTab, highlightBody], () => {
+watch(
+  () => motion.anim,
+  () => {
+    clearSelection();
+    rebuildSkeleton();
+  },
+);
+// Opening another stage tab moves the focus onto that stage's match, if any.
+watch(activeTab, (tab) => {
+  hoverBody.value = null;
+  const next = focusStage(selection.value, tab);
+  if (next === selection.value) return;
+  selection.value = next;
+  revealFocused();
+});
+watch([showLines, showHuman, activeTab, shownMapping, selection], () => {
   if (showHuman.value && !skeleton.value) rebuildSkeleton();
   else if (!showHuman.value && skeleton.value) rebuildSkeleton();
   else refreshLines();
 });
 watch(
   () => store.config,
-  () => refreshLines(),
+  () => {
+    // Rows renamed / remapped, a config imported or reset: keep the selection honest.
+    const next = refreshSelection(store.config, selection.value, activeTab.value);
+    if (!sameSelection(next, selection.value)) selection.value = next;
+    refreshLines();
+  },
   { deep: true },
 );
 watch(
@@ -401,6 +622,8 @@ onMounted(async () => {
     target: [VIEWPORT_ANCHOR.x, VIEWPORT_ANCHOR.y, VIEWPORT_ANCHOR.z],
   });
   sm.start();
+  sm.scene.add(robotMarker, humanMarker);
+  unbindTap = onViewportTap(sm.renderer.domElement, onSceneTap);
   sceneManager.value = sm;
   rebuildSkeleton();
   store.syncRobotToMotion(manifest.value);
@@ -408,13 +631,19 @@ onMounted(async () => {
 });
 
 onActivated(() => {
+  window.addEventListener('keydown', onKeydown);
   sceneManager.value?.start();
   // The preview page may have reloaded a different robot for a history entry,
   // freeing the one shown here (only one robot is kept alive): rebuild it.
   if (robotModel.value && isRobotModelDisposed(robotModel.value)) void ensureRobotScene();
 });
-onDeactivated(() => sceneManager.value?.stop());
+onDeactivated(() => {
+  window.removeEventListener('keydown', onKeydown);
+  sceneManager.value?.stop();
+});
 onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown);
+  unbindTap?.();
   clearHideStripTimer();
   skeleton.value?.dispose();
   robotScene.value?.dispose();
@@ -586,6 +815,7 @@ onUnmounted(() => {
 
           <v-switch v-model="showHuman" :label="t('showHuman')" color="primary" density="compact" hide-details />
           <v-switch v-model="showLines" :label="t('showLines')" color="primary" density="compact" hide-details />
+          <div class="text-caption text-medium-emphasis">{{ t('pickHint') }}</div>
         </div>
 
         <div class="sidebar-footer d-flex flex-column ga-2 pt-3 mt-auto">
@@ -627,6 +857,63 @@ onUnmounted(() => {
       <div class="viewport-wrap">
         <div ref="viewportEl" class="viewport" />
         <WorkflowNavBar />
+        <Transition name="selection-chip-fade">
+          <div
+            v-if="selectionLabel"
+            class="selection-chip text-caption"
+            :class="{ 'selection-chip--unmapped': !selectionLabel.mapped }"
+            role="status"
+            aria-live="polite"
+          >
+            <template v-if="selectionLabel.mapped">
+              <span class="selection-chip__dot" :class="`selection-chip__dot--${selectionLabel.stage}`" />
+              <span class="selection-chip__names">
+                <span class="selection-chip__name">{{ selectionLabel.robotBody }}</span>
+                <span class="selection-chip__arrow" aria-hidden="true">↔</span>
+                <span class="selection-chip__name">{{ selectionLabel.humanJoint }}</span>
+              </span>
+              <span class="selection-chip__meta selection-chip__meta--stage">
+                {{ t(selectionLabel.stage === 'stage1' ? 'stage1Short' : 'stage2Short') }}
+              </span>
+              <template v-if="selectionLabel.position">
+                <v-btn
+                  class="selection-chip__btn"
+                  :icon="icons.caretLeft"
+                  variant="text"
+                  size="x-small"
+                  :title="t('prevMapping')"
+                  :aria-label="t('prevMapping')"
+                  @click="stepMatch(-1)"
+                />
+                <span class="selection-chip__meta">{{ selectionLabel.position }}</span>
+                <v-btn
+                  class="selection-chip__btn"
+                  :icon="icons.caretRight"
+                  variant="text"
+                  size="x-small"
+                  :title="t('nextMapping')"
+                  :aria-label="t('nextMapping')"
+                  @click="stepMatch(1)"
+                />
+              </template>
+            </template>
+            <template v-else>
+              <span class="selection-chip__names">
+                <span class="selection-chip__name">{{ selectionLabel.name }}</span>
+              </span>
+              <span class="selection-chip__meta">{{ t('notMapped') }}</span>
+            </template>
+            <v-btn
+              class="selection-chip__btn"
+              :icon="icons.close"
+              variant="text"
+              size="x-small"
+              :title="t('clearSelection')"
+              :aria-label="t('clearSelection')"
+              @click="clearSelection"
+            />
+          </div>
+        </Transition>
         <!-- Floats over the viewport instead of pushing it, so the canvas never resizes for it. -->
         <Transition name="loading-strip-slide" @after-leave="onLoadingStripAfterLeave">
           <div
@@ -650,20 +937,24 @@ onUnmounted(() => {
           <v-tab value="stage2">{{ t('stage2') }}</v-tab>
           <v-tab value="scale">{{ t('scaleTable') }}</v-tab>
         </v-tabs>
-        <div class="table-scroll">
+        <div ref="tableScrollEl" class="table-scroll">
           <MappingTable
             v-if="activeTab === 'stage1'"
             :table="store.config.ik_match_table1"
             :human-joints="motion.jointNames"
             :robot-bodies="robotBodies"
-            @highlight="(b) => (highlightBody = b)"
+            :selected-body="selectedRow"
+            @hover="(b) => (hoverBody = b)"
+            @select="(b) => onRowSelect('stage1', b)"
           />
           <MappingTable
             v-else-if="activeTab === 'stage2'"
             :table="store.config.ik_match_table2"
             :human-joints="motion.jointNames"
             :robot-bodies="robotBodies"
-            @highlight="(b) => (highlightBody = b)"
+            :selected-body="selectedRow"
+            @hover="(b) => (hoverBody = b)"
+            @select="(b) => onRowSelect('stage2', b)"
           />
           <div v-else class="table-x-scroll">
             <v-table density="compact">
@@ -785,6 +1076,95 @@ onUnmounted(() => {
 .loading-strip--error {
   border-color: rgba(var(--v-theme-error), 0.5);
   color: rgb(var(--v-theme-error));
+}
+.selection-chip {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 24px);
+  padding: 2px 4px 2px 12px;
+  border-radius: var(--rro-radius);
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background: rgb(var(--v-theme-surface));
+  color: rgb(var(--v-theme-on-surface));
+  box-shadow: var(--rro-shadow-float);
+  font-variant-numeric: tabular-nums;
+}
+.selection-chip--unmapped .selection-chip__meta {
+  color: rgb(var(--v-theme-warning));
+}
+.selection-chip__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+/* The stage colours of the correspondence lines (refreshLines). */
+.selection-chip__dot--stage1 {
+  background: #4fc3f7;
+}
+.selection-chip__dot--stage2 {
+  background: #ffb74d;
+}
+.selection-chip__names {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-family: var(--rro-font-mono);
+}
+.selection-chip__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selection-chip__arrow {
+  flex: none;
+  opacity: 0.6;
+}
+.selection-chip__meta {
+  flex: none;
+  white-space: nowrap;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+.selection-chip__btn {
+  flex: none;
+}
+/* Phones: the two names stack, and the stage shows in the dot colour and the open tab. */
+@media (max-width: 599.98px) {
+  .selection-chip__names {
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    line-height: 1.3;
+  }
+  .selection-chip__name {
+    max-width: 100%;
+  }
+  .selection-chip__arrow,
+  .selection-chip__meta--stage {
+    display: none;
+  }
+}
+@media (pointer: coarse), (hover: none) {
+  .v-application .selection-chip__btn.v-btn {
+    min-width: var(--rro-tap-target);
+    min-height: var(--rro-tap-target);
+  }
+}
+.selection-chip-fade-enter-active,
+.selection-chip-fade-leave-active {
+  transition: opacity var(--rro-dur-color) var(--rro-ease);
+}
+.selection-chip-fade-enter-from,
+.selection-chip-fade-leave-to {
+  opacity: 0;
 }
 .mono {
   font-size: 0.75rem;

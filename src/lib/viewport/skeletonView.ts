@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { estimateSkeletonSize, isDecorJoint, type BvhAnim } from '../bvh/parse';
 import { blendKeypoints, frameBlendIndices } from './poseBlend';
+import { firstVisibleHit } from './scenePick';
 
 const BONE_COLOR = 0x8d99ae;
 const BONE_EMISSIVE = 0x10151c;
@@ -28,6 +29,13 @@ export interface SkeletonView {
   /** world position of a joint (after wrapper transform) */
   getJointWorldPos(jointIndex: number, out: THREE.Vector3): THREE.Vector3;
   getJointWorldQuat(jointIndex: number, out: THREE.Quaternion): THREE.Quaternion;
+  /** Joint drawn as a visible sphere (virtual / decor joints are hidden). */
+  isJointShown(jointIndex: number): boolean;
+  /**
+   * The joint under a ray: a hit on a joint sphere gives that joint, a hit on a
+   * bone gives whichever end of the bone is nearer the hit point.
+   */
+  pickJoint(raycaster: THREE.Raycaster): { joint: number; distance: number } | null;
   dispose(): void;
 }
 
@@ -183,6 +191,37 @@ export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonVie
     root.rotation.z = radians;
   }
 
+  const childJoints: number[][] = anim.joints.map(() => []);
+  for (let j = 0; j < J; j++) {
+    const parent = anim.joints[j].parent;
+    if (parent >= 0) childJoints[parent].push(j);
+  }
+  const pickTmp = new THREE.Vector3();
+
+  function isJointShown(jointIndex: number): boolean {
+    return jointSpheres[jointIndex]?.visible ?? false;
+  }
+
+  function pickJoint(raycaster: THREE.Raycaster): { joint: number; distance: number } | null {
+    const hit = firstVisibleHit(raycaster, root);
+    if (!hit) return null;
+    const owner = jointGroups.indexOf(hit.object.parent as THREE.Group);
+    if (owner < 0) return null;
+    if (hit.object === jointSpheres[owner]) return { joint: owner, distance: hit.distance };
+    // A bone hangs off its parent joint's group; it ends at one of that joint's children.
+    let best = -1;
+    let bestD = Infinity;
+    for (const j of [owner, ...childJoints[owner]]) {
+      if (!isJointShown(j)) continue;
+      const d = getJointWorldPos(j, pickTmp).distanceTo(hit.point);
+      if (d < bestD) {
+        bestD = d;
+        best = j;
+      }
+    }
+    return best < 0 ? null : { joint: best, distance: hit.distance };
+  }
+
   function lockJointToWorld(jointIndex: number, anchor: THREE.Vector3) {
     root.position.set(0, 0, 0);
     root.updateMatrixWorld(true);
@@ -206,6 +245,8 @@ export function buildSkeletonView(anim: BvhAnim, unitScale: number): SkeletonVie
     lockJointToWorld,
     getJointWorldPos,
     getJointWorldQuat,
+    isJointShown,
+    pickJoint,
     dispose,
   };
 }

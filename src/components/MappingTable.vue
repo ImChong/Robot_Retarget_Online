@@ -8,12 +8,18 @@ const props = defineProps<{
   table: Record<string, IkMatchEntry>;
   humanJoints: string[];
   robotBodies: string[];
+  /** Row (robot body) selected on the page — from this table or from the 3D view. */
+  selectedBody?: string | null;
 }>();
-const emit = defineEmits<{ highlight: [robotBody: string | null] }>();
+const emit = defineEmits<{
+  /** Mouse hover preview (touch never hovers, so a tap cannot leave one behind). */
+  hover: [robotBody: string | null];
+  /** Row tapped (null: the selected row was tapped again). */
+  select: [robotBody: string | null];
+}>();
 
 const { t } = useI18n();
 const expanded = ref<Set<string>>(new Set());
-const tappedRow = ref<string | null>(null);
 
 const rows = computed(() => Object.keys(props.table));
 
@@ -40,10 +46,7 @@ function onRobotBodyChange(oldBody: string, newBody: string) {
     next.add(newBody);
     expanded.value = next;
   }
-  if (tappedRow.value === oldBody) {
-    tappedRow.value = newBody;
-    emit('highlight', newBody);
-  }
+  if (props.selectedBody === oldBody) emit('select', newBody);
 }
 
 function toggleExpand(body: string) {
@@ -53,9 +56,21 @@ function toggleExpand(body: string) {
   expanded.value = next;
 }
 
-function onRowTap(body: string) {
-  tappedRow.value = tappedRow.value === body ? null : body;
-  emit('highlight', tappedRow.value);
+/**
+ * A tap on the row selects it; a second tap on its blank space clears it. A tap
+ * on one of its controls (to edit it) only ever selects, never clears.
+ */
+function onRowTap(e: MouseEvent, body: string) {
+  const onControl = (e.target as Element | null)?.closest('input, textarea, button, .v-btn, .v-field');
+  if (onControl) {
+    if (props.selectedBody !== body) emit('select', body);
+    return;
+  }
+  emit('select', props.selectedBody === body ? null : body);
+}
+
+function onRowPointer(e: PointerEvent, body: string | null) {
+  if (e.pointerType === 'mouse') emit('hover', body);
 }
 
 function num(v: string | number): number {
@@ -80,12 +95,14 @@ function num(v: string | number): number {
         <template v-for="body in rows" :key="body">
           <tr
             class="mapping-row"
-            :class="{ highlighted: tappedRow === body }"
-            @mouseenter="emit('highlight', body)"
-            @mouseleave="emit('highlight', null)"
-            @click="onRowTap(body)"
+            :class="{ highlighted: selectedBody === body }"
+            :data-robot-body="body"
+            :aria-selected="selectedBody === body"
+            @pointerenter="onRowPointer($event, body)"
+            @pointerleave="onRowPointer($event, null)"
+            @click="onRowTap($event, body)"
           >
-            <td @click.stop>
+            <td>
               <v-btn
                 :icon="expanded.has(body) ? icons.caretUp : icons.caretDown"
                 size="x-small"
@@ -93,7 +110,7 @@ function num(v: string | number): number {
                 @click="toggleExpand(body)"
               />
             </td>
-            <td @click.stop>
+            <td>
               <v-select
                 :model-value="body"
                 :items="robotOptions"
@@ -104,7 +121,7 @@ function num(v: string | number): number {
                 @update:model-value="(v: string) => onRobotBodyChange(body, v)"
               />
             </td>
-            <td @click.stop>
+            <td>
               <v-select
                 v-model="table[body][0]"
                 :items="humanOptions"
@@ -113,7 +130,7 @@ function num(v: string | number): number {
                 hide-details
               />
             </td>
-            <td @click.stop>
+            <td>
               <v-text-field
                 :model-value="table[body][1]"
                 type="number"
@@ -121,7 +138,7 @@ function num(v: string | number): number {
                 @update:model-value="(v: string) => (table[body][1] = num(v))"
               />
             </td>
-            <td @click.stop>
+            <td>
               <v-text-field
                 :model-value="table[body][2]"
                 type="number"
@@ -174,9 +191,12 @@ function num(v: string | number): number {
 .mapping-row {
   cursor: pointer;
 }
-.mapping-row.highlighted,
 .mapping-row:hover {
   background: rgba(var(--v-theme-on-surface), 0.06);
+}
+.mapping-row.highlighted {
+  background: rgba(var(--v-theme-primary), 0.16);
+  box-shadow: inset 3px 0 0 rgb(var(--v-theme-primary));
 }
 .mono {
   font-family: var(--rro-font-mono);

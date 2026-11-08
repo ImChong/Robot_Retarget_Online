@@ -204,6 +204,16 @@ const messages: Record<string, { zh: string; en: string }> = {
   },
   showLines: { zh: '显示对应关系', en: 'Correspondence lines' },
   showHuman: { zh: '显示人体骨架', en: 'Show human skeleton' },
+  pickHint: {
+    zh: '在 3D 视图中点击机器人部位或骨架关节，可高亮对应连线并定位到下方配置行；再次点击切换到下一条映射，点击空白处取消。',
+    en: 'Click a robot part or skeleton joint in the 3D view to highlight its correspondence line and jump to its row below; click it again for its next mapping, or empty space to clear.',
+  },
+  stage1Short: { zh: '阶段 1', en: 'Stage 1' },
+  stage2Short: { zh: '阶段 2', en: 'Stage 2' },
+  notMapped: { zh: '未映射', en: 'Not mapped' },
+  prevMapping: { zh: '上一条映射', en: 'Previous mapping' },
+  nextMapping: { zh: '下一条映射', en: 'Next mapping' },
+  clearSelection: { zh: '取消选中', en: 'Clear selection' },
 
   runRetarget: { zh: '开始重定向', en: 'Run retargeting' },
   cancel: { zh: '取消', en: 'Cancel' },
