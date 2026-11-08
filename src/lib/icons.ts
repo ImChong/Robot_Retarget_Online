@@ -75,6 +75,8 @@ export const icons = {
   openExternal: ph('arrowSquareOut'),
   gallery: ph('squaresFour'),
   search: ph('magnifyingGlass'),
+  arrange: ph('arrowsOutCardinal'),
+  snap: ph('magnetStraight'),
 } as const;
 
 /** Vuetify's internal icons, redrawn in Phosphor; anything unlisted keeps the MDI fallback. */

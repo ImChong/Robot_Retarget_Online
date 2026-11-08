@@ -133,6 +133,57 @@ export function pelvisWorldPose(
 }
 
 /**
+ * Where a figure stands on the floor: its root (robot pelvis / BVH hips) at
+ * (x, y), turned `yaw` radians about world Z away from the canonical facing.
+ * There is no height: every figure keeps the viewport's anchor height.
+ *
+ * A placement is display only. It moves the three.js objects and nothing
+ * else — the solver reads the motion frames and the MuJoCo model, never the
+ * viewport — so there is no offset to take back out before retargeting.
+ */
+export interface FloorPlace {
+  x: number;
+  y: number;
+  yaw: number;
+}
+
+/** Default stage: robot in front of the BVH (toward the camera), both facing it. */
+export function defaultPlace(member: 'robot' | 'human', anchor: THREE.Vector3 = VIEWPORT_ANCHOR): FloorPlace {
+  return { x: anchor.x, y: anchor.y + (member === 'robot' ? ROBOT_DEPTH_Y : HUMAN_DEPTH_Y), yaw: 0 };
+}
+
+/**
+ * Turn the robot about world Z so its pelvis faces FACING_YAW + place.yaw, then
+ * translate it so the pelvis stands at (place.x, place.y, height).
+ *
+ * Moves `scene.root` only, in the pose the scene already shows: it never reads
+ * `robot.data`, which the solver and the preview page pose as they run.
+ */
+export function placeRobotRoot(
+  scene: RobotSceneObject,
+  robot: RobotModel,
+  pelvisName: string,
+  place: FloorPlace,
+  height = VIEWPORT_ANCHOR.z,
+): void {
+  const pelvisId = robot.bodyIds.get(pelvisName);
+  if (pelvisId === undefined) return;
+
+  scene.root.position.set(0, 0, 0);
+  scene.root.rotation.set(0, 0, 0);
+  scene.root.updateMatrixWorld(true);
+
+  // Yaw the whole robot so its (local +X) forward points along the heading.
+  pelvisWorldPose(scene, pelvisId, tmpPos, tmpQuat);
+  scene.root.rotation.z = FACING_YAW + place.yaw - robotFacingYaw(tmpQuat);
+  scene.root.updateMatrixWorld(true);
+
+  // Then anchor the (now rotated) pelvis at the target world position.
+  pelvisWorldPose(scene, pelvisId, tmpPos, tmpQuat);
+  scene.root.position.set(place.x - tmpPos.x, place.y - tmpPos.y, height - tmpPos.z);
+}
+
+/**
  * Rotate the robot about world Z so its pelvis faces FACING_YAW, then translate
  * so the pelvis sits at anchor + (0, depthY, 0) (in front of the BVH along -Y).
  */
@@ -143,22 +194,33 @@ export function alignRobotRoot(
   anchor: THREE.Vector3,
   depthY = ROBOT_DEPTH_Y,
 ): void {
-  const pelvisId = robot.bodyIds.get(pelvisName);
-  if (pelvisId === undefined) return;
-
-  scene.root.position.set(0, 0, 0);
-  scene.root.rotation.set(0, 0, 0);
   scene.update(robot.data);
+  placeRobotRoot(scene, robot, pelvisName, { x: anchor.x, y: anchor.y + depthY, yaw: 0 }, anchor.z);
+}
 
-  // Yaw the whole robot so its (local +X) forward points along FACING_YAW.
-  pelvisWorldPose(scene, pelvisId, tmpPos, tmpQuat);
-  scene.root.rotation.z = FACING_YAW - robotFacingYaw(tmpQuat);
-  scene.root.updateMatrixWorld(true);
+/**
+ * Turn the BVH skeleton so it faces FACING_YAW + place.yaw and stand its root
+ * joint (`humanRootName`, else the motion root) at (place.x, place.y, height).
+ * Independent of the robot, so either figure can be placed on its own.
+ */
+export function placeSkeleton(
+  skeleton: SkeletonView,
+  anim: BvhAnim,
+  humanRootName: string,
+  place: FloorPlace,
+  height = VIEWPORT_ANCHOR.z,
+  frame = 0,
+): void {
+  const named = anim.joints.findIndex((j) => j.name === humanRootName);
+  const hipsIdx = named >= 0 ? named : resolveMotionRootJoint(anim);
 
-  // Then anchor the (now rotated) pelvis at the target world position.
-  pelvisWorldPose(scene, pelvisId, tmpPos, tmpQuat);
-  const target = anchor.clone().add(new THREE.Vector3(0, depthY, 0));
-  scene.root.position.copy(target).sub(tmpPos);
+  skeleton.setFrame(frame);
+  skeleton.setYaw(0);
+  const humanYaw = humanFacingYaw(skeleton, anim);
+  skeleton.setYaw(humanYaw === null ? place.yaw : FACING_YAW + place.yaw - humanYaw);
+
+  skeleton.setFrame(frame);
+  skeleton.lockJointToWorld(hipsIdx, new THREE.Vector3(place.x, place.y, height));
 }
 
 /**

@@ -8,6 +8,7 @@
 
 import * as THREE from 'three';
 import type { MjData, MjModel, MujocoModule, RobotModel } from './runtime';
+import { firstVisibleHit } from '../viewport/scenePick';
 
 const GEOM_SPHERE = 2;
 const GEOM_CAPSULE = 3;
@@ -16,11 +17,18 @@ const GEOM_CYLINDER = 5;
 const GEOM_BOX = 6;
 const GEOM_MESH = 7;
 
+/** Glow on a selected body; matches the skeleton's selected-joint emissive. */
+const HIGHLIGHT_EMISSIVE = 0x8a4d00;
+
 export interface RobotSceneObject {
   root: THREE.Group;
   bodyGroups: Map<number, THREE.Group>;
   update(data: MjData): void;
   setOpacity(alpha: number): void;
+  /** Body (MuJoCo id) under a ray, from its visual geoms. */
+  pickBody(raycaster: THREE.Raycaster): { bodyId: number; distance: number } | null;
+  /** Tint one body's visual geoms as selected (null clears). */
+  setHighlightedBody(bodyId: number | null): void;
   dispose(): void;
 }
 
@@ -147,13 +155,35 @@ export function buildRobotScene(robot: RobotModel): RobotSceneObject {
     }
   }
 
+  const bodyOfGroup = new Map([...bodyGroups].map(([b, group]) => [group, b]));
+  function pickBody(raycaster: THREE.Raycaster): { bodyId: number; distance: number } | null {
+    const hit = firstVisibleHit(raycaster, root);
+    // Geom meshes sit directly in their body's group.
+    const bodyId = hit ? bodyOfGroup.get(hit.object.parent as THREE.Group) : undefined;
+    return hit && bodyId !== undefined ? { bodyId, distance: hit.distance } : null;
+  }
+
+  let highlighted: number | null = null;
+  function tintBody(bodyId: number, hex: number) {
+    bodyGroups.get(bodyId)?.traverse((o) => {
+      const mat = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+      if ((o as THREE.Mesh).isMesh && mat?.emissive) mat.emissive.setHex(hex);
+    });
+  }
+  function setHighlightedBody(bodyId: number | null) {
+    if (bodyId === highlighted) return;
+    if (highlighted !== null) tintBody(highlighted, 0x000000);
+    highlighted = bodyId;
+    if (highlighted !== null) tintBody(highlighted, HIGHLIGHT_EMISSIVE);
+  }
+
   function dispose() {
     for (const m of materials) m.dispose();
     for (const geo of meshCache.values()) geo.dispose();
     root.removeFromParent();
   }
 
-  return { root, bodyGroups, update, setOpacity, dispose };
+  return { root, bodyGroups, update, setOpacity, pickBody, setHighlightedBody, dispose };
 }
 
 function buildMeshGeometry(model: MjModel, meshId: number): THREE.BufferGeometry {
