@@ -21,6 +21,7 @@ const assets = resolve(root, 'node_modules/@phosphor-icons/core/assets');
 const ICONS = {
   arrowCounterClockwise: ['arrow-counter-clockwise', 'regular'],
   arrowSquareOut: ['arrow-square-out', 'regular'],
+  arrowsOutCardinal: ['arrows-out-cardinal', 'regular'],
   arrowsClockwiseBold: ['arrows-clockwise', 'bold'],
   caretDown: ['caret-down', 'regular'],
   caretLeft: ['caret-left', 'regular'],
@@ -38,6 +39,7 @@ const ICONS = {
   info: ['info', 'regular'],
   magnifyingGlass: ['magnifying-glass', 'regular'],
   magicWand: ['magic-wand', 'regular'],
+  magnetStraight: ['magnet-straight', 'regular'],
   magnifyingGlassMinus: ['magnifying-glass-minus', 'regular'],
   minusSquare: ['minus-square', 'regular'],
   moon: ['moon', 'regular'],

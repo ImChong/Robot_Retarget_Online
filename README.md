@@ -35,7 +35,7 @@ The GIF is recorded from the built site by `node scripts/record_site_demo.mjs`
 | Page | 功能 |
 | --- | --- |
 | **BVH Viewer** | BVHView 风格的动捕预览：拖拽打开 `.bvh`、胶囊体骨架渲染、播放/拖动时间轴/变速、关节层级树与关节信息；示例动作含 LAFAN1 人形与 Labrador 狗四足动捕；**视频生成 BVH（浏览器内 MediaPipe 姿态估计，实验性）** |
-| **Retarget Config** | 引擎选择（GMR / OmniRetarget）、机器人选择（人形 Unitree G1 / Booster T1 等，四足 Unitree Go2 / A1；**或从 [Robot Description Gallery](https://imchong.github.io/Robot_Description_Gallery_Online/web/) 挑选人形 / 四足 URDF**，并可一键跳转 Gallery 查看对应模型）、IK 关键点映射表（两阶段权重/偏移；**在 3D 视图点选机器人部位或骨架关节即高亮对应连线并定位到映射行**，表格行反向联动 3D 高亮）、人体缩放表、求解器参数；配置 JSON 与 GMR `ik_config` 双向兼容 |
+| **Retarget Config** | 引擎选择（GMR / OmniRetarget）、机器人选择（人形 Unitree G1 / Booster T1 等，四足 Unitree Go2 / A1；**或从 [Robot Description Gallery](https://imchong.github.io/Robot_Description_Gallery_Online/web/) 挑选人形 / 四足 URDF**，并可一键跳转 Gallery 查看对应模型）、IK 关键点映射表（两阶段权重/偏移；**在 3D 视图点选机器人部位或骨架关节即高亮对应连线并定位到映射行**，表格行反向联动 3D 高亮；「摆放」可拖动/旋转机器人与 BVH 骨架以免重叠，只影响显示、不参与计算）、人体缩放表、求解器参数；配置 JSON 与 GMR `ik_config` 双向兼容 |
 | **Retarget Preview** | 引擎切换、一键重定向（带进度）、机器人动作回放、人体关键点叠加对比、逐帧误差曲线、导出 NPZ / CSV / JSON |
 
 ## How it works · 技术要点

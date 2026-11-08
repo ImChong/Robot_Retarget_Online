@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
+import { computed, defineAsyncComponent, onActivated, onDeactivated, onMounted, onUnmounted, reactive, ref, shallowRef, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import * as THREE from 'three';
 import { icons } from '@/lib/icons';
@@ -14,10 +14,25 @@ import { buildRobotScene, type RobotSceneObject } from '@/lib/mujoco/threeScene'
 import { SceneManager } from '@/lib/viewport/SceneManager';
 import { buildSkeletonView, type SkeletonView } from '@/lib/viewport/skeletonView';
 import {
-  alignRobotRoot,
-  alignSkeletonToRobot,
+  defaultPlace,
+  FACING_YAW,
+  placeRobotRoot,
+  placeSkeleton,
   VIEWPORT_ANCHOR,
+  type FloorPlace,
 } from '@/lib/viewport/sceneAlignment';
+import {
+  clampPlace,
+  dragPlace,
+  floorPoint,
+  MOVE_SNAP,
+  samePlace,
+  startGrab,
+  yawDegrees,
+  type PlacementGrab,
+  type StageMember,
+} from '@/lib/viewport/stagePlacement';
+import { buildPlacementGizmo, type GizmoHandle, type PlacementGizmo } from '@/lib/viewport/placementGizmo';
 import MappingTable from '@/components/MappingTable.vue';
 import MobileSidePanel from '@/components/MobileSidePanel.vue';
 import { BUILTIN_GALLERY_LINKS, galleryRobotUrl } from '@/lib/gallery/registry';
@@ -244,6 +259,13 @@ function pickAt(x: number, y: number, width: number, height: number, pointerType
 function onSceneTap(tap: ViewportTap) {
   const canvas = sceneManager.value?.renderer.domElement;
   if (!canvas) return;
+  if (arranging.value) {
+    // Arranging: a tap says which figure the gizmo and the fields are about.
+    aimRay(tap.clientX, tap.clientY);
+    const figure = pickFigure();
+    if (figure) arrangeTarget.value = figure.member;
+    return;
+  }
   const rect = canvas.getBoundingClientRect();
   const source = pickAt(tap.clientX - rect.left, tap.clientY - rect.top, rect.width, rect.height, tap.pointerType);
   if (source) selectFromView(source);
@@ -251,10 +273,11 @@ function onSceneTap(tap: ViewportTap) {
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key !== 'Escape' || !selection.value) return;
+  if (e.key !== 'Escape' || (!selection.value && !arranging.value)) return;
   const el = e.target as HTMLElement | null;
   if (el?.closest('input, textarea, select, [contenteditable="true"], .v-overlay')) return;
-  clearSelection();
+  if (arranging.value) arranging.value = false;
+  else clearSelection();
 }
 
 /** Selection pins: one at the robot body, one at the BVH joint (drawn through meshes). */
@@ -265,6 +288,184 @@ const humanMarker = new THREE.Mesh(markerGeo, markerMat);
 robotMarker.renderOrder = humanMarker.renderOrder = 12;
 robotMarker.visible = humanMarker.visible = false;
 let unbindTap: (() => void) | null = null;
+
+// ---- Stage arrangement: where the robot and the BVH stand (display only) ----
+//
+// Each figure can be slid across the floor and turned about the vertical, as
+// on Robot Description Gallery Online's compare stage, so the two need not
+// overlap where their keypoints are hard to click. Only the three.js objects
+// move: the solver reads the motion frames and the MuJoCo model, never the
+// viewport, so nothing has to be taken back out before retargeting, and the
+// exported config is unchanged. Untouched, both stand where they always have.
+
+const arranging = ref(false);
+const arrangeTarget = ref<StageMember>('robot');
+const snapping = ref(true);
+const places = reactive<Record<StageMember, FloorPlace>>({
+  robot: defaultPlace('robot'),
+  human: defaultPlace('human'),
+});
+const placementMoved = computed(
+  () => !samePlace(places.robot, defaultPlace('robot')) || !samePlace(places.human, defaultPlace('human')),
+);
+const targetPlaceFields = computed(() => {
+  const p = places[arrangeTarget.value];
+  return { x: p.x.toFixed(3), y: p.y.toFixed(3), yaw: String(yawDegrees(p.yaw)) };
+});
+
+let gizmo: PlacementGizmo | null = null;
+let gizmoFor: THREE.Object3D | null = null;
+let grab: PlacementGrab | null = null;
+let grabPointer = -1;
+const overHandle = ref<GizmoHandle | null>(null);
+const dragging = ref(false);
+
+function placeRobot() {
+  if (robotScene.value && robotModel.value) {
+    placeRobotRoot(robotScene.value, robotModel.value, alignBodyName(), places.robot, VIEWPORT_ANCHOR.z);
+  }
+}
+
+function placeHuman() {
+  if (skeleton.value && motion.anim) {
+    placeSkeleton(skeleton.value, motion.anim, store.config.human_root_name, places.human, VIEWPORT_ANCHOR.z);
+  }
+}
+
+function figureRoot(member: StageMember): THREE.Object3D | null {
+  return (member === 'robot' ? robotScene.value?.root : skeleton.value?.root) ?? null;
+}
+
+/** The gizmo under the figure being arranged, built for its size; none outside arrange mode. */
+function refreshGizmo() {
+  const sm = sceneManager.value;
+  if (!sm) return;
+  const target = arranging.value ? figureRoot(arrangeTarget.value) : null;
+  if (gizmo && gizmoFor !== target) {
+    gizmo.dispose();
+    gizmo = null;
+    gizmoFor = null;
+    overHandle.value = null;
+  }
+  if (target && !gizmo) {
+    const size = new THREE.Box3().setFromObject(target).getSize(new THREE.Vector3());
+    gizmo = buildPlacementGizmo(Math.min(Math.max(0.5 * Math.max(size.x, size.y), 0.15), 0.45));
+    gizmoFor = target;
+    sm.scene.add(gizmo.root);
+  }
+  const p = places[arrangeTarget.value];
+  gizmo?.place(p.x, p.y, FACING_YAW + p.yaw);
+  sm.invalidate();
+}
+
+function setPlace(member: StageMember, next: FloorPlace) {
+  if (samePlace(next, places[member])) return;
+  places[member] = next;
+  if (member === 'robot') placeRobot();
+  else placeHuman();
+  refreshGizmo();
+  refreshLines();
+}
+
+function resetPlacement() {
+  setPlace('robot', defaultPlace('robot'));
+  setPlace('human', defaultPlace('human'));
+}
+
+/** A typed placement, committed on `change` so a half-typed "-" never moves anything. */
+function onPlaceField(key: 'x' | 'y' | 'yaw', e: Event) {
+  const value = parseFloat((e.target as HTMLInputElement).value);
+  const member = arrangeTarget.value;
+  if (!Number.isFinite(value)) {
+    (e.target as HTMLInputElement).value = targetPlaceFields.value[key];
+    return;
+  }
+  setPlace(member, clampPlace({ ...places[member], [key]: key === 'yaw' ? (value * Math.PI) / 180 : value }));
+}
+
+function aimRay(clientX: number, clientY: number): boolean {
+  const sm = sceneManager.value;
+  if (!sm) return false;
+  const rect = sm.renderer.domElement.getBoundingClientRect();
+  if (!rect.width || !rect.height) return false;
+  pointerNdc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+  raycaster.setFromCamera(pointerNdc, sm.camera);
+  return true;
+}
+
+/** The figure under the current ray, the nearer of the two, with where it was hit. */
+function pickFigure(): { member: StageMember; point: THREE.Vector3; distance: number } | null {
+  const robotHit = robotScene.value?.pickBody(raycaster) ?? null;
+  const jointHit = skeleton.value?.pickJoint(raycaster) ?? null;
+  const hit =
+    robotHit && (!jointHit || robotHit.distance <= jointHit.distance)
+      ? { member: 'robot' as const, distance: robotHit.distance }
+      : jointHit
+        ? { member: 'human' as const, distance: jointHit.distance }
+        : null;
+  return hit && { ...hit, point: raycaster.ray.at(hit.distance, new THREE.Vector3()) };
+}
+
+/**
+ * Capture phase on the viewport, ahead of OrbitControls on the canvas inside
+ * it: taking hold of a figure or a handle switches the camera off before it
+ * starts following the same pointer. A press on empty floor still orbits.
+ */
+function onArrangePointerDown(e: PointerEvent) {
+  const sm = sceneManager.value;
+  if (!arranging.value || !sm || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  if (!aimRay(e.clientX, e.clientY)) return;
+  const handle = gizmo?.handleAt(raycaster) ?? null;
+  const figure = pickFigure();
+  let member: StageMember;
+  let kind: PlacementGrab['handle'];
+  let height: number;
+  if (handle && (!figure || handle.distance <= figure.distance)) {
+    member = arrangeTarget.value;
+    kind = handle.handle;
+    height = handle.point.z;
+  } else if (figure) {
+    member = figure.member;
+    kind = null;
+    height = figure.point.z;
+  } else {
+    return;
+  }
+  const from = floorPoint(raycaster.ray, height);
+  if (!from) return;
+  arrangeTarget.value = member;
+  grab = startGrab(member, kind, places[member], from, height);
+  grabPointer = e.pointerId;
+  dragging.value = true;
+  sm.controls.enabled = false;
+  sm.renderer.domElement.setPointerCapture?.(e.pointerId);
+}
+
+function onArrangePointerMove(e: PointerEvent) {
+  if (!grab) {
+    // Not dragging: light up the handle under a mouse, before anything is pressed.
+    if (!arranging.value || !gizmo || e.pointerType !== 'mouse' || e.buttons !== 0) return;
+    if (!aimRay(e.clientX, e.clientY)) return;
+    const over = gizmo.handleAt(raycaster)?.handle ?? null;
+    if (gizmo.hover(over)) sceneManager.value?.invalidate();
+    overHandle.value = over;
+    return;
+  }
+  if (e.pointerId !== grabPointer || !aimRay(e.clientX, e.clientY)) return;
+  const to = floorPoint(raycaster.ray, grab.height);
+  // Above the horizon there is no plane to read: stay where the last move left it.
+  if (!to) return;
+  setPlace(grab.member, dragPlace(grab, places[grab.member], to, e.shiftKey, snapping.value));
+}
+
+function onArrangePointerEnd(e: PointerEvent) {
+  if (!grab || e.pointerId !== grabPointer) return;
+  grab = null;
+  grabPointer = -1;
+  dragging.value = false;
+  const sm = sceneManager.value;
+  if (sm) sm.controls.enabled = true;
+}
 
 type RobotSelectItem = {
   title: string;
@@ -344,21 +545,12 @@ async function ensureRobotScene() {
     (robot.data.qpos as Float64Array).set(robot.model.qpos0 as Float64Array);
     robot.mujoco.mj_kinematics(robot.model, robot.data);
     scene.update(robot.data);
-    alignRobotRoot(scene, robot, alignBodyName(), VIEWPORT_ANCHOR);
     scene.root.renderOrder = 1;
     sm.scene.add(scene.root);
     robotScene.value = scene;
-    if (skeleton.value && motion.anim) {
-      alignSkeletonToRobot(
-        skeleton.value,
-        motion.anim,
-        store.config.human_root_name,
-        scene,
-        robot,
-        alignBodyName(),
-        VIEWPORT_ANCHOR,
-      );
-    }
+    placeRobot();
+    placeHuman();
+    refreshGizmo();
     refreshLines();
     frameSmallScene();
     prefetchPreviewStep();
@@ -402,22 +594,10 @@ function rebuildSkeleton() {
   sk.setFrame(0);
   sm.scene.add(sk.root);
   skeleton.value = sk;
-  if (robotScene.value && robotModel.value) {
-    alignSkeletonToRobot(
-      sk,
-      motion.anim,
-      store.config.human_root_name,
-      robotScene.value,
-      robotModel.value,
-      alignBodyName(),
-      VIEWPORT_ANCHOR,
-    );
-  } else {
-    // Fall back to the root joint (index 0) if the config root name is briefly
-    // out of sync with the loaded motion (e.g. SMPL-X `pelvis` vs a stale `Hips`).
-    const named = motion.anim.joints.findIndex((j) => j.name === store.config.human_root_name);
-    sk.lockJointToWorld(named >= 0 ? named : 0, VIEWPORT_ANCHOR);
-  }
+  // Falls back to the motion root if the config root name is briefly out of
+  // sync with the loaded motion (e.g. SMPL-X `pelvis` vs a stale `Hips`).
+  placeHuman();
+  refreshGizmo();
   refreshLines();
 }
 
@@ -593,25 +773,20 @@ watch(
 watch(
   () => [store.config.robot_root_name, store.config.human_root_name] as const,
   () => {
-    if (!robotScene.value || !robotModel.value || !skeleton.value || !motion.anim) return;
-    alignRobotRoot(
-      robotScene.value,
-      robotModel.value,
-      alignBodyName(),
-      VIEWPORT_ANCHOR,
-    );
-    alignSkeletonToRobot(
-      skeleton.value,
-      motion.anim,
-      store.config.human_root_name,
-      robotScene.value,
-      robotModel.value,
-      alignBodyName(),
-      VIEWPORT_ANCHOR,
-    );
+    placeRobot();
+    placeHuman();
+    refreshGizmo();
     refreshLines();
   },
 );
+watch([arranging, arrangeTarget], () => {
+  if (!arranging.value && grab) {
+    grab = null;
+    dragging.value = false;
+    if (sceneManager.value) sceneManager.value.controls.enabled = true;
+  }
+  refreshGizmo();
+});
 watch(mdAndUp, () => sceneManager.value?.resize());
 watch(panelOpen, () => nextTick(() => sceneManager.value?.resize()));
 
@@ -624,6 +799,11 @@ onMounted(async () => {
   sm.start();
   sm.scene.add(robotMarker, humanMarker);
   unbindTap = onViewportTap(sm.renderer.domElement, onSceneTap);
+  const host = viewportEl.value!;
+  host.addEventListener('pointerdown', onArrangePointerDown, true);
+  host.addEventListener('pointermove', onArrangePointerMove);
+  host.addEventListener('pointerup', onArrangePointerEnd);
+  host.addEventListener('pointercancel', onArrangePointerEnd);
   sceneManager.value = sm;
   rebuildSkeleton();
   store.syncRobotToMotion(manifest.value);
@@ -644,6 +824,7 @@ onDeactivated(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown);
   unbindTap?.();
+  gizmo?.dispose();
   clearHideStripTimer();
   skeleton.value?.dispose();
   robotScene.value?.dispose();
@@ -855,11 +1036,104 @@ onUnmounted(() => {
 
     <div class="main-col d-flex flex-column flex-grow-1">
       <div class="viewport-wrap">
-        <div ref="viewportEl" class="viewport" />
+        <div
+          ref="viewportEl"
+          class="viewport"
+          :class="{
+            'viewport--arranging': arranging,
+            'viewport--over-handle': arranging && overHandle !== null,
+            'viewport--dragging': dragging,
+          }"
+        />
         <WorkflowNavBar />
+        <div class="stage-tools">
+          <v-btn
+            class="stage-tools__arrange"
+            :prepend-icon="icons.arrange"
+            :variant="arranging ? 'flat' : 'tonal'"
+            :color="arranging ? 'primary' : undefined"
+            size="small"
+            :aria-pressed="arranging"
+            :title="t('arrangeTitle')"
+            @click="arranging = !arranging"
+          >
+            {{ t('arrange') }}
+          </v-btn>
+        </div>
+        <Transition name="selection-chip-fade">
+          <div v-if="arranging" class="arrange-panel text-caption" role="group" :aria-label="t('arrangeTitle')">
+            <div class="arrange-panel__row">
+              <v-btn-toggle
+                v-model="arrangeTarget"
+                mandatory
+                divided
+                density="compact"
+                variant="outlined"
+                color="primary"
+                class="arrange-panel__target"
+              >
+                <v-btn value="robot" size="small">{{ t('arrangeRobot') }}</v-btn>
+                <v-btn value="human" size="small">{{ t('arrangeHuman') }}</v-btn>
+              </v-btn-toggle>
+              <v-btn
+                class="arrange-panel__icon-btn"
+                :icon="icons.snap"
+                size="small"
+                :variant="snapping ? 'tonal' : 'text'"
+                :color="snapping ? 'primary' : undefined"
+                :aria-pressed="snapping"
+                :title="t('snapToGrid')"
+                :aria-label="t('snapToGrid')"
+                @click="snapping = !snapping"
+              />
+              <v-btn
+                v-if="placementMoved"
+                class="arrange-panel__reset"
+                variant="text"
+                size="small"
+                :prepend-icon="icons.reset"
+                :title="t('resetPlacement')"
+                :aria-label="t('resetPlacement')"
+                @click="resetPlacement"
+              >
+                <span class="arrange-panel__reset-label">{{ t('resetPlacement') }}</span>
+              </v-btn>
+            </div>
+            <div class="arrange-panel__row arrange-panel__fields">
+              <v-text-field
+                :model-value="targetPlaceFields.x"
+                label="X"
+                suffix="m"
+                type="number"
+                :step="snapping ? MOVE_SNAP : 0.01"
+                inputmode="decimal"
+                @change="(e: Event) => onPlaceField('x', e)"
+              />
+              <v-text-field
+                :model-value="targetPlaceFields.y"
+                label="Y"
+                suffix="m"
+                type="number"
+                :step="snapping ? MOVE_SNAP : 0.01"
+                inputmode="decimal"
+                @change="(e: Event) => onPlaceField('y', e)"
+              />
+              <v-text-field
+                :model-value="targetPlaceFields.yaw"
+                :label="t('placeYaw')"
+                suffix="°"
+                type="number"
+                :step="snapping ? 15 : 1"
+                inputmode="decimal"
+                @change="(e: Event) => onPlaceField('yaw', e)"
+              />
+            </div>
+            <div class="arrange-panel__hint">{{ t('arrangeHint') }}</div>
+          </div>
+        </Transition>
         <Transition name="selection-chip-fade">
           <div
-            v-if="selectionLabel"
+            v-if="selectionLabel && !arranging"
             class="selection-chip text-caption"
             :class="{ 'selection-chip--unmapped': !selectionLabel.mapped }"
             role="status"
@@ -1076,6 +1350,82 @@ onUnmounted(() => {
 .loading-strip--error {
   border-color: rgba(var(--v-theme-error), 0.5);
   color: rgb(var(--v-theme-error));
+}
+.viewport--over-handle {
+  cursor: grab;
+}
+.viewport--dragging {
+  cursor: grabbing;
+}
+.stage-tools {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+}
+/* Phones: the side-panel button already sits in the corner. */
+@media (max-width: 959.98px) {
+  .stage-tools {
+    left: 64px;
+  }
+}
+.arrange-panel {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(380px, calc(100% - 24px));
+  padding: 8px;
+  border-radius: var(--rro-radius);
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background: rgb(var(--v-theme-surface));
+  color: rgb(var(--v-theme-on-surface));
+  box-shadow: var(--rro-shadow-float);
+}
+.arrange-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.arrange-panel__reset {
+  margin-left: auto;
+}
+.arrange-panel__fields > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.arrange-panel__hint {
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  line-height: 1.35;
+}
+/* Phones: one row (target, snap, reset) so the small viewport stays usable; placing is by drag. */
+@media (max-width: 599.98px) {
+  .arrange-panel {
+    width: auto;
+    max-width: calc(100% - 24px);
+  }
+  .arrange-panel__fields,
+  .arrange-panel__hint,
+  .arrange-panel__reset-label {
+    display: none;
+  }
+  .arrange-panel__reset :deep(.v-btn__prepend) {
+    margin-inline: 0;
+  }
+}
+@media (pointer: coarse), (hover: none) {
+  .v-application .stage-tools .v-btn,
+  .v-application .arrange-panel .v-btn {
+    min-width: var(--rro-tap-target);
+    min-height: var(--rro-tap-target);
+  }
+  .v-application .arrange-panel__target {
+    height: var(--rro-tap-target);
+  }
 }
 .selection-chip {
   position: absolute;

@@ -214,6 +214,20 @@ const messages: Record<string, { zh: string; en: string }> = {
   prevMapping: { zh: '上一条映射', en: 'Previous mapping' },
   nextMapping: { zh: '下一条映射', en: 'Next mapping' },
   clearSelection: { zh: '取消选中', en: 'Clear selection' },
+  arrange: { zh: '摆放', en: 'Arrange' },
+  arrangeTitle: {
+    zh: '摆放机器人与 BVH 骨架（只影响显示，不参与重定向计算）',
+    en: 'Arrange the robot and the BVH skeleton (display only, not used by retargeting)',
+  },
+  arrangeRobot: { zh: '机器人', en: 'Robot' },
+  arrangeHuman: { zh: 'BVH 骨架', en: 'BVH skeleton' },
+  placeYaw: { zh: '朝向', en: 'Heading' },
+  snapToGrid: { zh: '吸附（5 cm / 15°）', en: 'Snap (5 cm / 15°)' },
+  resetPlacement: { zh: '恢复默认位置', en: 'Reset positions' },
+  arrangeHint: {
+    zh: '拖动模型平移，拖动箭头沿单轴移动，拖动圆环（或按住 Shift 拖动模型）旋转。只影响显示，不参与重定向计算。',
+    en: 'Drag a figure to move it, an arrow to move along one axis, the ring (or Shift-drag) to turn it. Display only: retargeting ignores it.',
+  },
 
   runRetarget: { zh: '开始重定向', en: 'Run retargeting' },
   cancel: { zh: '取消', en: 'Cancel' },
