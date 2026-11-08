@@ -89,10 +89,29 @@ Retarget Config can load any humanoid / quadruped URDF listed by
 STL in the browser) and links the selected robot back to the gallery page.
 Files: `src/lib/gallery/` (registry, URDF normalisation + bundle, mesh
 conversion), `src/components/GalleryRobotDialog.vue`, `tests/gallery.test.ts`,
-`scripts/e2e_gallery.mjs`. All 66 visible humanoid / quadruped URDF cards (112
-URDF versions) compile in MuJoCo (checked with placeholder meshes; G1, H1, Go2 and ANYmal C also end to end in the browser); the ik_config starts from a matching GMR preset
-or a name-based template (root + four feet for quadrupeds). Not covered:
-MJCF-only cards, xacro-only upstreams, SMPL-X motion.
+`scripts/e2e_gallery.mjs`. The ik_config starts from a matching GMR preset (when
+its scale fits), else a **structural template** read off the kinematic tree
+(`src/lib/retarget/autoConfig.ts`: legs / arms / knees / elbows by geometry, G1's
+rotation offsets carried over through limb directions and knee / elbow axes,
+scales from straight-leg length); quadrupeds use the Go2 preset / template
+rescaled to their leg length. Not covered: MJCF-only cards, xacro-only
+upstreams, SMPL-X motion.
+
+**Gallery compatibility matrix** / 全量兼容性矩阵 ✅ (issue #98):
+`scripts/gallery_matrix.mjs` runs every gallery card × version end to end in
+headless Chromium — download, MuJoCo compile, joint / body parse, ik_config,
+retarget a sample clip, checks on the robot's own kinematics (shape, finite
+values, joint ranges, root / feet tracking, penetration, floating, tilt, joint
+jumps), preview render, NPZ / CSV / JSON export — and registers every other row
+as unsupported with its reason (`src/lib/gallery/{inventory,compat}.ts`). The
+committed report is `docs/gallery-compat/README.md`; CI runs a subset on PRs and
+the whole matrix + a coverage-gap check weekly (`.github/workflows/gallery-matrix.yml`).
+Fixes it drove: structural templates, mesh decimation for MuJoCo's 2 GB heap,
+seeded root on frame 0, body-length units for robots over 2 m, smoothed ground
+lift, quadruped rescaling / leg-tip links / wheel-centre feet. Open gaps (see the
+report): closed-loop legs (Minitaur — needs loop-closure tasks), legless
+"humanoid" versions (TianYi 2 — needs an upper-body mode), MJCF-only and xacro
+cards, and the non-legged categories (arms, hands, mobile bases …).
 
 ### Near-term, still Phase 1 · 近期（仍属 Phase 1）
 

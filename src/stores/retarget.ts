@@ -1,12 +1,7 @@
 import { defineStore } from 'pinia';
 import { markRaw, toRaw } from 'vue';
-import {
-  createBlankConfig,
-  createBlankQuadrupedConfig,
-  getDefaultConfig,
-  matchPresetConfig,
-  validateConfig,
-} from '@/lib/retarget/defaults';
+import { getDefaultConfig, validateConfig } from '@/lib/retarget/defaults';
+import { initialCustomConfig } from '@/lib/retarget/customConfig';
 import {
   DEFAULT_SOLVER_OPTIONS,
   type GmrIkConfig,
@@ -23,7 +18,7 @@ import {
   parseCustomRobotImport,
   type CustomRobotBundle,
 } from '@/lib/mujoco/customRobot';
-import { BUILTIN_GALLERY_LINKS, type GalleryRobot } from '@/lib/gallery/registry';
+import type { GalleryRobot } from '@/lib/gallery/registry';
 import { findMissingBodies } from '@/lib/bvh/lafan1';
 import {
   defaultRobotIdForKind,
@@ -38,26 +33,6 @@ export type RetargetStatus = 'idle' | 'loading-robot' | 'running' | 'done' | 'er
 /** Motion family an imported robot retargets from (uploads are humanoid). */
 function bundleKind(bundle: CustomRobotBundle | null): MotionKind {
   return bundle?.kind ?? 'humanoid';
-}
-
-/**
- * Starting ik_config for an imported robot: a bundled GMR preset when every
- * body it names exists on the robot (the gallery's G1 / Go2 / A1 match the
- * built-in ones), else a name-heuristic template for its motion family.
- */
-function initialCustomConfig(bundle: CustomRobotBundle, bodyNames: string[]): GmrIkConfig {
-  const quadruped = bundleKind(bundle) === 'quadruped';
-  const gallery = bundle.gallery;
-  const preferred = gallery
-    ? Object.entries(BUILTIN_GALLERY_LINKS)
-        .filter(([, link]) => link.id === gallery.id && (!link.variant || link.variant === gallery.variant))
-        .map(([robotId]) => robotId)
-    : [];
-  const preset = matchPresetConfig(quadruped ? 'b_Hips' : 'Hips', bodyNames, preferred);
-  if (preset) return preset;
-  return quadruped
-    ? createBlankQuadrupedConfig(bundle.baseBody, bodyNames)
-    : createBlankConfig(bundle.baseBody, bodyNames);
 }
 
 interface RetargetState {
@@ -176,7 +151,7 @@ export const useRetargetStore = defineStore('retarget', {
       this.errorMessage = null;
 
       const robot = await this.ensureRobot();
-      this.config = initialCustomConfig(bundle, robot.bodyNames);
+      this.config = initialCustomConfig(robot, bundle);
     },
     removeCustomRobot(
       fallbackRobotId = defaultRobotIdForKind(useMotionStore().motionKind ?? 'humanoid'),
@@ -197,7 +172,7 @@ export const useRetargetStore = defineStore('retarget', {
       if (this.robotId === CUSTOM_ROBOT_ID && this.customRobot) {
         // Re-load body list if robot already cached.
         this.ensureRobot().then((robot) => {
-          this.config = initialCustomConfig(this.customRobot!, robot.bodyNames);
+          this.config = initialCustomConfig(robot, this.customRobot!);
         });
         return;
       }

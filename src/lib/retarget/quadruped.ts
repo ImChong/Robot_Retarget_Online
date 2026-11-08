@@ -30,6 +30,7 @@
 
 import { quatFromMat3, vCross, vNorm, vScale, vSub, type Vec3 } from '../math3d';
 import type { HumanFrame, HumanFrameBody } from '../bvh/lafan1';
+import { extremeZ } from '../mujoco/geometry';
 import type { RobotModel } from '../mujoco/runtime';
 import type { GmrIkConfig } from './types';
 
@@ -251,8 +252,24 @@ function lockCorrections(raw: Vec3[], planted: boolean[], groundZ: number, blend
   return out;
 }
 
-/** Height of a robot foot body above the floor when its foot touches it. */
+/**
+ * Height of a robot foot body above the floor when its foot touches it: the
+ * radius of its foot sphere (Go2 / A1 MJCF, most URDFs' collision spheres),
+ * else how far its geometry — a wheel, a mesh foot — reaches below it at rest,
+ * else 2 cm. Kinematics must be at the rest pose.
+ */
 function footContactHeight(robot: RobotModel, footBody: number): number {
+  const sphere = footSphereRadius(robot, footBody);
+  if (sphere !== null) return sphere;
+  const z = (robot.data.xpos as Float64Array)[footBody * 3 + 2];
+  const own = new Set([footBody]);
+  const below = z - extremeZ(robot, 1, own);
+  const hasGeom = Array.from(robot.model.geom_bodyid as Int32Array).some((b) => b === footBody);
+  if (hasGeom && below > 0.002 && below < 0.3) return below;
+  return 0.02;
+}
+
+function footSphereRadius(robot: RobotModel, footBody: number): number | null {
   const { model } = robot;
   const parent = (model.body_parentid as Int32Array)[footBody];
   const bodyPos = (model.body_pos as Float64Array).subarray(footBody * 3, footBody * 3 + 3);
@@ -269,7 +286,7 @@ function footContactHeight(robot: RobotModel, footBody: number): number {
     const ref = onFoot ? [0, 0, 0] : bodyPos;
     if (Math.hypot(p[0] - ref[0], p[1] - ref[1], p[2] - ref[2]) < 0.01) return geomSize[g * 3];
   }
-  return 0.02;
+  return null;
 }
 
 /**

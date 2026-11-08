@@ -135,15 +135,54 @@ built-in — on the gallery's own viewer page.
 - `src/lib/gallery/urdfBundle.ts` normalises what MuJoCo's URDF importer
   rejects (a `world` root link, several `<material>`s per visual, singular
   inertias), drops collision geometry (not drawn, irrelevant to IK) and keeps
-  fixed-joint links such as a quadruped's `FL_foot` as bodies.
-- The starting ik_config is a bundled GMR preset when every body it names
-  exists on the robot (the gallery's G1 / H1-2 / Go2 / A1 / PM01 / Fourier
-  robots match), otherwise a name-based template — root + four feet for
-  quadrupeds (`FL_foot`, `LF_FOOT`, `toe_fl`, `foot_front_left` …). Review the
-  mapping tables before trusting the result.
+  fixed-joint links such as a quadruped's `FL_foot` as bodies. CAD-resolution
+  meshes are simplified to 600 k triangles per robot (100 k per file) so MuJoCo's
+  2 GB WASM heap can compile them (`meshDecimate.ts`), and a quadruped leg that
+  ends in its calf link gets a fixed `<calf>_tip` link at its paw.
+- The starting ik_config (`src/lib/retarget/customConfig.ts`) is a bundled GMR
+  preset when every body it names exists on the robot *and* its scale fits
+  (the gallery's G1 / Go2 / A1 versions); otherwise, for humanoids, a
+  **structural template** read off the kinematic tree (`autoConfig.ts`): legs,
+  arms, knees and elbows found by geometry (names only break ties), GMR's G1
+  rotation offsets carried over through each limb's rest direction and
+  knee / elbow axis, scales from the robot's own straight-leg length. On G1 it
+  reproduces the G1 preset exactly; on N1 / T1 it lands within 15–20° of their
+  hand-tuned presets (`tests/robots/auto_config.test.ts`). Quadrupeds use the
+  Go2 preset / template rescaled to the robot's leg length, with wheel centres
+  as feet on wheel-legged robots. Review the mapping tables before trusting the result.
+- Solver additions that apply to every robot: the floating base starts at the
+  first frame's root target (`seedRoot`), robots taller than 2 m solve in body
+  lengths (GMR's LM damping is metric), and wherever the robot's lowest point
+  dips below the floor the base is lifted, smoothed over time
+  (`liftAboveGround`). With `seedRoot` / `liftAboveGround` off the engine is plain GMR.
 - Out of scope: MJCF-only gallery cards and xacro-only upstreams; SMPL-X motion.
 - `node scripts/e2e_gallery.mjs --url http://localhost:3000` drives the flow
   (G1 → walk, Go2 → dog walk) in headless Chromium; it needs network access.
+
+### Compatibility matrix · 全量兼容性矩阵
+
+[`docs/gallery-compat/README.md`](docs/gallery-compat/README.md) is the full
+report for every gallery card and every upstream version (issue #98): offered
+rows are downloaded, compiled, mapped, retargeted on a sample clip (LAFAN1 walk
+/ dog walk), checked on the robot's own kinematics (output shape, finite values,
+joint ranges, root / feet tracking, floor penetration, floating, trunk tilt,
+joint jumps), rendered, and exported (NPZ / CSV / JSON read back). Every other
+row is listed as unsupported with its reason and what supporting it would take.
+
+```bash
+npm run dev                                       # the harness imports /src from the dev server
+node scripts/gallery_matrix.mjs --url http://localhost:3000 --concurrency 2 \
+  --explore biped --report-dir docs/gallery-compat   # ~15 min, needs network
+node scripts/gallery_matrix.mjs --only g1@g1_23dof,go2   # a few rows
+node scripts/gallery_matrix.mjs --coverage docs/gallery-compat/report.json   # gallery changed since?
+```
+
+`.github/workflows/gallery-matrix.yml` runs a representative subset on pull
+requests that touch the retarget / gallery code, and the whole matrix plus the
+coverage check every week.
+
+完整报告见 [`docs/gallery-compat/README.md`](docs/gallery-compat/README.md)：Gallery 每张卡片的每个
+URDF 版本一行；可选的逐个跑完下载 → 编译 → 映射 → 求解 → 校验 → 预览 → 导出，其余逐条登记不支持原因与后续方案。
 
 ## Quadruped retargeting · 四足机器人重定向
 
@@ -268,7 +307,7 @@ Full plan of record in **[`ROADMAP.md`](ROADMAP.md)**. Headlines:
 - [x] Phase 2 — pluggable engines: **OmniRetarget** (in-browser interaction-mesh) selectable alongside GMR
 - [x] Video → BVH input (experimental, in-browser MediaPipe pose capture)
 - [x] **Quadruped retargeting** — dog mocap (BVH) → Unitree Go2 / A1 via keypoint IK ([motion_imitation](https://github.com/erwincoumans/motion_imitation)-style)
-- [x] **Robots from [Robot Description Gallery Online](https://github.com/ImChong/Robot_Description_Gallery_Online)** — pick any humanoid / quadruped URDF in the browser, with a link back to the gallery
+- [x] **Robots from [Robot Description Gallery Online](https://github.com/ImChong/Robot_Description_Gallery_Online)** — pick any humanoid / quadruped URDF in the browser, with a link back to the gallery; [full compatibility matrix](docs/gallery-compat/README.md) over every card × version: 110 / 112 offered URDFs retarget end to end, 2 registered capability gaps (closed-loop legs, legless base)
 - [ ] More GMR robots (assets are drop-in: `public/robots/` + manifest entry)
 - [ ] [holosoma](https://github.com/amazon-far/holosoma) as a third, trajectory-level engine (heavier; backend TBD)
 - [x] **SMPL-X / AMASS input** (user-supplied body model `.npz`, in-browser) — unlocks 10 more GMR robots (H1, H1-2, Kuavo, …); GMR parity pending

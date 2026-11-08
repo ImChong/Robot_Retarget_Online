@@ -62,6 +62,20 @@ export interface SolverOptions {
    * keypoint IK on the config's targets.
    */
   quadrupedPlanner: boolean;
+  /**
+   * Start the solve with the floating base already at the first frame's root
+   * target (joints at rest) instead of at the origin. Off ⇒ plain GMR, whose
+   * first frames lag behind clips that do not start at the origin.
+   */
+  seedRoot: boolean;
+  /**
+   * After solving (not with the quadruped planner, which plants feet itself):
+   * raise the floating base wherever the robot's lowest geometry dips below
+   * the floor (z = 0), smoothed over time. GMR never enforces the floor, so a
+   * foot pitched like the human's toe can sink its heel or toe; robots that do
+   * not touch the floor are left exactly as solved.
+   */
+  liftAboveGround: boolean;
 }
 
 export const DEFAULT_SOLVER_OPTIONS: SolverOptions = {
@@ -77,6 +91,8 @@ export const DEFAULT_SOLVER_OPTIONS: SolverOptions = {
   meshWeight: 16,
   meshNeighbors: 4,
   quadrupedPlanner: true,
+  seedRoot: true,
+  liftAboveGround: true,
 };
 
 export interface RetargetResult {

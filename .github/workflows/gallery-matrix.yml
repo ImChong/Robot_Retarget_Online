@@ -1,0 +1,88 @@
+name: Gallery URDF compatibility
+
+# Robot Description Gallery Online URDFs, retargeted end to end in headless
+# Chromium (scripts/gallery_matrix.mjs, issue #98). Needs the network: the
+# robots stream from their upstream repositories through jsDelivr.
+#
+# - pull requests touching the retarget / gallery code: a representative subset
+# - weekly + on demand: the whole matrix, and a check that the committed report
+#   (docs/gallery-compat/report.json) still covers the live gallery — a new or
+#   updated URDF fails it until the matrix is re-run and the report refreshed.
+
+on:
+  pull_request:
+    paths:
+      - 'src/lib/gallery/**'
+      - 'src/lib/retarget/**'
+      - 'src/lib/mujoco/**'
+      - 'scripts/gallery_matrix.mjs'
+      - '.github/workflows/gallery-matrix.yml'
+  schedule:
+    - cron: '23 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Rows to run (robot ids or robot@version keys, comma-separated; empty = all)'
+        required: false
+        default: ''
+      explore:
+        description: 'Unsupported categories to evaluate anyway (e.g. biped)'
+        required: false
+        default: 'biped'
+
+concurrency:
+  group: gallery-matrix-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright-core install --with-deps chromium
+
+      - name: Start the dev server
+        # The harness imports the app's modules from /src, so it needs Vite's
+        # dev server at the site root (GITHUB_ACTIONS would set a Pages base).
+        run: |
+          (env -u GITHUB_ACTIONS npx vite --host 127.0.0.1 --port 3000 > vite.log 2>&1 &)
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:3000/robots/manifest.json > /dev/null && exit 0; sleep 1; done
+          cat vite.log; exit 1
+
+      - name: Coverage of the committed report
+        if: github.event_name != 'pull_request'
+        run: node scripts/gallery_matrix.mjs --url http://127.0.0.1:3000 --out gallery-out --coverage docs/gallery-compat/report.json
+
+      - name: Compatibility matrix (subset)
+        if: github.event_name == 'pull_request'
+        run: >
+          node scripts/gallery_matrix.mjs --url http://127.0.0.1:3000 --out gallery-out --concurrency 2
+          --only g1@g1_29dof_rev_1_0,g1@g1_23dof,h1,h2,booster_k1,star1,atlas_drc,go2,b2,anymal_c,mini_cheetah,go2w,minitaur
+
+      - name: Compatibility matrix (all)
+        if: always() && github.event_name != 'pull_request'
+        run: >
+          node scripts/gallery_matrix.mjs --url http://127.0.0.1:3000 --out gallery-out --concurrency 2
+          --only "${{ inputs.only }}" --explore "${{ inputs.explore || 'biped' }}"
+
+      - name: Upload report, previews and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gallery-compat
+          path: gallery-out
+          retention-days: 30
