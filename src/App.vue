@@ -32,6 +32,13 @@ const tabs = computed(() => [
     disabled: !retarget.hasHistory,
     disabledHint: t('navPreviewDisabledHint'),
   },
+  {
+    value: 'postprocess',
+    label: t('navPostProcess'),
+    step: 4,
+    disabled: !retarget.hasHistory,
+    disabledHint: t('navPostProcessDisabledHint'),
+  },
 ]);
 
 const currentTab = computed({
@@ -356,7 +363,7 @@ void locale.value;
 
 .header-nav .v-tab.v-btn {
   min-width: 0;
-  padding-inline: 16px;
+  padding-inline: 12px;
   font-family: var(--rro-font-sans);
   font-size: 0.875rem;
   font-weight: 600;
@@ -434,6 +441,8 @@ void locale.value;
 }
 
 .bottom-nav .v-btn {
+  min-width: 0;
+  padding-inline: 4px;
   border-radius: 0 !important;
   font-family: var(--rro-font-sans);
   font-size: 0.75rem;
@@ -450,12 +459,24 @@ void locale.value;
 .tab-with-step {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .tab-with-step--compact {
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  max-width: 100%;
+}
+
+.bottom-nav .tab-label {
+  font-size: 0.6875rem;
+  line-height: 1.1;
+  text-align: center;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .tab-step {

@@ -5,7 +5,7 @@ export function isPageReload(): boolean {
   return nav?.type === 'reload';
 }
 
-export type WorkflowRouteName = 'bvh' | 'config' | 'preview';
+export type WorkflowRouteName = 'bvh' | 'config' | 'preview' | 'postprocess';
 
 /** Strategy B: redirect blocked workflow steps when prerequisites are missing. */
 export function workflowRouteRedirect(
@@ -16,7 +16,7 @@ export function workflowRouteRedirect(
   if (toName === 'config' && !hasMotion) {
     return { name: 'bvh' };
   }
-  if (toName === 'preview' && !hasRetargetHistory) {
+  if ((toName === 'preview' || toName === 'postprocess') && !hasRetargetHistory) {
     return hasMotion ? { name: 'config' } : { name: 'bvh' };
   }
   return undefined;

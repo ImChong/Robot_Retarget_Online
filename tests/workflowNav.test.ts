@@ -22,6 +22,18 @@ describe('workflowRouteRedirect', () => {
     expect(workflowRouteRedirect('preview', true, true)).toBeUndefined();
   });
 
+  it('blocks postprocess without motion or history', () => {
+    expect(workflowRouteRedirect('postprocess', false, false)).toEqual({ name: 'bvh' });
+  });
+
+  it('blocks postprocess with motion but no retarget history', () => {
+    expect(workflowRouteRedirect('postprocess', true, false)).toEqual({ name: 'config' });
+  });
+
+  it('allows postprocess when retarget history exists', () => {
+    expect(workflowRouteRedirect('postprocess', true, true)).toBeUndefined();
+  });
+
   it('ignores unrelated routes', () => {
     expect(workflowRouteRedirect('bvh', false, false)).toBeUndefined();
   });

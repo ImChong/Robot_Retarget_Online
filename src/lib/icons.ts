@@ -77,6 +77,11 @@ export const icons = {
   search: ph('magnifyingGlass'),
   arrange: ph('arrowsOutCardinal'),
   snap: ph('magnetStraight'),
+  check: ph('check'),
+  checkCircle: ph('checkCircle'),
+  warning: ph('warning'),
+  info: ph('info'),
+  errorCircle: ph('xCircle'),
 } as const;
 
 /** Vuetify's internal icons, redrawn in Phosphor; anything unlisted keeps the MDI fallback. */
