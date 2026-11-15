@@ -3,7 +3,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore } from '@/stores/retarget';
 
-export type WorkflowStep = 'bvh' | 'config' | 'preview';
+export type WorkflowStep = 'bvh' | 'config' | 'preview' | 'postprocess';
 
 export function useWorkflowNav() {
   const route = useRoute();
@@ -15,6 +15,7 @@ export function useWorkflowNav() {
 
   const canGoConfig = computed(() => motion.hasMotion);
   const canGoPreview = computed(() => retarget.hasHistory);
+  const canGoPostProcess = computed(() => retarget.hasHistory);
   const showNav = computed(() => step.value === 'bvh' || step.value === 'config');
   const isLoadingRobot = computed(() => retarget.isLoadingRobot);
   const isRetargetRunning = computed(() => retarget.isRetargetRunning);
@@ -25,6 +26,14 @@ export function useWorkflowNav() {
 
   function goToBvh() {
     void router.push({ name: 'bvh' });
+  }
+
+  function goToPreview() {
+    if (canGoPreview.value) void router.push({ name: 'preview' });
+  }
+
+  function goToPostProcess() {
+    if (canGoPostProcess.value) void router.push({ name: 'postprocess' });
   }
 
   async function runRetarget() {
@@ -42,10 +51,13 @@ export function useWorkflowNav() {
     showNav,
     canGoConfig,
     canGoPreview,
+    canGoPostProcess,
     isLoadingRobot,
     isRetargetRunning,
     goToConfig,
     goToBvh,
+    goToPreview,
+    goToPostProcess,
     runRetarget,
     cancelRetarget,
   };

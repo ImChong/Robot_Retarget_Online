@@ -27,3 +27,12 @@ export function formatRetargetExportBasename(entry: RetargetHistoryEntry): strin
   const stamp = formatRetargetFilenameStamp(entry.createdAt);
   return `${base}_${entry.result.robotId}_${entry.result.engine}_${stamp}`;
 }
+
+export function formatPostProcessExportBasename(
+  entry: RetargetHistoryEntry,
+  variant: 'raw' | 'processed' | 'report',
+): string {
+  const base = formatRetargetExportBasename(entry);
+  if (variant === 'report') return `${base}_postprocess_report`;
+  return `${base}_${variant}`;
+}

@@ -9,10 +9,14 @@ const { t } = useI18n();
 const {
   step,
   canGoConfig,
+  canGoPreview,
+  canGoPostProcess,
   isLoadingRobot,
   isRetargetRunning,
   goToConfig,
   goToBvh,
+  goToPreview,
+  goToPostProcess,
   runRetarget,
   cancelRetarget,
 } = useWorkflowNav();
@@ -137,6 +141,41 @@ const runRetargetTooltip = computed(() => {
           </span>
         </template>
       </v-tooltip>
+
+      <v-tooltip :text="t('workflowToPostProcessHint')" location="bottom">
+        <template #activator="{ props: tipProps }">
+          <span v-bind="tipProps" class="workflow-nav__activator">
+            <v-btn
+              color="primary"
+              variant="flat"
+              size="small"
+              :append-icon="icons.caretRight"
+              :disabled="!canGoPostProcess"
+              @click="goToPostProcess"
+            >
+              {{ t('workflowToPostProcess') }}
+            </v-btn>
+          </span>
+        </template>
+      </v-tooltip>
+    </template>
+
+    <template v-else-if="step === 'postprocess'">
+      <v-tooltip :text="t('workflowBackPreviewHint')" location="bottom">
+        <template #activator="{ props: tipProps }">
+          <span v-bind="tipProps" class="workflow-nav__activator">
+            <v-btn
+              variant="tonal"
+              size="small"
+              :prepend-icon="icons.caretLeft"
+              :disabled="!canGoPreview"
+              @click="goToPreview"
+            >
+              {{ t('workflowBackPreview') }}
+            </v-btn>
+          </span>
+        </template>
+      </v-tooltip>
     </template>
   </div>
 </template>
@@ -148,6 +187,8 @@ const runRetargetTooltip = computed(() => {
   right: 12px;
   z-index: 6;
   display: flex;
+  flex-wrap: wrap;
+  max-width: calc(100% - 76px);
   align-items: center;
   justify-content: flex-end;
   gap: 4px;

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import * as THREE from 'three';
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
 import { icons } from '@/lib/icons';
 import { useDisplay } from 'vuetify';
 import { useI18n } from '@/i18n';
 import { useMotionStore } from '@/stores/motion';
 import { useRetargetStore } from '@/stores/retarget';
+import { prefetchPostProcessStep } from '@/lib/prefetch';
 import {
   formatRetargetExportBasename,
   formatRetargetHistoryLabel,
@@ -25,6 +27,7 @@ import { exportCsv, exportJson, exportNpz, downloadBlob } from '@/lib/export/mot
 import { isCoarsePointerDevice } from '@/lib/plotlyTouch';
 
 const { t } = useI18n();
+const router = useRouter();
 const { mdAndUp } = useDisplay();
 const motion = useMotionStore();
 const store = useRetargetStore();
@@ -112,6 +115,7 @@ async function setupResultScene() {
 
   applyFrame(playback.poseFrame.value);
   frameSmallRobot(scene.root);
+  prefetchPostProcessStep();
 }
 
 /** Pull the camera in for small robots (e.g. quadrupeds) so they aren't a speck. */
@@ -316,6 +320,16 @@ onUnmounted(() => {
             {{ t('exportJson') }}
           </v-btn>
         </div>
+
+        <v-btn
+          color="primary"
+          variant="flat"
+          :append-icon="icons.caretRight"
+          block
+          @click="router.push({ name: 'postprocess' })"
+        >
+          {{ t('workflowToPostProcess') }}
+        </v-btn>
       </template>
       <p v-else class="not-run text-body-2">
         {{ t('notRun') }}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatPostProcessExportBasename,
   formatRetargetExportBasename,
   formatRetargetFilenameStamp,
   formatRetargetHistoryLabel,
@@ -66,5 +67,12 @@ describe('historyLabel', () => {
   it('includes timestamp in export basenames', () => {
     const base = formatRetargetExportBasename(sampleEntry());
     expect(base).toMatch(/^walk_unitree_g1_gmr_\d{8}-\d{6}$/);
+  });
+
+  it('distinguishes raw, processed, and report export basenames', () => {
+    const entry = sampleEntry();
+    expect(formatPostProcessExportBasename(entry, 'raw')).toMatch(/^walk_unitree_g1_gmr_\d{8}-\d{6}_raw$/);
+    expect(formatPostProcessExportBasename(entry, 'processed')).toMatch(/^walk_unitree_g1_gmr_\d{8}-\d{6}_processed$/);
+    expect(formatPostProcessExportBasename(entry, 'report')).toMatch(/^walk_unitree_g1_gmr_\d{8}-\d{6}_postprocess_report$/);
   });
 });

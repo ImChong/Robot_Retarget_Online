@@ -57,3 +57,10 @@ export function prefetchPreviewStep() {
     ]),
   );
 }
+
+/** A retarget result exists on the preview page: post-processing is the next step. */
+export function prefetchPostProcessStep() {
+  prefetchOnce('postprocess', () =>
+    Promise.all([import('@/views/MotionPostProcessView.vue'), loadPlotly()]),
+  );
+}
